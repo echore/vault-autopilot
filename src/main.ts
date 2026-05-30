@@ -33,7 +33,13 @@ export default class VaultAutopilotPlugin extends Plugin {
 
   async loadSettings(): Promise<void> {
     const loaded = await this.loadData();
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, loaded);
+    this.settings = {
+      ...DEFAULT_SETTINGS,
+      ...loaded,
+      httpServer: { ...DEFAULT_SETTINGS.httpServer, ...(loaded?.httpServer ?? {}) },
+      rules: loaded?.rules ?? DEFAULT_SETTINGS.rules,
+      providers: loaded?.providers ?? DEFAULT_SETTINGS.providers,
+    };
   }
 
   async saveSettings(): Promise<void> {

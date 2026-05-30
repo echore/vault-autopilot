@@ -33,9 +33,12 @@ describe('createServer', () => {
   });
 
   test('OPTIONS /clip returns 204 with CORS headers', async () => {
-    const res = await fetch(`http://127.0.0.1:${PORT}/clip`, { method: 'OPTIONS' });
+    const res = await fetch(`http://127.0.0.1:${PORT}/clip`, {
+      method: 'OPTIONS',
+      headers: { 'Origin': 'chrome-extension://test' },
+    });
     expect(res.status).toBe(204);
-    expect(res.headers.get('access-control-allow-origin')).toBe('*');
+    expect(res.headers.get('access-control-allow-origin')).toBe('chrome-extension://test');
   });
 
   test('handler error returns 500', async () => {

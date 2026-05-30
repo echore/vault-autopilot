@@ -1,6 +1,14 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { AIProvider, AnalysisRequest, GeminiAPIProviderConfig } from '../types';
 
+function imageMimeType(filePath: string): string {
+  const ext = filePath.split('.').pop()?.toLowerCase() || '';
+  const map: Record<string, string> = {
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif',
+  };
+  return map[ext] ?? 'image/png';
+}
+
 export function createGeminiAPIProvider(config: GeminiAPIProviderConfig): AIProvider {
   const genAI = new GoogleGenerativeAI(config.apiKey);
 
@@ -13,7 +21,7 @@ export function createGeminiAPIProvider(config: GeminiAPIProviderConfig): AIProv
       const parts: any[] = [{ text: req.sopContent + '\n\n' + buildContext(req) }];
 
       if (req.fileType === 'image') {
-        parts.push({ inlineData: { mimeType: 'image/png', data: req.fileContent.toString('base64') } });
+        parts.push({ inlineData: { mimeType: imageMimeType(req.filePath), data: req.fileContent.toString('base64') } });
       } else {
         parts[0].text += `\n\nFile content:\n${req.fileContent.toString('utf8')}`;
       }

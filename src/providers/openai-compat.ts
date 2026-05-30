@@ -1,8 +1,10 @@
 import OpenAI from 'openai';
 import { AIProvider, AnalysisRequest, OpenAICompatProviderConfig } from '../types';
 
-function imageToDataUrl(buf: Buffer): string {
-  return `data:image/png;base64,${buf.toString('base64')}`;
+function imageToDataUrl(buf: Buffer, filePath: string): string {
+  const ext = filePath.split('.').pop()?.toLowerCase() || 'png';
+  const mime: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif' };
+  return `data:${mime[ext] ?? 'image/png'};base64,${buf.toString('base64')}`;
 }
 
 export function createOpenAICompatProvider(config: OpenAICompatProviderConfig): AIProvider {
@@ -22,7 +24,7 @@ export function createOpenAICompatProvider(config: OpenAICompatProviderConfig): 
       const userContent = req.fileType === 'image'
         ? [
             { type: 'text' as const, text: buildTextContext(req) },
-            { type: 'image_url' as const, image_url: { url: imageToDataUrl(req.fileContent) } },
+            { type: 'image_url' as const, image_url: { url: imageToDataUrl(req.fileContent, req.filePath) } },
           ]
         : buildTextContext(req);
 

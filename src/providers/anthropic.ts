@@ -1,6 +1,14 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { AIProvider, AnalysisRequest, AnthropicProviderConfig } from '../types';
 
+function imageMimeType(filePath: string): 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif' {
+  const ext = filePath.split('.').pop()?.toLowerCase() || '';
+  const map: Record<string, 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif'> = {
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif',
+  };
+  return map[ext] ?? 'image/png';
+}
+
 export function createAnthropicProvider(config: AnthropicProviderConfig): AIProvider {
   const client = new Anthropic({ apiKey: config.apiKey });
 
@@ -11,7 +19,7 @@ export function createAnthropicProvider(config: AnthropicProviderConfig): AIProv
     async analyze(req: AnalysisRequest): Promise<string> {
       const userContent: any[] = req.fileType === 'image'
         ? [
-            { type: 'image', source: { type: 'base64', media_type: 'image/png', data: req.fileContent.toString('base64') } },
+            { type: 'image', source: { type: 'base64', media_type: imageMimeType(req.filePath), data: req.fileContent.toString('base64') } },
             { type: 'text', text: buildContext(req) },
           ]
         : [{ type: 'text', text: `${buildContext(req)}\n\n${req.fileContent.toString('utf8')}` }];
