@@ -5,7 +5,7 @@ import { AnalysisRequest } from '../../src/types';
 jest.mock('child_process');
 const mockSpawn = spawn as jest.MockedFunction<typeof spawn>;
 
-function makeMockProc(stdout: string, stderr: string, code: number) {
+function makeMockProc(stdout: string, stderr: string, code: number | null, signal: string | null = null) {
   const proc: any = {
     stdout: { on: jest.fn() },
     stderr: { on: jest.fn() },
@@ -17,8 +17,8 @@ function makeMockProc(stdout: string, stderr: string, code: number) {
   proc.stderr.on.mockImplementation((ev: string, cb: (d: Buffer) => void) => {
     if (ev === 'data') cb(Buffer.from(stderr));
   });
-  proc.on.mockImplementation((ev: string, cb: (code: number) => void) => {
-    if (ev === 'close') cb(code);
+  proc.on.mockImplementation((ev: string, cb: (code: number | null, signal: string | null) => void) => {
+    if (ev === 'close') cb(code, signal);
   });
   mockSpawn.mockReturnValue(proc);
   return proc;
@@ -36,6 +36,8 @@ describe('createCLIProvider (claude)', () => {
   const provider = createCLIProvider({
     id: 'p1', type: 'cli', cliType: 'claude', bin: 'claude',
   });
+
+  beforeEach(() => mockSpawn.mockClear());
 
   test('id and name are set', () => {
     expect(provider.id).toBe('p1');
@@ -62,6 +64,26 @@ describe('createCLIProvider (claude)', () => {
   test('throws on non-zero exit', async () => {
     makeMockProc('', 'auth error', 1);
     await expect(provider.analyze(baseRequest)).rejects.toThrow('auth error');
+  });
+
+  test('throws timeout message when killed by signal', async () => {
+    makeMockProc('', '', null, 'SIGTERM');
+    await expect(provider.analyze(baseRequest)).rejects.toThrow('claude timed out after 300s');
+  });
+
+  test('throws spawn error when binary not found', async () => {
+    const proc: any = {
+      stdout: { on: jest.fn() },
+      stderr: { on: jest.fn() },
+      on: jest.fn(),
+    };
+    proc.stdout.on.mockImplementation(() => {});
+    proc.stderr.on.mockImplementation(() => {});
+    proc.on.mockImplementation((ev: string, cb: (err: Error) => void) => {
+      if (ev === 'error') cb(new Error('spawn claude ENOENT'));
+    });
+    mockSpawn.mockReturnValue(proc);
+    await expect(provider.analyze(baseRequest)).rejects.toThrow('spawn claude ENOENT');
   });
 });
 

@@ -29,7 +29,7 @@ function buildPrompt(req: AnalysisRequest): string {
 }
 
 function extractMarkdown(stdout: string): string {
-  const match = stdout.match(/```markdown\n([\s\S]*?)```/);
+  const match = stdout.match(/```markdown\r?\n([\s\S]*?)```/);
   return match ? match[1].trim() : stdout.trim();
 }
 
@@ -49,13 +49,16 @@ export function createCLIProvider(config: CLIProviderConfig): AIProvider {
         let stderr = '';
         proc.stdout.on('data', (d: Buffer) => { stdout += d.toString(); });
         proc.stderr.on('data', (d: Buffer) => { stderr += d.toString(); });
-        proc.on('close', (code) => {
-          if (code !== 0) {
+        proc.on('close', (code, signal) => {
+          if (signal) {
+            reject(new Error(`${config.cliType} timed out after 300s`));
+          } else if (code !== 0) {
             reject(new Error(stderr.trim() || `${config.cliType} exited with code ${code}`));
           } else {
             resolve(extractMarkdown(stdout));
           }
         });
+        proc.on('error', (err) => reject(err));
       });
     },
   };
