@@ -1,13 +1,14 @@
 import { spawn } from 'child_process';
 import { AIProvider, AnalysisRequest, CLIProviderConfig } from '../types';
 
-// Each CLI provider has its own non-interactive flag and prompt format.
+// Each CLI provider has its own non-interactive flags.
+// Prompt is passed via stdin to avoid special-character parsing issues with shell arguments.
 // NOTE: gemini and codex non-interactive flags verified against their CLIs at time of writing.
-// If a future CLI version changes flags, update buildArgs() here.
-const CLI_ARGS: Record<string, (prompt: string) => string[]> = {
-  claude: (p) => ['-p', p, '--allowedTools', 'Read'],
-  gemini: (p) => ['-p', p],
-  codex:  (p) => ['--prompt', p, '--quiet'],
+// If a future CLI version changes flags, update CLI_FLAGS here.
+const CLI_FLAGS: Record<string, string[]> = {
+  claude: ['-p', '--allowedTools', 'Read'],
+  gemini: ['-p'],
+  codex:  ['--quiet'],
 };
 
 function buildPrompt(req: AnalysisRequest): string {
@@ -34,8 +35,8 @@ function extractMarkdown(stdout: string): string {
 }
 
 export function createCLIProvider(config: CLIProviderConfig): AIProvider {
-  const buildArgs = CLI_ARGS[config.cliType];
-  if (!buildArgs) throw new Error(`Unknown CLI type: ${config.cliType}`);
+  const flags = CLI_FLAGS[config.cliType];
+  if (!flags) throw new Error(`Unknown CLI type: ${config.cliType}`);
 
   return {
     id: config.id,
@@ -44,11 +45,17 @@ export function createCLIProvider(config: CLIProviderConfig): AIProvider {
     analyze(req: AnalysisRequest): Promise<string> {
       return new Promise((resolve, reject) => {
         const prompt = buildPrompt(req);
-        const proc = spawn(config.bin, buildArgs(prompt), { timeout: 300_000 });
+        const proc = spawn(config.bin, flags, { timeout: 300_000 });
+
+        // Send prompt via stdin — avoids special-character parsing issues with -p argument
+        proc.stdin?.write(prompt, 'utf8');
+        proc.stdin?.end();
+
         let stdout = '';
         let stderr = '';
         proc.stdout.on('data', (d: Buffer) => { stdout += d.toString(); });
         proc.stderr.on('data', (d: Buffer) => { stderr += d.toString(); });
+        proc.on('error', (err) => reject(err));
         proc.on('close', (code, signal) => {
           if (signal) {
             reject(new Error(`${config.cliType} timed out after 300s`));
@@ -58,7 +65,6 @@ export function createCLIProvider(config: CLIProviderConfig): AIProvider {
             resolve(extractMarkdown(stdout));
           }
         });
-        proc.on('error', (err) => reject(err));
       });
     },
   };

@@ -7,6 +7,7 @@ const mockSpawn = spawn as jest.MockedFunction<typeof spawn>;
 
 function makeMockProc(stdout: string, stderr: string, code: number | null, signal: string | null = null) {
   const proc: any = {
+    stdin: { write: jest.fn(), end: jest.fn() },
     stdout: { on: jest.fn() },
     stderr: { on: jest.fn() },
     on: jest.fn(),
@@ -50,9 +51,16 @@ describe('createCLIProvider (claude)', () => {
     expect(result).toContain('# Note');
     expect(mockSpawn).toHaveBeenCalledWith(
       'claude',
-      expect.arrayContaining(['-p']),
+      ['-p', '--allowedTools', 'Read'],
       expect.objectContaining({ timeout: 300_000 }),
     );
+  });
+
+  test('writes prompt to stdin', async () => {
+    const proc = makeMockProc('output', '', 0);
+    await provider.analyze(baseRequest);
+    expect(proc.stdin.write).toHaveBeenCalled();
+    expect(proc.stdin.end).toHaveBeenCalled();
   });
 
   test('resolves with raw stdout when no markdown block', async () => {
@@ -73,6 +81,7 @@ describe('createCLIProvider (claude)', () => {
 
   test('throws spawn error when binary not found', async () => {
     const proc: any = {
+      stdin: { write: jest.fn(), end: jest.fn() },
       stdout: { on: jest.fn() },
       stderr: { on: jest.fn() },
       on: jest.fn(),
@@ -99,7 +108,7 @@ describe('createCLIProvider (gemini)', () => {
     await provider.analyze(baseRequest);
     const [bin, args] = mockSpawn.mock.calls[0];
     expect(bin).toBe('gemini');
-    expect(args).toContain('-p');
+    expect(args).toEqual(['-p']);
   });
 });
 
@@ -110,11 +119,11 @@ describe('createCLIProvider (codex)', () => {
 
   beforeEach(() => mockSpawn.mockClear());
 
-  test('uses --prompt flag', async () => {
+  test('uses --quiet flag', async () => {
     makeMockProc('codex output', '', 0);
     await provider.analyze(baseRequest);
     const [bin, args] = mockSpawn.mock.calls[0];
     expect(bin).toBe('codex');
-    expect(args).toContain('--prompt');
+    expect(args).toEqual(['--quiet']);
   });
 });
