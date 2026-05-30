@@ -1,0 +1,9 @@
+{
+  "id": "vault-autopilot",
+  "name": "Vault Autopilot",
+  "version": "0.1.0",
+  "minAppVersion": "1.4.0",
+  "description": "Watch folders for new files, run AI analysis via any provider, write structured notes.",
+  "author": "liyachen",
+  "isDesktopOnly": true
+}

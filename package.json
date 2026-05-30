@@ -1,0 +1,23 @@
+{
+  "name": "vault-autopilot",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc --noEmit --skipLibCheck && node esbuild.config.mjs production",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.26.0",
+    "@google/generative-ai": "^0.15.0",
+    "openai": "^4.52.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "esbuild": "0.21.3",
+    "obsidian": "latest",
+    "ts-jest": "^29.1.0",
+    "typescript": "5.4.5"
+  }
+}
