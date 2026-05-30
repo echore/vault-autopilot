@@ -73,7 +73,6 @@ export interface WatchRule {
 export interface HttpServerSettings {
   enabled: boolean;
   port: number;
-  token: string;          // auto-generated on first load, never shown in plain text in logs
 }
 
 export interface PluginSettings {
