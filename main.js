@@ -17586,18 +17586,19 @@ var VaultAutopilotPlugin = class extends import_obsidian3.Plugin {
     this.server = null;
   }
   async loadSettings() {
-    var _a3, _b, _c, _d, _e2, _f, _g;
+    var _a3, _b, _c, _d, _e2, _f, _g, _h, _i;
     const loaded = await this.loadData();
     this.settings = {
       ...DEFAULT_SETTINGS,
       ...loaded,
       httpServer: { ...DEFAULT_SETTINGS.httpServer, ...(_a3 = loaded == null ? void 0 : loaded.httpServer) != null ? _a3 : {} },
       clipRules: {
-        hook: { ...DEFAULT_SETTINGS.clipRules.hook, ...(_c = (_b = loaded == null ? void 0 : loaded.clipRules) == null ? void 0 : _b.hook) != null ? _c : {} },
-        keyframe: { ...DEFAULT_SETTINGS.clipRules.keyframe, ...(_e2 = (_d = loaded == null ? void 0 : loaded.clipRules) == null ? void 0 : _d.keyframe) != null ? _e2 : {} }
+        screenshot: { ...DEFAULT_SETTINGS.clipRules.screenshot, ...(_c = (_b = loaded == null ? void 0 : loaded.clipRules) == null ? void 0 : _b.screenshot) != null ? _c : {} },
+        hook: { ...DEFAULT_SETTINGS.clipRules.hook, ...(_e2 = (_d = loaded == null ? void 0 : loaded.clipRules) == null ? void 0 : _d.hook) != null ? _e2 : {} },
+        keyframe: { ...DEFAULT_SETTINGS.clipRules.keyframe, ...(_g = (_f = loaded == null ? void 0 : loaded.clipRules) == null ? void 0 : _f.keyframe) != null ? _g : {} }
       },
-      rules: (_f = loaded == null ? void 0 : loaded.rules) != null ? _f : DEFAULT_SETTINGS.rules,
-      providers: (_g = loaded == null ? void 0 : loaded.providers) != null ? _g : DEFAULT_SETTINGS.providers
+      rules: (_h = loaded == null ? void 0 : loaded.rules) != null ? _h : DEFAULT_SETTINGS.rules,
+      providers: (_i = loaded == null ? void 0 : loaded.providers) != null ? _i : DEFAULT_SETTINGS.providers
     };
   }
   async saveSettings() {

@@ -43,6 +43,7 @@ export default class VaultAutopilotPlugin extends Plugin {
       ...loaded,
       httpServer: { ...DEFAULT_SETTINGS.httpServer, ...(loaded?.httpServer ?? {}) },
       clipRules: {
+        screenshot: { ...DEFAULT_SETTINGS.clipRules.screenshot, ...(loaded?.clipRules?.screenshot ?? {}) },
         hook: { ...DEFAULT_SETTINGS.clipRules.hook, ...(loaded?.clipRules?.hook ?? {}) },
         keyframe: { ...DEFAULT_SETTINGS.clipRules.keyframe, ...(loaded?.clipRules?.keyframe ?? {}) },
       },
