@@ -6525,6 +6525,7 @@ var VaultAutopilotSettingTab = class extends import_obsidian.PluginSettingTab {
       new import_obsidian.Setting(containerEl).setName("Processing mode").setDesc("Auto: vault-autopilot calls AI and writes the note. Manual: saves frames + template, you trigger analysis in Obsidian.").addDropdown((d2) => d2.addOption("manual", "Manual (save frames + template)").addOption("auto", "Auto (call AI provider)").setValue(this.plugin.settings.clipRules[mode].processingMode).onChange(async (v2) => {
         this.plugin.settings.clipRules[mode].processingMode = v2;
         await this.plugin.saveSettings();
+        this.display();
       }));
       new import_obsidian.Setting(containerEl).setName("Max frames to save").setDesc("How many frames to sample and save (1\u201320). Default: 5.").addText((t2) => t2.setValue(String(this.plugin.settings.clipRules[mode].maxFrames)).onChange(async (v2) => {
         const n2 = parseInt(v2, 10);
@@ -6545,15 +6546,17 @@ var VaultAutopilotSettingTab = class extends import_obsidian.PluginSettingTab {
         this.plugin.settings.clipRules[mode].outputFolder = v2.trim();
         await this.plugin.saveSettings();
       }));
-      new import_obsidian.Setting(containerEl).setName("Provider").setDesc("Must be an API provider (Anthropic, OpenAI-compatible, or Gemini).").addDropdown((d2) => {
-        this.plugin.settings.providers.forEach(
-          (p2) => d2.addOption(p2.id, p2.type === "cli" ? `CLI: ${p2.cliType}` : p2.label || p2.type)
-        );
-        d2.setValue(this.plugin.settings.clipRules[mode].providerId).onChange(async (v2) => {
-          this.plugin.settings.clipRules[mode].providerId = v2;
-          await this.plugin.saveSettings();
+      if (this.plugin.settings.clipRules[mode].processingMode === "auto") {
+        new import_obsidian.Setting(containerEl).setName("Provider").setDesc("Must be an API provider (Anthropic, OpenAI-compatible, or Gemini).").addDropdown((d2) => {
+          this.plugin.settings.providers.forEach(
+            (p2) => d2.addOption(p2.id, p2.type === "cli" ? `CLI: ${p2.cliType}` : p2.label || p2.type)
+          );
+          d2.setValue(this.plugin.settings.clipRules[mode].providerId).onChange(async (v2) => {
+            this.plugin.settings.clipRules[mode].providerId = v2;
+            await this.plugin.saveSettings();
+          });
         });
-      });
+      }
     }
   }
   renderScreenshotClipRule(el) {
@@ -6561,6 +6564,7 @@ var VaultAutopilotSettingTab = class extends import_obsidian.PluginSettingTab {
     new import_obsidian.Setting(el).setName("Processing mode").setDesc("Auto: vault-autopilot calls AI and writes the note. Manual: saves images + template, you trigger analysis in Obsidian.").addDropdown((d2) => d2.addOption("manual", "Manual (save images + template)").addOption("auto", "Auto (call AI provider)").setValue(rule.processingMode).onChange(async (v2) => {
       this.plugin.settings.clipRules.screenshot.processingMode = v2;
       await this.plugin.saveSettings();
+      this.display();
     }));
     new import_obsidian.Setting(el).setName("Frames folder").setDesc("Vault-relative path where screenshot images are saved. Default: Assets/images").addText((t2) => t2.setValue(rule.framesFolder).onChange(async (v2) => {
       this.plugin.settings.clipRules.screenshot.framesFolder = v2.trim();
@@ -6574,15 +6578,17 @@ var VaultAutopilotSettingTab = class extends import_obsidian.PluginSettingTab {
       this.plugin.settings.clipRules.screenshot.outputFolder = v2.trim();
       await this.plugin.saveSettings();
     }));
-    new import_obsidian.Setting(el).setName("Provider").setDesc("Must be an API provider (Anthropic, OpenAI-compatible, or Gemini).").addDropdown((d2) => {
-      this.plugin.settings.providers.forEach(
-        (p2) => d2.addOption(p2.id, p2.type === "cli" ? `CLI: ${p2.cliType}` : p2.label || p2.type)
-      );
-      d2.setValue(rule.providerId).onChange(async (v2) => {
-        this.plugin.settings.clipRules.screenshot.providerId = v2;
-        await this.plugin.saveSettings();
+    if (rule.processingMode === "auto") {
+      new import_obsidian.Setting(el).setName("Provider").setDesc("Must be an API provider (Anthropic, OpenAI-compatible, or Gemini).").addDropdown((d2) => {
+        this.plugin.settings.providers.forEach(
+          (p2) => d2.addOption(p2.id, p2.type === "cli" ? `CLI: ${p2.cliType}` : p2.label || p2.type)
+        );
+        d2.setValue(rule.providerId).onChange(async (v2) => {
+          this.plugin.settings.clipRules.screenshot.providerId = v2;
+          await this.plugin.saveSettings();
+        });
       });
-    });
+    }
   }
   renderProvider(el, prov, i2) {
     const label = prov.type === "cli" ? `CLI: ${prov.cliType}` : prov.type === "openai-compat" ? `API: ${prov.label}` : `API: ${prov.type}`;

@@ -118,6 +118,7 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
           .onChange(async v => {
             this.plugin.settings.clipRules[mode].processingMode = v as 'auto' | 'manual';
             await this.plugin.saveSettings();
+            this.display();
           }));
       new Setting(containerEl)
         .setName('Max frames to save')
@@ -158,19 +159,21 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
             this.plugin.settings.clipRules[mode].outputFolder = v.trim();
             await this.plugin.saveSettings();
           }));
-      new Setting(containerEl)
-        .setName('Provider')
-        .setDesc('Must be an API provider (Anthropic, OpenAI-compatible, or Gemini).')
-        .addDropdown(d => {
-          this.plugin.settings.providers.forEach(p =>
-            d.addOption(p.id, p.type === 'cli' ? `CLI: ${(p as any).cliType}` : (p as any).label || p.type)
-          );
-          d.setValue(this.plugin.settings.clipRules[mode].providerId)
-            .onChange(async v => {
-              this.plugin.settings.clipRules[mode].providerId = v;
-              await this.plugin.saveSettings();
-            });
-        });
+      if (this.plugin.settings.clipRules[mode].processingMode === 'auto') {
+        new Setting(containerEl)
+          .setName('Provider')
+          .setDesc('Must be an API provider (Anthropic, OpenAI-compatible, or Gemini).')
+          .addDropdown(d => {
+            this.plugin.settings.providers.forEach(p =>
+              d.addOption(p.id, p.type === 'cli' ? `CLI: ${(p as any).cliType}` : (p as any).label || p.type)
+            );
+            d.setValue(this.plugin.settings.clipRules[mode].providerId)
+              .onChange(async v => {
+                this.plugin.settings.clipRules[mode].providerId = v;
+                await this.plugin.saveSettings();
+              });
+          });
+      }
     }
   }
 
@@ -186,6 +189,7 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
         .onChange(async v => {
           this.plugin.settings.clipRules.screenshot.processingMode = v as 'auto' | 'manual';
           await this.plugin.saveSettings();
+          this.display();
         }));
     new Setting(el)
       .setName('Frames folder')
@@ -214,19 +218,21 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
           this.plugin.settings.clipRules.screenshot.outputFolder = v.trim();
           await this.plugin.saveSettings();
         }));
-    new Setting(el)
-      .setName('Provider')
-      .setDesc('Must be an API provider (Anthropic, OpenAI-compatible, or Gemini).')
-      .addDropdown(d => {
-        this.plugin.settings.providers.forEach(p =>
-          d.addOption(p.id, p.type === 'cli' ? `CLI: ${(p as any).cliType}` : (p as any).label || p.type)
-        );
-        d.setValue(rule.providerId)
-          .onChange(async v => {
-            this.plugin.settings.clipRules.screenshot.providerId = v;
-            await this.plugin.saveSettings();
-          });
-      });
+    if (rule.processingMode === 'auto') {
+      new Setting(el)
+        .setName('Provider')
+        .setDesc('Must be an API provider (Anthropic, OpenAI-compatible, or Gemini).')
+        .addDropdown(d => {
+          this.plugin.settings.providers.forEach(p =>
+            d.addOption(p.id, p.type === 'cli' ? `CLI: ${(p as any).cliType}` : (p as any).label || p.type)
+          );
+          d.setValue(rule.providerId)
+            .onChange(async v => {
+              this.plugin.settings.clipRules.screenshot.providerId = v;
+              await this.plugin.saveSettings();
+            });
+        });
+    }
   }
 
   private renderProvider(el: HTMLElement, prov: ProviderConfig, i: number): void {
