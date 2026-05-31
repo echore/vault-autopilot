@@ -1,7 +1,7 @@
 import * as crypto from 'crypto';
 import { App, Notice, PluginSettingTab, Setting } from 'obsidian';
 import type VaultAutopilotPlugin from './main';
-import { PluginSettings, ProviderConfig, WatchRule } from './types';
+import { PluginSettings, ProviderConfig, ScreenshotClipRule, WatchRule } from './types';
 
 export const DEFAULT_SETTINGS: PluginSettings = {
   rules: [],
@@ -11,6 +11,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
     port: 27183,
   },
   clipRules: {
+    screenshot: { sopPath: '', outputFolder: '', providerId: '', processingMode: 'manual', framesFolder: 'Assets/images' },
     hook: { sopPath: '', outputFolder: '', providerId: '', processingMode: 'manual', maxFrames: 5, framesFolder: 'Assets/images' },
     keyframe: { sopPath: '', outputFolder: '', providerId: '', processingMode: 'manual', maxFrames: 5, framesFolder: 'Assets/images' },
   },
@@ -100,9 +101,9 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
 
     // ── Clip Rules ──────────────────────────────────────────────────────────────
     new Setting(containerEl).setName('Clip Rules').setHeading();
-    new Setting(containerEl)
-      .setName('Screenshot')
-      .setDesc('Uses the first enabled Watch Rule above (watchFolder + provider + SOP).');
+
+    new Setting(containerEl).setName('Screenshot').setHeading();
+    this.renderScreenshotClipRule(containerEl);
 
     for (const mode of ['hook', 'keyframe'] as const) {
       const label = mode === 'hook' ? 'Hook Analysis' : 'Keyframe Analysis';
@@ -171,6 +172,61 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
             });
         });
     }
+  }
+
+  private renderScreenshotClipRule(el: HTMLElement): void {
+    const rule: ScreenshotClipRule = this.plugin.settings.clipRules.screenshot;
+    new Setting(el)
+      .setName('Processing mode')
+      .setDesc('Auto: vault-autopilot calls AI and writes the note. Manual: saves images + template, you trigger analysis in Obsidian.')
+      .addDropdown(d => d
+        .addOption('manual', 'Manual (save images + template)')
+        .addOption('auto', 'Auto (call AI provider)')
+        .setValue(rule.processingMode)
+        .onChange(async v => {
+          this.plugin.settings.clipRules.screenshot.processingMode = v as 'auto' | 'manual';
+          await this.plugin.saveSettings();
+        }));
+    new Setting(el)
+      .setName('Frames folder')
+      .setDesc('Vault-relative path where screenshot images are saved. Default: Assets/images')
+      .addText(t => t
+        .setValue(rule.framesFolder)
+        .onChange(async v => {
+          this.plugin.settings.clipRules.screenshot.framesFolder = v.trim();
+          await this.plugin.saveSettings();
+        }));
+    new Setting(el)
+      .setName('SOP / prompt path')
+      .setDesc('Absolute path to the markdown SOP file.')
+      .addText(t => t
+        .setValue(rule.sopPath)
+        .onChange(async v => {
+          this.plugin.settings.clipRules.screenshot.sopPath = v.trim();
+          await this.plugin.saveSettings();
+        }));
+    new Setting(el)
+      .setName('Output folder')
+      .setDesc('Vault-relative path. e.g. Notes/Screenshots')
+      .addText(t => t
+        .setValue(rule.outputFolder)
+        .onChange(async v => {
+          this.plugin.settings.clipRules.screenshot.outputFolder = v.trim();
+          await this.plugin.saveSettings();
+        }));
+    new Setting(el)
+      .setName('Provider')
+      .setDesc('Must be an API provider (Anthropic, OpenAI-compatible, or Gemini).')
+      .addDropdown(d => {
+        this.plugin.settings.providers.forEach(p =>
+          d.addOption(p.id, p.type === 'cli' ? `CLI: ${(p as any).cliType}` : (p as any).label || p.type)
+        );
+        d.setValue(rule.providerId)
+          .onChange(async v => {
+            this.plugin.settings.clipRules.screenshot.providerId = v;
+            await this.plugin.saveSettings();
+          });
+      });
   }
 
   private renderProvider(el: HTMLElement, prov: ProviderConfig, i: number): void {

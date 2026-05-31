@@ -99,6 +99,14 @@ export interface ClipRule {
   framesFolder: string;  // vault-relative path for frame PNGs (e.g. "Assets/images")
 }
 
+export interface ScreenshotClipRule {
+  sopPath: string;
+  outputFolder: string;
+  providerId: string;
+  processingMode: 'auto' | 'manual';
+  framesFolder: string;
+}
+
 // ── Plugin settings ───────────────────────────────────────────────────────────
 
 export interface HttpServerSettings {
@@ -111,6 +119,7 @@ export interface PluginSettings {
   providers: ProviderConfig[];
   httpServer: HttpServerSettings;
   clipRules: {
+    screenshot: ScreenshotClipRule;
     hook: ClipRule;
     keyframe: ClipRule;
   };

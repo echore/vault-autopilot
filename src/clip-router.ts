@@ -1,5 +1,5 @@
 import { ClipPayload, HookPayload, KeyframePayload, LegacyClipPayload, ScreenshotPayload } from './server';
-import { AIProvider, ClipRule, isMultiFrameProvider, MultiFrameRequest, PluginSettings, WatchRule } from './types';
+import { AIProvider, ClipRule, isMultiFrameProvider, MultiFrameRequest, PluginSettings, ScreenshotClipRule, WatchRule } from './types';
 import { postProcessMarkdown, sanitize, buildVideoEmbed } from './util';
 
 export interface VaultOps {
@@ -17,13 +17,12 @@ export async function routeClip(
   vaultOps: VaultOps,
 ): Promise<void> {
   if (isLegacy(payload)) {
-    return handleScreenshot(
-      { mode: 'screenshot', image: payload.image_base64, url: payload.source_url, title: payload.title },
-      watchRules,
-      vaultOps,
-    );
+    return handleLegacyScreenshot(payload, watchRules, vaultOps);
   }
-  if (payload.mode === 'screenshot') return handleScreenshot(payload, watchRules, vaultOps);
+  if (payload.mode === 'screenshot') {
+    const normalized = normalizeScreenshot(payload);
+    return handleScreenshot(normalized, providers, clipRules.screenshot, vaultOps);
+  }
   if (payload.mode === 'hook') return handleMultiFrame(payload, providers, clipRules.hook, vaultOps);
   if (payload.mode === 'keyframe') return handleMultiFrame(payload, providers, clipRules.keyframe, vaultOps);
   throw new Error('Unknown clip mode');
@@ -33,8 +32,15 @@ function isLegacy(p: ClipPayload): p is LegacyClipPayload {
   return 'image_base64' in p;
 }
 
-async function handleScreenshot(
-  payload: ScreenshotPayload,
+function normalizeScreenshot(payload: ScreenshotPayload & { image?: string }): ScreenshotPayload {
+  if (!payload.images && payload.image) {
+    return { ...payload, images: [payload.image] };
+  }
+  return payload;
+}
+
+async function handleLegacyScreenshot(
+  payload: LegacyClipPayload,
   watchRules: WatchRule[],
   vaultOps: VaultOps,
 ): Promise<void> {
@@ -44,10 +50,74 @@ async function handleScreenshot(
   await vaultOps.ensureFolder(rule.watchFolder);
   await vaultOps.create(
     `${rule.watchFolder}/${stem}.meta.json`,
-    JSON.stringify({ source_url: payload.url, title: payload.title }),
+    JSON.stringify({ source_url: payload.source_url, title: payload.title }),
   );
-  const bytes = Buffer.from(payload.image, 'base64');
+  const bytes = Buffer.from(payload.image_base64, 'base64');
   await vaultOps.createBinary(`${rule.watchFolder}/${stem}.png`, bytes.buffer as ArrayBuffer);
+}
+
+function buildScreenshotTemplate(payload: ScreenshotPayload, imageNames: string[]): string {
+  const imageLines = imageNames.map((n) => `> ![[${n}]]`).join('\n');
+  return [
+    `# Screenshot — ${payload.title}`,
+    ``,
+    `来源：${payload.url}`,
+    ``,
+    `> [!NOTE] 截图`,
+    imageLines,
+    ``,
+    `---`,
+    ``,
+    `## 笔记`,
+    ``,
+  ].join('\n');
+}
+
+async function handleScreenshot(
+  payload: ScreenshotPayload,
+  providers: Map<string, AIProvider>,
+  rule: ScreenshotClipRule,
+  vaultOps: VaultOps,
+): Promise<void> {
+  const stem = `screenshot-${sanitize(payload.title)}-${Date.now()}`;
+  const framesDir = rule.framesFolder || rule.outputFolder;
+  await vaultOps.ensureFolder(framesDir);
+  await vaultOps.ensureFolder(rule.outputFolder);
+
+  const imageNames: string[] = [];
+  for (let i = 0; i < payload.images.length; i++) {
+    const name = `${stem}-${String(i + 1).padStart(2, '0')}.png`;
+    const bytes = Buffer.from(payload.images[i], 'base64');
+    await vaultOps.createBinary(`${framesDir}/${name}`, bytes.buffer as ArrayBuffer);
+    imageNames.push(name);
+  }
+
+  if (rule.processingMode === 'manual') {
+    const template = buildScreenshotTemplate(payload, imageNames);
+    await vaultOps.create(`${rule.outputFolder}/${stem}.md`, template);
+    return;
+  }
+
+  if (!rule.sopPath || !rule.outputFolder || !rule.providerId) {
+    throw new Error('Screenshot clip rule is not configured');
+  }
+  const provider = providers.get(rule.providerId);
+  if (!provider) throw new Error(`Provider "${rule.providerId}" not found`);
+  if (!isMultiFrameProvider(provider)) {
+    throw new Error(
+      `Provider "${provider.name}" does not support multi-frame analysis. ` +
+      `Use an API provider (Anthropic, OpenAI-compatible, or Gemini).`,
+    );
+  }
+  const frames = payload.images.map((img) => Buffer.from(img, 'base64'));
+  const sopContent = vaultOps.readFileSync(rule.sopPath);
+  const result = await provider.analyzeMultiFrame({
+    frames,
+    sopContent,
+    meta: { url: payload.url },
+  });
+  const markdown = postProcessMarkdown(result);
+  await vaultOps.create(`${rule.outputFolder}/${stem}.md`, markdown);
 }
 
 function sampleFrames(frames: string[], max: number): string[] {

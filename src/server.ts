@@ -8,7 +8,7 @@ export type LegacyClipPayload = {
 
 export type ScreenshotPayload = {
   mode: 'screenshot';
-  image: string;
+  images: string[];
   url: string;
   title: string;
 };

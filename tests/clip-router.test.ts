@@ -1,5 +1,5 @@
 import { routeClip, VaultOps } from '../src/clip-router';
-import { AIProvider, ClipRule, WatchRule, isMultiFrameProvider } from '../src/types';
+import { AIProvider, ClipRule, ScreenshotClipRule, WatchRule, isMultiFrameProvider } from '../src/types';
 import { ClipPayload } from '../src/server';
 
 function makeMultiFrameProvider(id = 'p1') {
@@ -30,6 +30,10 @@ const enabledWatchRule: WatchRule = {
   outputFolder: 'Notes', providerId: 'p1',
 };
 
+const screenshotClipRule: ScreenshotClipRule = {
+  sopPath: '/ss-sop.md', outputFolder: 'Screenshots', providerId: 'p1',
+  processingMode: 'manual', framesFolder: 'Assets/images',
+};
 const hookClipRule: ClipRule = {
   sopPath: '/hook-sop.md', outputFolder: 'Hooks', providerId: 'p1',
   processingMode: 'auto', maxFrames: 5, framesFolder: 'Assets/images',
@@ -38,7 +42,7 @@ const keyframeClipRule: ClipRule = {
   sopPath: '/kf-sop.md', outputFolder: 'Keyframes', providerId: 'p1',
   processingMode: 'auto', maxFrames: 5, framesFolder: 'Assets/images',
 };
-const clipRules = { hook: hookClipRule, keyframe: keyframeClipRule };
+const clipRules = { screenshot: screenshotClipRule, hook: hookClipRule, keyframe: keyframeClipRule };
 
 // ── isMultiFrameProvider ──────────────────────────────────────────────────────
 
@@ -80,22 +84,69 @@ describe('routeClip — legacy format', () => {
 // ── screenshot ────────────────────────────────────────────────────────────────
 
 describe('routeClip — screenshot', () => {
-  test('saves new-format screenshot image and meta to watchRule folder', async () => {
+  test('manual: saves images to framesFolder and creates template note', async () => {
     const vaultOps = makeVaultOps();
     const payload: ClipPayload = {
       mode: 'screenshot',
-      image: Buffer.from('pixels').toString('base64'),
+      images: [Buffer.from('pixels').toString('base64'), Buffer.from('pixels2').toString('base64')],
       url: 'https://x.com',
       title: 'My Screenshot',
     };
-    await routeClip(payload, new Map(), clipRules, [enabledWatchRule], vaultOps);
+    await routeClip(payload, new Map(), clipRules, [], vaultOps);
+    expect(vaultOps.createBinary).toHaveBeenCalledTimes(2);
     expect(vaultOps.createBinary).toHaveBeenCalledWith(
-      expect.stringContaining('Inbox/'),
+      expect.stringContaining('Assets/images/'),
       expect.any(ArrayBuffer),
     );
     expect(vaultOps.create).toHaveBeenCalledWith(
-      expect.stringContaining('.meta.json'),
-      expect.stringContaining('"title":"My Screenshot"'),
+      expect.stringMatching(/Screenshots\/screenshot-.+\.md/),
+      expect.stringContaining('# Screenshot — My Screenshot'),
+    );
+    expect(vaultOps.create).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.stringContaining('![['),
+    );
+  });
+
+  test('auto: saves images then calls analyzeMultiFrame', async () => {
+    const provider = makeMultiFrameProvider('p1');
+    const providers = new Map<string, AIProvider>([['p1', provider as any]]);
+    const vaultOps = makeVaultOps();
+    const autoRule: ScreenshotClipRule = { ...screenshotClipRule, processingMode: 'auto' };
+    const payload: ClipPayload = {
+      mode: 'screenshot',
+      images: [Buffer.from('pixels').toString('base64')],
+      url: 'https://x.com',
+      title: 'Auto Shot',
+    };
+    await routeClip(payload, providers, { ...clipRules, screenshot: autoRule }, [], vaultOps);
+    expect(vaultOps.createBinary).toHaveBeenCalledWith(
+      expect.stringContaining('Assets/images/'),
+      expect.any(ArrayBuffer),
+    );
+    expect(provider.analyzeMultiFrame).toHaveBeenCalledWith(expect.objectContaining({
+      frames: [Buffer.from('pixels')],
+      sopContent: '# SOP\nAnalyze this.',
+    }));
+    expect(vaultOps.create).toHaveBeenCalledWith(
+      expect.stringMatching(/Screenshots\/screenshot-.+\.md/),
+      expect.any(String),
+    );
+  });
+
+  test('backward compat: old image field is normalized to images array', async () => {
+    const vaultOps = makeVaultOps();
+    const payload = {
+      mode: 'screenshot' as const,
+      image: Buffer.from('pixels').toString('base64'),
+      url: 'https://x.com',
+      title: 'Old Format',
+    } as unknown as ClipPayload;
+    await routeClip(payload, new Map(), clipRules, [], vaultOps);
+    expect(vaultOps.createBinary).toHaveBeenCalledTimes(1);
+    expect(vaultOps.create).toHaveBeenCalledWith(
+      expect.stringMatching(/Screenshots\/screenshot-.+\.md/),
+      expect.stringContaining('# Screenshot — Old Format'),
     );
   });
 });
@@ -129,7 +180,7 @@ describe('routeClip — hook', () => {
 
   test('throws when hook clip rule has no sopPath configured', async () => {
     const vaultOps = makeVaultOps();
-    const emptyRules = { hook: { sopPath: '', outputFolder: 'Hooks', providerId: 'p1', processingMode: 'auto' as const, maxFrames: 5, framesFolder: 'Assets/images' }, keyframe: keyframeClipRule };
+    const emptyRules = { screenshot: screenshotClipRule, hook: { sopPath: '', outputFolder: 'Hooks', providerId: 'p1', processingMode: 'auto' as const, maxFrames: 5, framesFolder: 'Assets/images' }, keyframe: keyframeClipRule };
     const payload: ClipPayload = {
       mode: 'hook', frames: [Buffer.from('f').toString('base64')],
       video_title: 'V', url: 'https://yt.com', captured_at: '2026-05-30T18:00:00Z',
@@ -190,7 +241,7 @@ describe('routeClip — keyframe', () => {
       time_range: { start: 0, end: 15 },
       captured_at: '2026-05-30T18:00:00Z',
     };
-    await routeClip(payload, providers, { hook: hookClipRule, keyframe: keyframeClipRule }, [enabledWatchRule], vaultOps);
+    await routeClip(payload, providers, { screenshot: screenshotClipRule, hook: hookClipRule, keyframe: keyframeClipRule }, [enabledWatchRule], vaultOps);
     expect(provider.analyzeMultiFrame).toHaveBeenCalledWith(expect.objectContaining({
       transcript: undefined,
       meta: expect.objectContaining({ time_range: { start: 0, end: 15 } }),
@@ -209,7 +260,7 @@ describe('routeClip — manual mode (hook)', () => {
     sopPath: '', outputFolder: 'Hooks', providerId: '',
     processingMode: 'manual', maxFrames: 3, framesFolder: 'Assets/images',
   };
-  const manualClipRules = { hook: manualHookRule, keyframe: keyframeClipRule };
+  const manualClipRules = { screenshot: screenshotClipRule, hook: manualHookRule, keyframe: keyframeClipRule };
 
   test('saves sampled frames as PNG files', async () => {
     const vaultOps = makeVaultOps();
@@ -265,7 +316,7 @@ describe('routeClip — manual mode (keyframe)', () => {
     sopPath: '', outputFolder: 'Keyframes', providerId: '',
     processingMode: 'manual', maxFrames: 5, framesFolder: 'Assets/images',
   };
-  const manualClipRules = { hook: hookClipRule, keyframe: manualKeyframeRule };
+  const manualClipRules = { screenshot: screenshotClipRule, hook: hookClipRule, keyframe: manualKeyframeRule };
 
   test('writes keyframe template with time range in title and jump link', async () => {
     const vaultOps = makeVaultOps();

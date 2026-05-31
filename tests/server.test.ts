@@ -54,7 +54,7 @@ describe('createServer', () => {
   });
 
   test('POST /clip with new screenshot payload calls handler', async () => {
-    const payload = { mode: 'screenshot', image: 'abc', url: 'https://x.com', title: 'Test' };
+    const payload = { mode: 'screenshot', images: ['abc'], url: 'https://x.com', title: 'Test' };
     const { status, body } = await request('POST', '/clip', payload);
     expect(status).toBe(200);
     expect(body).toEqual({ success: true });
