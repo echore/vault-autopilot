@@ -158,14 +158,14 @@ function buildManualTemplate(
     `> `,
     `> ---`,
     `> **完成后执行：**`,
-    `> - [ ] 帧已阅，分析已写入笔记`,
+    `> - [ ] 按 SOP 完成分析，填入各章节`,
     `> - [ ] 删除此整个帧块`,
     `> - [ ] 删除 framesFolder 中对应的图片文件`,
   ].join('\n');
 
   if (payload.mode === 'hook') {
-    const transcriptLine = payload.transcript
-      ? `>\n> **字幕**\n> ${payload.transcript}`
+    const transcriptSection = payload.transcript
+      ? `\n## 字幕\n\n${payload.transcript}\n`
       : '';
     const durationSuffix = payload.time_range ? ` [${payload.time_range.start}s–${payload.time_range.end}s]` : '';
     const durationLabel = payload.time_range ? ` | ${payload.time_range.end}s Hook` : '';
@@ -178,13 +178,13 @@ function buildManualTemplate(
       ``,
       `> [!NOTE] 分析用帧`,
       frameLines,
-      transcriptLine,
       frameChecklist,
       ``,
     ];
     if (sopContent) parts.push(sopBlock(sopContent), ``);
+    parts.push(`---`, ``);
+    if (transcriptSection) parts.push(transcriptSection);
     parts.push(
-      `---`, ``,
       `## Hook 类型`, ``,
       `## 具体手法`, ``,
       `## 为什么有效`, ``,

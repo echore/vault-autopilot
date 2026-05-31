@@ -17455,14 +17455,16 @@ function buildManualTemplate(payload, frameNames, sopContent) {
     `> `,
     `> ---`,
     `> **\u5B8C\u6210\u540E\u6267\u884C\uFF1A**`,
-    `> - [ ] \u5E27\u5DF2\u9605\uFF0C\u5206\u6790\u5DF2\u5199\u5165\u7B14\u8BB0`,
+    `> - [ ] \u6309 SOP \u5B8C\u6210\u5206\u6790\uFF0C\u586B\u5165\u5404\u7AE0\u8282`,
     `> - [ ] \u5220\u9664\u6B64\u6574\u4E2A\u5E27\u5757`,
     `> - [ ] \u5220\u9664 framesFolder \u4E2D\u5BF9\u5E94\u7684\u56FE\u7247\u6587\u4EF6`
   ].join("\n");
   if (payload.mode === "hook") {
-    const transcriptLine = payload.transcript ? `>
-> **\u5B57\u5E55**
-> ${payload.transcript}` : "";
+    const transcriptSection = payload.transcript ? `
+## \u5B57\u5E55
+
+${payload.transcript}
+` : "";
     const durationSuffix = payload.time_range ? ` [${payload.time_range.start}s\u2013${payload.time_range.end}s]` : "";
     const durationLabel = payload.time_range ? ` | ${payload.time_range.end}s Hook` : "";
     const parts = [
@@ -17474,14 +17476,13 @@ function buildManualTemplate(payload, frameNames, sopContent) {
       ``,
       `> [!NOTE] \u5206\u6790\u7528\u5E27`,
       frameLines,
-      transcriptLine,
       frameChecklist,
       ``
     ];
     if (sopContent) parts.push(sopBlock(sopContent), ``);
+    parts.push(`---`, ``);
+    if (transcriptSection) parts.push(transcriptSection);
     parts.push(
-      `---`,
-      ``,
       `## Hook \u7C7B\u578B`,
       ``,
       `## \u5177\u4F53\u624B\u6CD5`,
