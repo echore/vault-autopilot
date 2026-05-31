@@ -123,6 +123,9 @@ async function handleThumbnail(
   rule: ThumbnailClipRule,
   vaultOps: VaultOps,
 ): Promise<void> {
+  if (!rule.outputFolder || !rule.thumbnailFolder) {
+    throw new Error('Thumbnail output folder or thumbnail folder is not configured. Go to Settings → Clip Rules → Thumbnail.');
+  }
   await vaultOps.ensureFolder(rule.thumbnailFolder);
   await vaultOps.ensureFolder(rule.outputFolder);
 
@@ -183,6 +186,9 @@ async function handleScreenshot(
   rule: ScreenshotClipRule,
   vaultOps: VaultOps,
 ): Promise<void> {
+  if (!rule.outputFolder) {
+    throw new Error('Screenshot output folder is not configured. Go to Settings → Clip Rules → Screenshot → Output folder.');
+  }
   const stem = `screenshot-${sanitize(payload.title)}-${Date.now()}`;
   const framesDir = rule.framesFolder || rule.outputFolder;
   await vaultOps.ensureFolder(framesDir);

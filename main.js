@@ -17458,6 +17458,9 @@ function buildThumbnailNote(payload, thumbnailFile, sopContent, coverAnalysis) {
   return frontmatter + bodyParts.join("\n");
 }
 async function handleThumbnail(payload, providers, rule, vaultOps) {
+  if (!rule.outputFolder || !rule.thumbnailFolder) {
+    throw new Error("Thumbnail output folder or thumbnail folder is not configured. Go to Settings \u2192 Clip Rules \u2192 Thumbnail.");
+  }
   await vaultOps.ensureFolder(rule.thumbnailFolder);
   await vaultOps.ensureFolder(rule.outputFolder);
   const ext = payload.thumbnail_url.includes(".webp") ? "webp" : "jpg";
@@ -17506,6 +17509,9 @@ function buildScreenshotTemplate(payload, imageNames, sopContent) {
   return parts.join("\n");
 }
 async function handleScreenshot(payload, providers, rule, vaultOps) {
+  if (!rule.outputFolder) {
+    throw new Error("Screenshot output folder is not configured. Go to Settings \u2192 Clip Rules \u2192 Screenshot \u2192 Output folder.");
+  }
   const stem = `screenshot-${sanitize(payload.title)}-${Date.now()}`;
   const framesDir = rule.framesFolder || rule.outputFolder;
   await vaultOps.ensureFolder(framesDir);
