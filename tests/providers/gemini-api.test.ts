@@ -1,5 +1,5 @@
 import { createGeminiAPIProvider } from '../../src/providers/gemini-api';
-import { AnalysisRequest } from '../../src/types';
+import { AnalysisRequest, MultiFrameRequest } from '../../src/types';
 
 jest.mock('@google/generative-ai', () => ({
   GoogleGenerativeAI: jest.fn().mockImplementation(() => ({
@@ -21,6 +21,50 @@ const req: AnalysisRequest = {
   fileContent: Buffer.from([0x89, 0x50]),
   sopContent: 'Analyze.', meta: {},
 };
+
+describe('analyzeMultiFrame — Gemini', () => {
+  let mockGenerateContent: jest.Mock;
+
+  beforeEach(() => {
+    mockGenerateContent = jest.fn().mockResolvedValue({
+      response: { text: () => '# Keyframe Analysis\nContent' },
+    });
+    MockGAI.mockImplementation(() => ({
+      getGenerativeModel: jest.fn().mockReturnValue({ generateContent: mockGenerateContent }),
+    }) as any);
+  });
+
+  const multiFrameReq: MultiFrameRequest = {
+    frames: [Buffer.from('frame1'), Buffer.from('frame2')],
+    sopContent: 'Analyze the keyframes.',
+    meta: { video_title: 'My Video', url: 'https://yt.com', time_range: { start: 0, end: 15 }, captured_at: '2026-05-30T18:00:00Z' },
+  };
+
+  test('returns trimmed text from response', async () => {
+    const p = createGeminiAPIProvider(config);
+    const result = await (p as any).analyzeMultiFrame(multiFrameReq);
+    expect(result).toBe('# Keyframe Analysis\nContent');
+  });
+
+  test('sends each frame as a separate inlineData part', async () => {
+    const p = createGeminiAPIProvider(config);
+    await (p as any).analyzeMultiFrame(multiFrameReq);
+    const parts = mockGenerateContent.mock.calls[0][0];
+    const inlineDataParts = parts.filter((p: any) => p.inlineData);
+    expect(inlineDataParts).toHaveLength(2);
+    expect(inlineDataParts[0].inlineData.mimeType).toBe('image/png');
+    expect(inlineDataParts[0].inlineData.data).toBe(Buffer.from('frame1').toString('base64'));
+  });
+
+  test('includes sop and context in the text part', async () => {
+    const p = createGeminiAPIProvider(config);
+    await (p as any).analyzeMultiFrame(multiFrameReq);
+    const parts = mockGenerateContent.mock.calls[0][0];
+    const textPart = parts.find((p: any) => p.text);
+    expect(textPart.text).toContain('Analyze the keyframes.');
+    expect(textPart.text).toContain('My Video');
+  });
+});
 
 describe('createGeminiAPIProvider', () => {
   let mockGenerate: jest.Mock;
