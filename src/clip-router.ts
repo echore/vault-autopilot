@@ -58,7 +58,14 @@ async function handleLegacyScreenshot(
 
 function sopBlock(sopContent: string): string {
   const lines = sopContent.split('\n').map((l) => `> ${l}`).join('\n');
-  return `> [!TIP] 分析提示（分析完成后请删除此块）\n${lines}`;
+  const checklist = [
+    `> `,
+    `> ---`,
+    `> **完成后执行：**`,
+    `> - [ ] 分析已写入笔记各章节`,
+    `> - [ ] 删除此整个提示块`,
+  ].join('\n');
+  return `> [!TIP] 分析提示\n${lines}\n${checklist}`;
 }
 
 function readSopSafely(sopPath: string, vaultOps: VaultOps): string | undefined {

@@ -17366,8 +17366,16 @@ async function handleLegacyScreenshot(payload, watchRules, vaultOps) {
 }
 function sopBlock(sopContent) {
   const lines = sopContent.split("\n").map((l2) => `> ${l2}`).join("\n");
-  return `> [!TIP] \u5206\u6790\u63D0\u793A\uFF08\u5206\u6790\u5B8C\u6210\u540E\u8BF7\u5220\u9664\u6B64\u5757\uFF09
-${lines}`;
+  const checklist = [
+    `> `,
+    `> ---`,
+    `> **\u5B8C\u6210\u540E\u6267\u884C\uFF1A**`,
+    `> - [ ] \u5206\u6790\u5DF2\u5199\u5165\u7B14\u8BB0\u5404\u7AE0\u8282`,
+    `> - [ ] \u5220\u9664\u6B64\u6574\u4E2A\u63D0\u793A\u5757`
+  ].join("\n");
+  return `> [!TIP] \u5206\u6790\u63D0\u793A
+${lines}
+${checklist}`;
 }
 function readSopSafely(sopPath, vaultOps) {
   if (!sopPath) return void 0;
