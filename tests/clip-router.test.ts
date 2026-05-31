@@ -132,6 +132,17 @@ describe('routeClip — hook', () => {
       .rejects.toThrow('not configured');
   });
 
+  test('throws when provider id is not found in providers map', async () => {
+    const vaultOps = makeVaultOps();
+    const payload: ClipPayload = {
+      mode: 'hook', frames: [Buffer.from('f').toString('base64')],
+      video_title: 'V', url: 'https://yt.com', captured_at: '2026-05-30T18:00:00Z',
+    };
+    // clipRules.hook.providerId is 'p1' but the map is empty
+    await expect(routeClip(payload, new Map(), clipRules, [], vaultOps))
+      .rejects.toThrow('not found');
+  });
+
   test('throws when provider does not support multi-frame', async () => {
     const singleProvider = makeSingleProvider('p1');
     const providers = new Map<string, AIProvider>([['p1', singleProvider]]);
