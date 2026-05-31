@@ -83,9 +83,8 @@ function thumbnailNoteStem(payload: ThumbnailPayload): string {
   return `${payload.channel} - ${titleSlug}`;
 }
 
-function buildThumbnailNote(payload: ThumbnailPayload, thumbnailFile: string, coverAnalysis?: string): string {
+function buildThumbnailNote(payload: ThumbnailPayload, thumbnailFile: string, sopContent?: string, coverAnalysis?: string): string {
   const today = new Date().toISOString().slice(0, 10);
-  const dimensions = ['封面标题'];
   const frontmatter = [
     `---`,
     `type: video`,
@@ -98,12 +97,12 @@ function buildThumbnailNote(payload: ThumbnailPayload, thumbnailFile: string, co
     ...(payload.views ? [`views: "${payload.views}"`] : []),
     `analyzed_at: ${today}`,
     `tags: []`,
-    `dimensions: [${dimensions.join(', ')}]`,
+    `dimensions: [封面标题]`,
     `depth: normal`,
     `---`,
   ].join('\n');
 
-  const body = [
+  const bodyParts = [
     ``,
     `# ${payload.title}`,
     ``,
@@ -111,12 +110,11 @@ function buildThumbnailNote(payload: ThumbnailPayload, thumbnailFile: string, co
     ``,
     `![[${thumbnailFile}]]`,
     ``,
-    `## 封面标题`,
-    ``,
-    coverAnalysis ?? ``,
-  ].join('\n');
+  ];
+  if (sopContent) bodyParts.push(sopBlock(sopContent), ``);
+  bodyParts.push(`## 封面标题`, ``, coverAnalysis ?? ``);
 
-  return frontmatter + body;
+  return frontmatter + bodyParts.join('\n');
 }
 
 async function handleThumbnail(
@@ -138,7 +136,8 @@ async function handleThumbnail(
   const notePath = `${rule.outputFolder}/${stem}.md`;
 
   if (rule.processingMode === 'manual') {
-    await vaultOps.create(notePath, buildThumbnailNote(payload, thumbnailFile));
+    const sopContent = readSopSafely(rule.sopPath, vaultOps);
+    await vaultOps.create(notePath, buildThumbnailNote(payload, thumbnailFile, sopContent));
     return;
   }
 

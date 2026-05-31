@@ -17426,9 +17426,8 @@ function thumbnailNoteStem(payload) {
   const titleSlug = payload.title.slice(0, 40).trim();
   return `${payload.channel} - ${titleSlug}`;
 }
-function buildThumbnailNote(payload, thumbnailFile, coverAnalysis) {
+function buildThumbnailNote(payload, thumbnailFile, sopContent, coverAnalysis) {
   const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-  const dimensions = ["\u5C01\u9762\u6807\u9898"];
   const frontmatter = [
     `---`,
     `type: video`,
@@ -17441,23 +17440,22 @@ function buildThumbnailNote(payload, thumbnailFile, coverAnalysis) {
     ...payload.views ? [`views: "${payload.views}"`] : [],
     `analyzed_at: ${today}`,
     `tags: []`,
-    `dimensions: [${dimensions.join(", ")}]`,
+    `dimensions: [\u5C01\u9762\u6807\u9898]`,
     `depth: normal`,
     `---`
   ].join("\n");
-  const body = [
+  const bodyParts = [
     ``,
     `# ${payload.title}`,
     ``,
     `<iframe width="100%" height="315" src="https://www.youtube.com/embed/${payload.video_id}" frameborder="0" allowfullscreen></iframe>`,
     ``,
     `![[${thumbnailFile}]]`,
-    ``,
-    `## \u5C01\u9762\u6807\u9898`,
-    ``,
-    coverAnalysis != null ? coverAnalysis : ``
-  ].join("\n");
-  return frontmatter + body;
+    ``
+  ];
+  if (sopContent) bodyParts.push(sopBlock(sopContent), ``);
+  bodyParts.push(`## \u5C01\u9762\u6807\u9898`, ``, coverAnalysis != null ? coverAnalysis : ``);
+  return frontmatter + bodyParts.join("\n");
 }
 async function handleThumbnail(payload, providers, rule, vaultOps) {
   await vaultOps.ensureFolder(rule.thumbnailFolder);
@@ -17470,7 +17468,8 @@ async function handleThumbnail(payload, providers, rule, vaultOps) {
   const stem = thumbnailNoteStem(payload);
   const notePath = `${rule.outputFolder}/${stem}.md`;
   if (rule.processingMode === "manual") {
-    await vaultOps.create(notePath, buildThumbnailNote(payload, thumbnailFile));
+    const sopContent2 = readSopSafely(rule.sopPath, vaultOps);
+    await vaultOps.create(notePath, buildThumbnailNote(payload, thumbnailFile, sopContent2));
     return;
   }
   if (!rule.sopPath || !rule.providerId) {
