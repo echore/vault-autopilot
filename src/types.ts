@@ -94,6 +94,8 @@ export interface ClipRule {
   sopPath: string;       // absolute path to SOP markdown file
   outputFolder: string;  // vault-relative path
   providerId: string;    // must match a ProviderConfig.id
+  processingMode: 'auto' | 'manual';
+  maxFrames: number;
 }
 
 // ── Plugin settings ───────────────────────────────────────────────────────────

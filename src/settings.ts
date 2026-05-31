@@ -11,8 +11,8 @@ export const DEFAULT_SETTINGS: PluginSettings = {
     port: 27183,
   },
   clipRules: {
-    hook: { sopPath: '', outputFolder: '', providerId: '' },
-    keyframe: { sopPath: '', outputFolder: '', providerId: '' },
+    hook: { sopPath: '', outputFolder: '', providerId: '', processingMode: 'manual', maxFrames: 5 },
+    keyframe: { sopPath: '', outputFolder: '', providerId: '', processingMode: 'manual', maxFrames: 5 },
   },
 };
 
@@ -107,6 +107,29 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
     for (const mode of ['hook', 'keyframe'] as const) {
       const label = mode === 'hook' ? 'Hook Analysis' : 'Keyframe Analysis';
       new Setting(containerEl).setName(label).setHeading();
+      new Setting(containerEl)
+        .setName('Processing mode')
+        .setDesc('Auto: vault-autopilot calls AI and writes the note. Manual: saves frames + template, you trigger analysis in Obsidian.')
+        .addDropdown(d => d
+          .addOption('manual', 'Manual (save frames + template)')
+          .addOption('auto', 'Auto (call AI provider)')
+          .setValue(this.plugin.settings.clipRules[mode].processingMode)
+          .onChange(async v => {
+            this.plugin.settings.clipRules[mode].processingMode = v as 'auto' | 'manual';
+            await this.plugin.saveSettings();
+          }));
+      new Setting(containerEl)
+        .setName('Max frames to save')
+        .setDesc('How many frames to sample and save (1–20). Default: 5.')
+        .addText(t => t
+          .setValue(String(this.plugin.settings.clipRules[mode].maxFrames))
+          .onChange(async v => {
+            const n = parseInt(v, 10);
+            if (n >= 1 && n <= 20) {
+              this.plugin.settings.clipRules[mode].maxFrames = n;
+              await this.plugin.saveSettings();
+            }
+          }));
       new Setting(containerEl)
         .setName('SOP / prompt path')
         .setDesc('Absolute path to the markdown SOP file.')

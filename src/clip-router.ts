@@ -50,12 +50,107 @@ async function handleScreenshot(
   await vaultOps.createBinary(`${rule.watchFolder}/${stem}.png`, bytes.buffer as ArrayBuffer);
 }
 
+function sampleFrames(frames: string[], max: number): string[] {
+  if (frames.length <= max) return frames;
+  const step = frames.length / max;
+  return Array.from({ length: max }, (_, i) => frames[Math.floor(i * step)]);
+}
+
+function buildTimestampUrl(url: string, platform: string | undefined, startSeconds: number): string {
+  const sep = url.includes('?') ? '&' : '?';
+  if (platform === 'youtube' || url.includes('youtube.com') || url.includes('youtu.be')) {
+    return `${url}${sep}t=${startSeconds}s`;
+  }
+  if (platform === 'bilibili' || url.includes('bilibili.com')) {
+    return `${url}${sep}t=${startSeconds}`;
+  }
+  return url;
+}
+
+function buildManualTemplate(
+  payload: HookPayload | KeyframePayload,
+  frameNames: string[],
+): string {
+  const embeds = frameNames.map((n) => `![[${n}]]`).join('\n');
+  const startSeconds = payload.mode === 'keyframe' ? payload.time_range.start : 0;
+  const platform = payload.mode === 'hook' ? payload.platform : undefined;
+  const channel = payload.mode === 'hook' ? payload.channel : undefined;
+  const jumpUrl = buildTimestampUrl(payload.url, platform, startSeconds);
+
+  if (payload.mode === 'hook') {
+    const transcriptSection = payload.transcript
+      ? `\n**字幕**\n${payload.transcript}\n`
+      : '';
+    return [
+      `# Hook — ${payload.video_title}`,
+      ``,
+      `▶ [跳转原视频](${jumpUrl})`,
+      `来源：${platform ?? ''} | ${channel ?? ''} | ${payload.url} | ${payload.captured_at}`,
+      ``,
+      embeds,
+      transcriptSection,
+      `---`,
+      ``,
+      `## Hook 类型`,
+      ``,
+      `## 具体手法`,
+      ``,
+      `## 为什么有效`,
+      ``,
+      `## 如何复制`,
+      ``,
+      `## 我的想法`,
+      ``,
+    ].join('\n');
+  } else {
+    const { start, end } = payload.time_range;
+    return [
+      `# 关键帧 — ${payload.video_title} [${start}s–${end}s]`,
+      ``,
+      `▶ [跳转原视频 (${start}s–${end}s)](${jumpUrl})`,
+      `来源：${payload.url} | ${payload.captured_at}`,
+      ``,
+      embeds,
+      ``,
+      `---`,
+      ``,
+      `## 技法类型`,
+      ``,
+      `## 技术实现`,
+      ``,
+      `## 视觉目的`,
+      ``,
+      `## 如何复制`,
+      ``,
+      `## 我的想法`,
+      ``,
+    ].join('\n');
+  }
+}
+
 async function handleMultiFrame(
   payload: HookPayload | KeyframePayload,
   providers: Map<string, AIProvider>,
   rule: ClipRule,
   vaultOps: VaultOps,
 ): Promise<void> {
+  if (rule.processingMode === 'manual') {
+    const max = rule.maxFrames ?? 5;
+    const sampled = sampleFrames(payload.frames, max);
+    const stem = `${payload.mode}-${sanitize(payload.video_title)}-${Date.now()}`;
+    await vaultOps.ensureFolder(rule.outputFolder);
+    const frameNames: string[] = [];
+    for (let i = 0; i < sampled.length; i++) {
+      const name = `${stem}-f${String(i + 1).padStart(2, '0')}.png`;
+      const bytes = Buffer.from(sampled[i], 'base64');
+      await vaultOps.createBinary(`${rule.outputFolder}/${name}`, bytes.buffer as ArrayBuffer);
+      frameNames.push(name);
+    }
+    const template = buildManualTemplate(payload, frameNames);
+    await vaultOps.create(`${rule.outputFolder}/${stem}.md`, template);
+    return;
+  }
+
   if (!rule.sopPath || !rule.outputFolder || !rule.providerId) {
     throw new Error(`Clip rule for "${payload.mode}" is not configured`);
   }

@@ -30,8 +30,8 @@ const enabledWatchRule: WatchRule = {
   outputFolder: 'Notes', providerId: 'p1',
 };
 
-const hookClipRule: ClipRule = { sopPath: '/hook-sop.md', outputFolder: 'Hooks', providerId: 'p1' };
-const keyframeClipRule: ClipRule = { sopPath: '/kf-sop.md', outputFolder: 'Keyframes', providerId: 'p1' };
+const hookClipRule: ClipRule = { sopPath: '/hook-sop.md', outputFolder: 'Hooks', providerId: 'p1', processingMode: 'auto', maxFrames: 5 };
+const keyframeClipRule: ClipRule = { sopPath: '/kf-sop.md', outputFolder: 'Keyframes', providerId: 'p1', processingMode: 'auto', maxFrames: 5 };
 const clipRules = { hook: hookClipRule, keyframe: keyframeClipRule };
 
 // ── isMultiFrameProvider ──────────────────────────────────────────────────────
@@ -123,7 +123,7 @@ describe('routeClip — hook', () => {
 
   test('throws when hook clip rule has no sopPath configured', async () => {
     const vaultOps = makeVaultOps();
-    const emptyRules = { hook: { sopPath: '', outputFolder: 'Hooks', providerId: 'p1' }, keyframe: keyframeClipRule };
+    const emptyRules = { hook: { sopPath: '', outputFolder: 'Hooks', providerId: 'p1', processingMode: 'auto' as const, maxFrames: 5 }, keyframe: keyframeClipRule };
     const payload: ClipPayload = {
       mode: 'hook', frames: [Buffer.from('f').toString('base64')],
       video_title: 'V', url: 'https://yt.com', captured_at: '2026-05-30T18:00:00Z',
@@ -193,5 +193,84 @@ describe('routeClip — keyframe', () => {
       expect.stringMatching(/Keyframes\/keyframe-.+\.md/),
       expect.any(String),
     );
+  });
+});
+
+// ── manual mode ───────────────────────────────────────────────────────────────
+
+describe('routeClip — manual mode (hook)', () => {
+  const manualHookRule: ClipRule = {
+    sopPath: '', outputFolder: 'Hooks', providerId: '',
+    processingMode: 'manual', maxFrames: 3,
+  };
+  const manualClipRules = { hook: manualHookRule, keyframe: keyframeClipRule };
+
+  test('saves sampled frames as PNG files', async () => {
+    const vaultOps = makeVaultOps();
+    const frames = Array.from({ length: 6 }, (_, i) => Buffer.from(`frame${i}`).toString('base64'));
+    const payload: ClipPayload = {
+      mode: 'hook', frames, video_title: 'Test Hook',
+      url: 'https://youtube.com/watch?v=abc', captured_at: '2026-05-30T18:00:00Z',
+    };
+    await routeClip(payload, new Map(), manualClipRules, [], vaultOps);
+    expect(vaultOps.createBinary).toHaveBeenCalledTimes(3);
+    expect(vaultOps.createBinary).toHaveBeenCalledWith(
+      expect.stringMatching(/Hooks\/hook-.+-f01\.png/),
+      expect.any(ArrayBuffer),
+    );
+  });
+
+  test('writes markdown template with frame embeds and jump link', async () => {
+    const vaultOps = makeVaultOps();
+    const payload: ClipPayload = {
+      mode: 'hook',
+      frames: [Buffer.from('f1').toString('base64'), Buffer.from('f2').toString('base64')],
+      video_title: 'My Hook', transcript: 'Hello world',
+      url: 'https://youtube.com/watch?v=abc', captured_at: '2026-05-30T18:00:00Z',
+    };
+    await routeClip(payload, new Map(), manualClipRules, [], vaultOps);
+    const [notePath, noteContent] = (vaultOps.create as jest.Mock).mock.calls[0];
+    expect(notePath).toMatch(/Hooks\/hook-.+\.md/);
+    expect(noteContent).toContain('# Hook — My Hook');
+    expect(noteContent).toContain('youtube.com');
+    expect(noteContent).toContain('![[');
+    expect(noteContent).toContain('Hello world');
+    expect(noteContent).toContain('## Hook 类型');
+  });
+
+  test('does not call analyzeMultiFrame in manual mode', async () => {
+    const provider = makeMultiFrameProvider('p1');
+    const providers = new Map<string, AIProvider>([['p1', provider as any]]);
+    const vaultOps = makeVaultOps();
+    const payload: ClipPayload = {
+      mode: 'hook',
+      frames: [Buffer.from('f').toString('base64')],
+      video_title: 'V', url: 'https://yt.com', captured_at: '2026-05-30T18:00:00Z',
+    };
+    await routeClip(payload, providers, manualClipRules, [], vaultOps);
+    expect(provider.analyzeMultiFrame).not.toHaveBeenCalled();
+  });
+});
+
+describe('routeClip — manual mode (keyframe)', () => {
+  const manualKeyframeRule: ClipRule = {
+    sopPath: '', outputFolder: 'Keyframes', providerId: '',
+    processingMode: 'manual', maxFrames: 5,
+  };
+  const manualClipRules = { hook: hookClipRule, keyframe: manualKeyframeRule };
+
+  test('writes keyframe template with time range in title and jump link', async () => {
+    const vaultOps = makeVaultOps();
+    const payload: ClipPayload = {
+      mode: 'keyframe',
+      frames: [Buffer.from('f1').toString('base64')],
+      video_title: 'My Video', url: 'https://youtube.com/watch?v=xyz',
+      time_range: { start: 30, end: 45 }, captured_at: '2026-05-30T18:00:00Z',
+    };
+    await routeClip(payload, new Map(), manualClipRules, [], vaultOps);
+    const [, noteContent] = (vaultOps.create as jest.Mock).mock.calls[0];
+    expect(noteContent).toContain('# 关键帧 — My Video [30s–45s]');
+    expect(noteContent).toContain('t=30s');
+    expect(noteContent).toContain('## 技法类型');
   });
 });
