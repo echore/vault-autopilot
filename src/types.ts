@@ -19,6 +19,28 @@ export interface AIProvider {
   analyze(request: AnalysisRequest): Promise<string>; // returns markdown note content
 }
 
+export interface MultiFrameRequest {
+  frames: Buffer[];
+  transcript?: string;
+  sopContent: string;
+  meta: {
+    video_title?: string;
+    channel?: string;
+    platform?: string;
+    url?: string;
+    time_range?: { start: number; end: number };
+    captured_at?: string;
+  };
+}
+
+export interface MultiFrameProvider extends AIProvider {
+  analyzeMultiFrame(req: MultiFrameRequest): Promise<string>;
+}
+
+export function isMultiFrameProvider(p: AIProvider): p is MultiFrameProvider {
+  return typeof (p as any).analyzeMultiFrame === 'function';
+}
+
 // ── Provider configs ──────────────────────────────────────────────────────────
 
 export interface CLIProviderConfig {
@@ -68,6 +90,12 @@ export interface WatchRule {
   providerId: string;     // must match a ProviderConfig.id
 }
 
+export interface ClipRule {
+  sopPath: string;       // absolute path to SOP markdown file
+  outputFolder: string;  // vault-relative path
+  providerId: string;    // must match a ProviderConfig.id
+}
+
 // ── Plugin settings ───────────────────────────────────────────────────────────
 
 export interface HttpServerSettings {
@@ -79,4 +107,8 @@ export interface PluginSettings {
   rules: WatchRule[];
   providers: ProviderConfig[];
   httpServer: HttpServerSettings;
+  clipRules: {
+    hook: ClipRule;
+    keyframe: ClipRule;
+  };
 }
