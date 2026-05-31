@@ -142,11 +142,12 @@ export default class VaultAutopilotPlugin extends Plugin {
       // Save image to vault inbox of first enabled rule that watches images
       const rule = this.settings.rules.find((r) => r.enabled);
       if (!rule) throw new Error('No enabled watch rules configured');
-      const stem = `${Date.now()}-${sanitize(payload.title)}`;
+      const legacy = payload as import('./server').LegacyClipPayload;
+      const stem = `${Date.now()}-${sanitize(legacy.title)}`;
       await this.ensureFolder(rule.watchFolder);
-      const meta = JSON.stringify({ source_url: payload.source_url, title: payload.title });
+      const meta = JSON.stringify({ source_url: legacy.source_url, title: legacy.title });
       await this.app.vault.create(`${rule.watchFolder}/${stem}.meta.json`, meta);
-      const bytes = Buffer.from(payload.image_base64, 'base64');
+      const bytes = Buffer.from(legacy.image_base64, 'base64');
       await this.app.vault.createBinary(`${rule.watchFolder}/${stem}.png`, bytes.buffer as ArrayBuffer);
     });
     this.server.on('error', (err: NodeJS.ErrnoException) => {

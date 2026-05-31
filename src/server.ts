@@ -1,10 +1,43 @@
 import * as http from 'http';
 
-export interface ClipPayload {
+export type LegacyClipPayload = {
   image_base64: string;
   source_url: string;
   title: string;
-}
+};
+
+export type ScreenshotPayload = {
+  mode: 'screenshot';
+  image: string;
+  url: string;
+  title: string;
+};
+
+export type HookPayload = {
+  mode: 'hook';
+  frames: string[];
+  transcript?: string;
+  video_title: string;
+  channel?: string;
+  platform?: string;
+  url: string;
+  captured_at: string;
+};
+
+export type KeyframePayload = {
+  mode: 'keyframe';
+  frames: string[];
+  video_title: string;
+  url: string;
+  time_range: { start: number; end: number };
+  captured_at: string;
+};
+
+export type ClipPayload =
+  | ScreenshotPayload
+  | HookPayload
+  | KeyframePayload
+  | LegacyClipPayload;
 
 export type ClipHandler = (payload: ClipPayload) => Promise<void>;
 

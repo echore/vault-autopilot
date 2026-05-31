@@ -52,4 +52,39 @@ describe('createServer', () => {
     const { status } = await request('GET', '/unknown');
     expect(status).toBe(404);
   });
+
+  test('POST /clip with new screenshot payload calls handler', async () => {
+    const payload = { mode: 'screenshot', image: 'abc', url: 'https://x.com', title: 'Test' };
+    const { status, body } = await request('POST', '/clip', payload);
+    expect(status).toBe(200);
+    expect(body).toEqual({ success: true });
+    expect(handler).toHaveBeenCalledWith(payload);
+  });
+
+  test('POST /clip with hook payload calls handler', async () => {
+    const payload = {
+      mode: 'hook',
+      frames: ['ZnJhbWUx', 'ZnJhbWUy'],
+      video_title: 'My Hook',
+      url: 'https://yt.com',
+      captured_at: '2026-05-30T18:00:00Z',
+    };
+    const { status } = await request('POST', '/clip', payload);
+    expect(status).toBe(200);
+    expect(handler).toHaveBeenCalledWith(payload);
+  });
+
+  test('POST /clip with keyframe payload calls handler', async () => {
+    const payload = {
+      mode: 'keyframe',
+      frames: ['ZnJhbWUx'],
+      video_title: 'My Video',
+      url: 'https://yt.com',
+      time_range: { start: 0, end: 15 },
+      captured_at: '2026-05-30T18:00:00Z',
+    };
+    const { status } = await request('POST', '/clip', payload);
+    expect(status).toBe(200);
+    expect(handler).toHaveBeenCalledWith(payload);
+  });
 });
