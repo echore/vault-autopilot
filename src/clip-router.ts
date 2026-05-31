@@ -1,5 +1,5 @@
-import { ClipPayload, HookPayload, KeyframePayload, LegacyClipPayload, ScreenshotPayload } from './server';
-import { AIProvider, ClipRule, isMultiFrameProvider, MultiFrameRequest, PluginSettings, ScreenshotClipRule, WatchRule } from './types';
+import { ClipPayload, HookPayload, KeyframePayload, LegacyClipPayload, ScreenshotPayload, ThumbnailPayload } from './server';
+import { AIProvider, ClipRule, isMultiFrameProvider, MultiFrameRequest, PluginSettings, ScreenshotClipRule, ThumbnailClipRule, WatchRule } from './types';
 import { postProcessMarkdown, sanitize, buildVideoEmbed } from './util';
 
 export interface VaultOps {
@@ -7,6 +7,7 @@ export interface VaultOps {
   createBinary(filePath: string, data: ArrayBuffer): Promise<void>;
   create(filePath: string, content: string): Promise<void>;
   readFileSync(absolutePath: string): string;
+  downloadUrl(url: string): Promise<ArrayBuffer>;
 }
 
 export async function routeClip(
@@ -19,6 +20,7 @@ export async function routeClip(
   if (isLegacy(payload)) {
     return handleLegacyScreenshot(payload, watchRules, vaultOps);
   }
+  if (payload.mode === 'thumbnail') return handleThumbnail(payload, providers, clipRules.thumbnail, vaultOps);
   if (payload.mode === 'screenshot') {
     const normalized = normalizeScreenshot(payload);
     return handleScreenshot(normalized, providers, clipRules.screenshot, vaultOps);
@@ -71,6 +73,90 @@ function sopBlock(sopContent: string): string {
 function readSopSafely(sopPath: string, vaultOps: VaultOps): string | undefined {
   if (!sopPath) return undefined;
   try { return vaultOps.readFileSync(sopPath); } catch { return undefined; }
+}
+
+function thumbnailNoteStem(payload: ThumbnailPayload): string {
+  const titleSlug = payload.title.slice(0, 40).trim();
+  return `${payload.channel} - ${titleSlug}`;
+}
+
+function buildThumbnailNote(payload: ThumbnailPayload, thumbnailFile: string, coverAnalysis?: string): string {
+  const today = new Date().toISOString().slice(0, 10);
+  const dimensions = ['封面标题'];
+  const frontmatter = [
+    `---`,
+    `type: video`,
+    `platform: ${payload.platform}`,
+    `channel: "${payload.channel}"`,
+    ...(payload.channel_handle ? [`channel_handle: "${payload.channel_handle}"`] : []),
+    `video_id: "${payload.video_id}"`,
+    `video_url: "${payload.video_url}"`,
+    `title: "${payload.title}"`,
+    ...(payload.views ? [`views: "${payload.views}"`] : []),
+    `analyzed_at: ${today}`,
+    `tags: []`,
+    `dimensions: [${dimensions.join(', ')}]`,
+    `depth: normal`,
+    `---`,
+  ].join('\n');
+
+  const body = [
+    ``,
+    `# ${payload.title}`,
+    ``,
+    `<iframe width="100%" height="315" src="https://www.youtube.com/embed/${payload.video_id}" frameborder="0" allowfullscreen></iframe>`,
+    ``,
+    `![[${thumbnailFile}]]`,
+    ``,
+    `## 封面标题`,
+    ``,
+    coverAnalysis ?? ``,
+  ].join('\n');
+
+  return frontmatter + body;
+}
+
+async function handleThumbnail(
+  payload: ThumbnailPayload,
+  providers: Map<string, AIProvider>,
+  rule: ThumbnailClipRule,
+  vaultOps: VaultOps,
+): Promise<void> {
+  await vaultOps.ensureFolder(rule.thumbnailFolder);
+  await vaultOps.ensureFolder(rule.outputFolder);
+
+  const ext = payload.thumbnail_url.includes('.webp') ? 'webp' : 'jpg';
+  const thumbnailFile = `${payload.video_id}.${ext}`;
+  const thumbnailPath = `${rule.thumbnailFolder}/${thumbnailFile}`;
+  const imgData = await vaultOps.downloadUrl(payload.thumbnail_url);
+  await vaultOps.createBinary(thumbnailPath, imgData);
+
+  const stem = thumbnailNoteStem(payload);
+  const notePath = `${rule.outputFolder}/${stem}.md`;
+
+  if (rule.processingMode === 'manual') {
+    await vaultOps.create(notePath, buildThumbnailNote(payload, thumbnailFile));
+    return;
+  }
+
+  if (!rule.sopPath || !rule.providerId) {
+    throw new Error('Thumbnail clip rule is not fully configured (sopPath / providerId missing)');
+  }
+  const provider = providers.get(rule.providerId);
+  if (!provider) throw new Error(`Provider "${rule.providerId}" not found`);
+  if (!isMultiFrameProvider(provider)) {
+    throw new Error(
+      `Provider "${provider.name}" does not support image analysis. ` +
+      `Use an API provider (Anthropic, OpenAI-compatible, or Gemini).`,
+    );
+  }
+  const sopContent = vaultOps.readFileSync(rule.sopPath);
+  const result = await provider.analyzeMultiFrame({
+    frames: [Buffer.from(imgData)],
+    sopContent,
+    meta: { video_title: payload.title, channel: payload.channel, url: payload.video_url },
+  });
+  await vaultOps.create(notePath, buildThumbnailNote(payload, thumbnailFile, postProcessMarkdown(result)));
 }
 
 function buildScreenshotTemplate(payload: ScreenshotPayload, imageNames: string[], sopContent?: string): string {

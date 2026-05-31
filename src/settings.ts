@@ -1,7 +1,7 @@
 import * as crypto from 'crypto';
 import { App, Notice, PluginSettingTab, Setting } from 'obsidian';
 import type VaultAutopilotPlugin from './main';
-import { PluginSettings, ProviderConfig, ScreenshotClipRule, WatchRule } from './types';
+import { PluginSettings, ProviderConfig, ScreenshotClipRule, ThumbnailClipRule, WatchRule } from './types';
 
 export const DEFAULT_SETTINGS: PluginSettings = {
   rules: [],
@@ -11,6 +11,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
     port: 27183,
   },
   clipRules: {
+    thumbnail: { sopPath: '', outputFolder: 'Content Creation/Great Videos', thumbnailFolder: 'Assets/Great Videos', providerId: '', processingMode: 'manual' },
     screenshot: { sopPath: '', outputFolder: '', providerId: '', processingMode: 'manual', framesFolder: 'Assets/images' },
     hook: { sopPath: '', outputFolder: '', providerId: '', processingMode: 'manual', maxFrames: 5, framesFolder: 'Assets/images' },
     keyframe: { sopPath: '', outputFolder: '', providerId: '', processingMode: 'manual', maxFrames: 5, framesFolder: 'Assets/images' },
@@ -102,6 +103,9 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
     // ── Clip Rules ──────────────────────────────────────────────────────────────
     new Setting(containerEl).setName('Clip Rules').setHeading();
 
+    new Setting(containerEl).setName('Thumbnail / Great Videos').setHeading();
+    this.renderThumbnailClipRule(containerEl);
+
     new Setting(containerEl).setName('Screenshot').setHeading();
     this.renderScreenshotClipRule(containerEl);
 
@@ -176,6 +180,64 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
               });
           });
       }
+    }
+  }
+
+  private renderThumbnailClipRule(el: HTMLElement): void {
+    const rule: ThumbnailClipRule = this.plugin.settings.clipRules.thumbnail;
+    new Setting(el)
+      .setName('Processing mode')
+      .setDesc('Auto: downloads thumbnail + calls AI to analyze cover. Manual: downloads thumbnail + generates note template.')
+      .addDropdown(d => d
+        .addOption('manual', 'Manual (download + template)')
+        .addOption('auto', 'Auto (download + call AI provider)')
+        .setValue(rule.processingMode)
+        .onChange(async v => {
+          this.plugin.settings.clipRules.thumbnail.processingMode = v as 'auto' | 'manual';
+          await this.plugin.saveSettings();
+          this.display();
+        }));
+    new Setting(el)
+      .setName('Output folder')
+      .setDesc('Vault-relative path for generated notes. Default: Content Creation/Great Videos')
+      .addText(t => t
+        .setValue(rule.outputFolder)
+        .onChange(async v => {
+          this.plugin.settings.clipRules.thumbnail.outputFolder = v.trim();
+          await this.plugin.saveSettings();
+        }));
+    new Setting(el)
+      .setName('Thumbnail folder')
+      .setDesc('Vault-relative path for downloaded thumbnail images. Default: Assets/Great Videos')
+      .addText(t => t
+        .setValue(rule.thumbnailFolder)
+        .onChange(async v => {
+          this.plugin.settings.clipRules.thumbnail.thumbnailFolder = v.trim();
+          await this.plugin.saveSettings();
+        }));
+    new Setting(el)
+      .setName('SOP / prompt path')
+      .setDesc('Absolute path to the markdown SOP file.')
+      .addText(t => t
+        .setValue(rule.sopPath)
+        .onChange(async v => {
+          this.plugin.settings.clipRules.thumbnail.sopPath = v.trim();
+          await this.plugin.saveSettings();
+        }));
+    if (rule.processingMode === 'auto') {
+      new Setting(el)
+        .setName('Provider')
+        .setDesc('Must be an API provider (Anthropic, OpenAI-compatible, or Gemini).')
+        .addDropdown(d => {
+          this.plugin.settings.providers.forEach(p =>
+            d.addOption(p.id, p.type === 'cli' ? `CLI: ${(p as any).cliType}` : (p as any).label || p.type)
+          );
+          d.setValue(rule.providerId)
+            .onChange(async v => {
+              this.plugin.settings.clipRules.thumbnail.providerId = v;
+              await this.plugin.saveSettings();
+            });
+        });
     }
   }
 

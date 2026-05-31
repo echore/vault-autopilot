@@ -6453,6 +6453,7 @@ var DEFAULT_SETTINGS = {
     port: 27183
   },
   clipRules: {
+    thumbnail: { sopPath: "", outputFolder: "Content Creation/Great Videos", thumbnailFolder: "Assets/Great Videos", providerId: "", processingMode: "manual" },
     screenshot: { sopPath: "", outputFolder: "", providerId: "", processingMode: "manual", framesFolder: "Assets/images" },
     hook: { sopPath: "", outputFolder: "", providerId: "", processingMode: "manual", maxFrames: 5, framesFolder: "Assets/images" },
     keyframe: { sopPath: "", outputFolder: "", providerId: "", processingMode: "manual", maxFrames: 5, framesFolder: "Assets/images" }
@@ -6517,6 +6518,8 @@ var VaultAutopilotSettingTab = class extends import_obsidian.PluginSettingTab {
       this.renderRule(containerEl, rule, i2);
     }
     new import_obsidian.Setting(containerEl).setName("Clip Rules").setHeading();
+    new import_obsidian.Setting(containerEl).setName("Thumbnail / Great Videos").setHeading();
+    this.renderThumbnailClipRule(containerEl);
     new import_obsidian.Setting(containerEl).setName("Screenshot").setHeading();
     this.renderScreenshotClipRule(containerEl);
     for (const mode of ["hook", "keyframe"]) {
@@ -6559,6 +6562,37 @@ var VaultAutopilotSettingTab = class extends import_obsidian.PluginSettingTab {
           });
         });
       }
+    }
+  }
+  renderThumbnailClipRule(el) {
+    const rule = this.plugin.settings.clipRules.thumbnail;
+    new import_obsidian.Setting(el).setName("Processing mode").setDesc("Auto: downloads thumbnail + calls AI to analyze cover. Manual: downloads thumbnail + generates note template.").addDropdown((d2) => d2.addOption("manual", "Manual (download + template)").addOption("auto", "Auto (download + call AI provider)").setValue(rule.processingMode).onChange(async (v2) => {
+      this.plugin.settings.clipRules.thumbnail.processingMode = v2;
+      await this.plugin.saveSettings();
+      this.display();
+    }));
+    new import_obsidian.Setting(el).setName("Output folder").setDesc("Vault-relative path for generated notes. Default: Content Creation/Great Videos").addText((t2) => t2.setValue(rule.outputFolder).onChange(async (v2) => {
+      this.plugin.settings.clipRules.thumbnail.outputFolder = v2.trim();
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian.Setting(el).setName("Thumbnail folder").setDesc("Vault-relative path for downloaded thumbnail images. Default: Assets/Great Videos").addText((t2) => t2.setValue(rule.thumbnailFolder).onChange(async (v2) => {
+      this.plugin.settings.clipRules.thumbnail.thumbnailFolder = v2.trim();
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian.Setting(el).setName("SOP / prompt path").setDesc("Absolute path to the markdown SOP file.").addText((t2) => t2.setValue(rule.sopPath).onChange(async (v2) => {
+      this.plugin.settings.clipRules.thumbnail.sopPath = v2.trim();
+      await this.plugin.saveSettings();
+    }));
+    if (rule.processingMode === "auto") {
+      new import_obsidian.Setting(el).setName("Provider").setDesc("Must be an API provider (Anthropic, OpenAI-compatible, or Gemini).").addDropdown((d2) => {
+        this.plugin.settings.providers.forEach(
+          (p2) => d2.addOption(p2.id, p2.type === "cli" ? `CLI: ${p2.cliType}` : p2.label || p2.type)
+        );
+        d2.setValue(rule.providerId).onChange(async (v2) => {
+          this.plugin.settings.clipRules.thumbnail.providerId = v2;
+          await this.plugin.saveSettings();
+        });
+      });
     }
   }
   renderScreenshotClipRule(el) {
@@ -17337,6 +17371,7 @@ async function routeClip(payload, providers, clipRules, watchRules, vaultOps) {
   if (isLegacy(payload)) {
     return handleLegacyScreenshot(payload, watchRules, vaultOps);
   }
+  if (payload.mode === "thumbnail") return handleThumbnail(payload, providers, clipRules.thumbnail, vaultOps);
   if (payload.mode === "screenshot") {
     const normalized = normalizeScreenshot(payload);
     return handleScreenshot(normalized, providers, clipRules.screenshot, vaultOps);
@@ -17386,6 +17421,75 @@ function readSopSafely(sopPath, vaultOps) {
   } catch (e2) {
     return void 0;
   }
+}
+function thumbnailNoteStem(payload) {
+  const titleSlug = payload.title.slice(0, 40).trim();
+  return `${payload.channel} - ${titleSlug}`;
+}
+function buildThumbnailNote(payload, thumbnailFile, coverAnalysis) {
+  const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  const dimensions = ["\u5C01\u9762\u6807\u9898"];
+  const frontmatter = [
+    `---`,
+    `type: video`,
+    `platform: ${payload.platform}`,
+    `channel: "${payload.channel}"`,
+    ...payload.channel_handle ? [`channel_handle: "${payload.channel_handle}"`] : [],
+    `video_id: "${payload.video_id}"`,
+    `video_url: "${payload.video_url}"`,
+    `title: "${payload.title}"`,
+    ...payload.views ? [`views: "${payload.views}"`] : [],
+    `analyzed_at: ${today}`,
+    `tags: []`,
+    `dimensions: [${dimensions.join(", ")}]`,
+    `depth: normal`,
+    `---`
+  ].join("\n");
+  const body = [
+    ``,
+    `# ${payload.title}`,
+    ``,
+    `<iframe width="100%" height="315" src="https://www.youtube.com/embed/${payload.video_id}" frameborder="0" allowfullscreen></iframe>`,
+    ``,
+    `![[${thumbnailFile}]]`,
+    ``,
+    `## \u5C01\u9762\u6807\u9898`,
+    ``,
+    coverAnalysis != null ? coverAnalysis : ``
+  ].join("\n");
+  return frontmatter + body;
+}
+async function handleThumbnail(payload, providers, rule, vaultOps) {
+  await vaultOps.ensureFolder(rule.thumbnailFolder);
+  await vaultOps.ensureFolder(rule.outputFolder);
+  const ext = payload.thumbnail_url.includes(".webp") ? "webp" : "jpg";
+  const thumbnailFile = `${payload.video_id}.${ext}`;
+  const thumbnailPath = `${rule.thumbnailFolder}/${thumbnailFile}`;
+  const imgData = await vaultOps.downloadUrl(payload.thumbnail_url);
+  await vaultOps.createBinary(thumbnailPath, imgData);
+  const stem = thumbnailNoteStem(payload);
+  const notePath = `${rule.outputFolder}/${stem}.md`;
+  if (rule.processingMode === "manual") {
+    await vaultOps.create(notePath, buildThumbnailNote(payload, thumbnailFile));
+    return;
+  }
+  if (!rule.sopPath || !rule.providerId) {
+    throw new Error("Thumbnail clip rule is not fully configured (sopPath / providerId missing)");
+  }
+  const provider = providers.get(rule.providerId);
+  if (!provider) throw new Error(`Provider "${rule.providerId}" not found`);
+  if (!isMultiFrameProvider(provider)) {
+    throw new Error(
+      `Provider "${provider.name}" does not support image analysis. Use an API provider (Anthropic, OpenAI-compatible, or Gemini).`
+    );
+  }
+  const sopContent = vaultOps.readFileSync(rule.sopPath);
+  const result = await provider.analyzeMultiFrame({
+    frames: [Buffer.from(imgData)],
+    sopContent,
+    meta: { video_title: payload.title, channel: payload.channel, url: payload.video_url }
+  });
+  await vaultOps.create(notePath, buildThumbnailNote(payload, thumbnailFile, postProcessMarkdown(result)));
 }
 function buildScreenshotTemplate(payload, imageNames, sopContent) {
   const imageLines = imageNames.map((n2) => `> ![[${n2}]]`).join("\n");
@@ -17628,19 +17732,20 @@ var VaultAutopilotPlugin = class extends import_obsidian3.Plugin {
     this.server = null;
   }
   async loadSettings() {
-    var _a3, _b, _c, _d, _e2, _f, _g, _h, _i;
+    var _a3, _b, _c, _d, _e2, _f, _g, _h, _i, _j, _k;
     const loaded = await this.loadData();
     this.settings = {
       ...DEFAULT_SETTINGS,
       ...loaded,
       httpServer: { ...DEFAULT_SETTINGS.httpServer, ...(_a3 = loaded == null ? void 0 : loaded.httpServer) != null ? _a3 : {} },
       clipRules: {
-        screenshot: { ...DEFAULT_SETTINGS.clipRules.screenshot, ...(_c = (_b = loaded == null ? void 0 : loaded.clipRules) == null ? void 0 : _b.screenshot) != null ? _c : {} },
-        hook: { ...DEFAULT_SETTINGS.clipRules.hook, ...(_e2 = (_d = loaded == null ? void 0 : loaded.clipRules) == null ? void 0 : _d.hook) != null ? _e2 : {} },
-        keyframe: { ...DEFAULT_SETTINGS.clipRules.keyframe, ...(_g = (_f = loaded == null ? void 0 : loaded.clipRules) == null ? void 0 : _f.keyframe) != null ? _g : {} }
+        thumbnail: { ...DEFAULT_SETTINGS.clipRules.thumbnail, ...(_c = (_b = loaded == null ? void 0 : loaded.clipRules) == null ? void 0 : _b.thumbnail) != null ? _c : {} },
+        screenshot: { ...DEFAULT_SETTINGS.clipRules.screenshot, ...(_e2 = (_d = loaded == null ? void 0 : loaded.clipRules) == null ? void 0 : _d.screenshot) != null ? _e2 : {} },
+        hook: { ...DEFAULT_SETTINGS.clipRules.hook, ...(_g = (_f = loaded == null ? void 0 : loaded.clipRules) == null ? void 0 : _f.hook) != null ? _g : {} },
+        keyframe: { ...DEFAULT_SETTINGS.clipRules.keyframe, ...(_i = (_h = loaded == null ? void 0 : loaded.clipRules) == null ? void 0 : _h.keyframe) != null ? _i : {} }
       },
-      rules: (_h = loaded == null ? void 0 : loaded.rules) != null ? _h : DEFAULT_SETTINGS.rules,
-      providers: (_i = loaded == null ? void 0 : loaded.providers) != null ? _i : DEFAULT_SETTINGS.providers
+      rules: (_j = loaded == null ? void 0 : loaded.rules) != null ? _j : DEFAULT_SETTINGS.rules,
+      providers: (_k = loaded == null ? void 0 : loaded.providers) != null ? _k : DEFAULT_SETTINGS.providers
     };
   }
   async saveSettings() {
@@ -17731,7 +17836,11 @@ var VaultAutopilotPlugin = class extends import_obsidian3.Plugin {
       create: async (p2, content) => {
         await this.app.vault.create(p2, content);
       },
-      readFileSync: (p2) => fs5.readFileSync(p2, "utf8")
+      readFileSync: (p2) => fs5.readFileSync(p2, "utf8"),
+      downloadUrl: async (url) => {
+        const resp = await (0, import_obsidian3.requestUrl)({ url, method: "GET" });
+        return resp.arrayBuffer;
+      }
     };
     this.server = createServer2(
       port,

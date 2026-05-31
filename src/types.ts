@@ -107,6 +107,14 @@ export interface ScreenshotClipRule {
   framesFolder: string;
 }
 
+export interface ThumbnailClipRule {
+  sopPath: string;
+  outputFolder: string;        // vault-relative, e.g. Content Creation/Great Videos
+  thumbnailFolder: string;     // vault-relative, e.g. Assets/Great Videos
+  providerId: string;
+  processingMode: 'auto' | 'manual';
+}
+
 // ── Plugin settings ───────────────────────────────────────────────────────────
 
 export interface HttpServerSettings {
@@ -119,6 +127,7 @@ export interface PluginSettings {
   providers: ProviderConfig[];
   httpServer: HttpServerSettings;
   clipRules: {
+    thumbnail: ThumbnailClipRule;
     screenshot: ScreenshotClipRule;
     hook: ClipRule;
     keyframe: ClipRule;

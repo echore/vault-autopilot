@@ -1,5 +1,5 @@
 import { routeClip, VaultOps } from '../src/clip-router';
-import { AIProvider, ClipRule, ScreenshotClipRule, WatchRule, isMultiFrameProvider } from '../src/types';
+import { AIProvider, ClipRule, ScreenshotClipRule, ThumbnailClipRule, WatchRule, isMultiFrameProvider } from '../src/types';
 import { ClipPayload } from '../src/server';
 
 function makeMultiFrameProvider(id = 'p1') {
@@ -21,6 +21,7 @@ function makeVaultOps(): jest.Mocked<VaultOps> {
     createBinary: jest.fn().mockResolvedValue(undefined),
     create: jest.fn().mockResolvedValue(undefined),
     readFileSync: jest.fn().mockReturnValue('# SOP\nAnalyze this.'),
+    downloadUrl: jest.fn().mockResolvedValue(new ArrayBuffer(8)),
   };
 }
 
@@ -30,6 +31,10 @@ const enabledWatchRule: WatchRule = {
   outputFolder: 'Notes', providerId: 'p1',
 };
 
+const thumbnailClipRule: ThumbnailClipRule = {
+  sopPath: '/thumb-sop.md', outputFolder: 'Content Creation/Great Videos',
+  thumbnailFolder: 'Assets/Great Videos', providerId: 'p1', processingMode: 'manual',
+};
 const screenshotClipRule: ScreenshotClipRule = {
   sopPath: '/ss-sop.md', outputFolder: 'Screenshots', providerId: 'p1',
   processingMode: 'manual', framesFolder: 'Assets/images',
@@ -42,9 +47,59 @@ const keyframeClipRule: ClipRule = {
   sopPath: '/kf-sop.md', outputFolder: 'Keyframes', providerId: 'p1',
   processingMode: 'auto', maxFrames: 5, framesFolder: 'Assets/images',
 };
-const clipRules = { screenshot: screenshotClipRule, hook: hookClipRule, keyframe: keyframeClipRule };
+const clipRules = { thumbnail: thumbnailClipRule, screenshot: screenshotClipRule, hook: hookClipRule, keyframe: keyframeClipRule };
 
 // ── isMultiFrameProvider ──────────────────────────────────────────────────────
+
+// ── thumbnail ─────────────────────────────────────────────────────────────────
+
+describe('routeClip — thumbnail', () => {
+  const payload: ClipPayload = {
+    mode: 'thumbnail',
+    platform: 'youtube',
+    video_id: 'abc123',
+    video_url: 'https://www.youtube.com/watch?v=abc123',
+    thumbnail_url: 'https://img.youtube.com/vi/abc123/maxresdefault.jpg',
+    title: 'How to Get Rich on Easy Mode',
+    channel: 'Ali Abdaal',
+    channel_handle: '@aliabdaal',
+    views: '27.8万',
+    captured_at: '2026-05-31T00:00:00Z',
+  };
+
+  test('manual: downloads thumbnail and creates note with correct frontmatter', async () => {
+    const vaultOps = makeVaultOps();
+    await routeClip(payload, new Map(), clipRules, [], vaultOps);
+    expect(vaultOps.downloadUrl).toHaveBeenCalledWith(payload.thumbnail_url);
+    expect(vaultOps.createBinary).toHaveBeenCalledWith(
+      'Assets/Great Videos/abc123.jpg',
+      expect.any(ArrayBuffer),
+    );
+    const [notePath, noteContent] = (vaultOps.create as jest.Mock).mock.calls[0];
+    expect(notePath).toBe('Content Creation/Great Videos/Ali Abdaal - How to Get Rich on Easy Mode.md');
+    expect(noteContent).toContain('type: video');
+    expect(noteContent).toContain('video_id: "abc123"');
+    expect(noteContent).toContain('channel: "Ali Abdaal"');
+    expect(noteContent).toContain('dimensions: [封面标题]');
+    expect(noteContent).toContain('![[abc123.jpg]]');
+    expect(noteContent).toContain('## 封面标题');
+  });
+
+  test('auto: calls analyzeMultiFrame with thumbnail buffer and writes AI result', async () => {
+    const provider = makeMultiFrameProvider('p1');
+    const providers = new Map<string, AIProvider>([['p1', provider as any]]);
+    const vaultOps = makeVaultOps();
+    const autoRule: ThumbnailClipRule = { ...thumbnailClipRule, processingMode: 'auto' };
+    await routeClip(payload, providers, { ...clipRules, thumbnail: autoRule }, [], vaultOps);
+    expect(provider.analyzeMultiFrame).toHaveBeenCalledWith(expect.objectContaining({
+      sopContent: '# SOP\nAnalyze this.',
+      meta: expect.objectContaining({ video_title: 'How to Get Rich on Easy Mode' }),
+    }));
+    const [, noteContent] = (vaultOps.create as jest.Mock).mock.calls[0];
+    expect(noteContent).toContain('## 封面标题');
+    expect(noteContent).toContain('# Analysis');
+  });
+});
 
 describe('isMultiFrameProvider', () => {
   test('returns true when analyzeMultiFrame method is present', () => {
@@ -180,7 +235,7 @@ describe('routeClip — hook', () => {
 
   test('throws when hook clip rule has no sopPath configured', async () => {
     const vaultOps = makeVaultOps();
-    const emptyRules = { screenshot: screenshotClipRule, hook: { sopPath: '', outputFolder: 'Hooks', providerId: 'p1', processingMode: 'auto' as const, maxFrames: 5, framesFolder: 'Assets/images' }, keyframe: keyframeClipRule };
+    const emptyRules = { thumbnail: thumbnailClipRule, screenshot: screenshotClipRule, hook:{ sopPath: '', outputFolder: 'Hooks', providerId: 'p1', processingMode: 'auto' as const, maxFrames: 5, framesFolder: 'Assets/images' }, keyframe: keyframeClipRule };
     const payload: ClipPayload = {
       mode: 'hook', frames: [Buffer.from('f').toString('base64')],
       video_title: 'V', url: 'https://yt.com', captured_at: '2026-05-30T18:00:00Z',
@@ -241,7 +296,7 @@ describe('routeClip — keyframe', () => {
       time_range: { start: 0, end: 15 },
       captured_at: '2026-05-30T18:00:00Z',
     };
-    await routeClip(payload, providers, { screenshot: screenshotClipRule, hook: hookClipRule, keyframe: keyframeClipRule }, [enabledWatchRule], vaultOps);
+    await routeClip(payload, providers, { thumbnail: thumbnailClipRule, screenshot: screenshotClipRule, hook:hookClipRule, keyframe: keyframeClipRule }, [enabledWatchRule], vaultOps);
     expect(provider.analyzeMultiFrame).toHaveBeenCalledWith(expect.objectContaining({
       transcript: undefined,
       meta: expect.objectContaining({ time_range: { start: 0, end: 15 } }),
@@ -260,7 +315,7 @@ describe('routeClip — manual mode (hook)', () => {
     sopPath: '', outputFolder: 'Hooks', providerId: '',
     processingMode: 'manual', maxFrames: 3, framesFolder: 'Assets/images',
   };
-  const manualClipRules = { screenshot: screenshotClipRule, hook: manualHookRule, keyframe: keyframeClipRule };
+  const manualClipRules = { thumbnail: thumbnailClipRule, screenshot: screenshotClipRule, hook:manualHookRule, keyframe: keyframeClipRule };
 
   test('saves sampled frames as PNG files', async () => {
     const vaultOps = makeVaultOps();
@@ -316,7 +371,7 @@ describe('routeClip — manual mode (keyframe)', () => {
     sopPath: '', outputFolder: 'Keyframes', providerId: '',
     processingMode: 'manual', maxFrames: 5, framesFolder: 'Assets/images',
   };
-  const manualClipRules = { screenshot: screenshotClipRule, hook: hookClipRule, keyframe: manualKeyframeRule };
+  const manualClipRules = { thumbnail: thumbnailClipRule, screenshot: screenshotClipRule, hook:hookClipRule, keyframe: manualKeyframeRule };
 
   test('writes keyframe template with time range in title and jump link', async () => {
     const vaultOps = makeVaultOps();

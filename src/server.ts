@@ -34,7 +34,21 @@ export type KeyframePayload = {
   captured_at: string;
 };
 
+export type ThumbnailPayload = {
+  mode: 'thumbnail';
+  platform: string;
+  video_id: string;
+  video_url: string;
+  thumbnail_url: string;
+  title: string;
+  channel: string;
+  channel_handle?: string;
+  views?: string;
+  captured_at: string;
+};
+
 export type ClipPayload =
+  | ThumbnailPayload
   | ScreenshotPayload
   | HookPayload
   | KeyframePayload
