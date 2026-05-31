@@ -1,205 +1,135 @@
 # Vault Autopilot — Backlog
 
 > 按优先级排列。P1 = 最常用路径上的 bug，P2 = 体验问题，P3 = 功能缺失，P4 = 未来想法。
+> 标注 [扩展] = Chrome 扩展侧工作，[插件] = vault-autopilot 侧工作。
 
 ---
 
-## P1 — Hook / Keyframe 手动模式重设计（最高优先级）
+## P1 — [扩展] Hook 字幕未发送
 
 **问题**
-- 帧图片和 MD 文件混在同一文件夹，笔记文件夹被 PNG 占满
-- 模板里没有 `[Image #1]` / `[Image #2]` 标注，Claudian 分析后无法对应帧
-- 字幕（transcript）字段未显示（Chrome 扩展可能未发送）
-- 视频链接是纯跳转链接，无法在 Obsidian 里直接看视频
+Chrome 扩展发来的 hook payload 里没有 `transcript` 字段（或为空）。
+vault-autopilot 模板里字幕逻辑已实现——问题完全在扩展侧。
 
-**目标体验**
-
-```
-Content Creation/
-  hook-标题-1234.md     ← 笔记文件夹只有 MD
-
-Assets/images/
-  hook-标题-1234-f01.png   ← 帧图片和平时截图放一起
-  hook-标题-1234-f02.png
-```
-
-**Hook MD 模板**
-
-```
-# Hook — 视频标题
-
-<iframe width="100%" height="315"
-  src="https://www.youtube.com/embed/VIDEO_ID?start=0"
-  frameborder="0" allowfullscreen></iframe>
-
-来源：youtube | 频道名 | 2026-05-30
-
-> [!NOTE] 分析用帧（Claudian 看完后删除此块 + Assets/images 里的对应文件）
-> [Image #1] ![[hook-标题-1234-f01.png]]
-> [Image #2] ![[hook-标题-1234-f02.png]]
-> [Image #3] ![[hook-标题-1234-f03.png]]
->
-> 字幕：你有没有想过，为什么有些视频开场 3 秒就能让你停下来？
+**需要扩展做的**
+- [ ] 在页面加载时开始监听 `.ytp-caption-segment`，把字幕+时间戳缓存到内存
+- [ ] 点击 Hook 按钮时，取 0 到 `video.currentTime` 这段字幕，拼成字符串放入 `transcript`
 
 ---
 
-## Hook 类型
-
-## 具体手法
-
-## 为什么有效
-
-## 如何复制
-
-## 我的想法
-```
-
-**Keyframe MD 模板**（`?start=30` 从指定秒数开始播）
-
-```
-# 关键帧 — 视频标题 [30s–45s]
-
-<iframe width="100%" height="315"
-  src="https://www.youtube.com/embed/VIDEO_ID?start=30"
-  frameborder="0" allowfullscreen></iframe>
-
-来源：youtube | 2026-05-30 | 30s–45s
-
-> [!NOTE] 分析用帧（Claudian 看完后删除此块）
-> [Image #1] ![[keyframe-标题-1234-f01.png]]
-
----
-
-## 技法类型
-
-## 技术实现
-
-## 视觉目的
-
-## 如何复制
-
-## 我的想法
-```
-
-**iframe 技术细节**
-- YouTube embed：`https://www.youtube.com/embed/{VIDEO_ID}?start={秒数}`
-- 从 `youtu.be/ID?si=xxx` 或 `youtube.com/watch?v=ID` 提取 VIDEO_ID
-- Bilibili embed：`https://player.bilibili.com/player.html?bvid={BVID}&page=1&t={秒数}`
-- Obsidian 前提：Settings → Editor → "Allow HTML iframes" 需开启（首次使用提示用户）
-
-**解决方案**
-- [ ] 新增 `extractVideoId(url, platform)` — 提取 YouTube/Bilibili 视频 ID
-- [ ] 新增 `buildVideoEmbed(url, platform, startSeconds)` — 生成 iframe HTML
-- [ ] `ClipRule` 加 `framesFolder: string` 字段（默认 `Assets/images`）
-- [ ] 设置 UI 加 "Frames folder" 输入框
-- [ ] `buildManualTemplate` 全面重写：iframe + `[Image #N]` + Callout 块
-- [ ] 验证 Chrome 扩展是否发送 `transcript`（curl 测试）
-- [ ] 修复字幕显示 bug
-
----
-
-## P1 — Screenshot 模式点击无响应
+## P1 — [扩展] Screenshot 模式点击无响应
 
 **问题**
 Chrome 扩展里点击截图按钮，vault-autopilot 收不到请求。
 
-**可能原因**
-- 扩展发的是旧格式 `image_base64`，代码路由出了问题
-- 或扩展本身有 bug，根本没发请求
-
-**解决方案**
-- [ ] Chrome 扩展加 console.log，确认请求是否发出
-- [ ] curl 发旧格式 payload 到 `/clip`，确认 vault-autopilot 这边处理正常
-- [ ] 对比扩展新旧代码差异
+**排查步骤**
+- [ ] Chrome 扩展 console.log 确认请求是否发出
+- [ ] curl 发旧格式 payload `{ image_base64, source_url, title }` 到 `/clip`，确认插件侧处理正常
+- [ ] 对比扩展新旧代码差异，找发送逻辑 bug
 
 ---
 
-## P1 — Keyframe 模式点击无响应
+## P1 — [扩展] Hook 帧捕获完整实现
 
 **问题**
-Chrome 扩展里点击 keyframe 按钮无反应。
+当前 Hook 按钮行为不完整：没有从 0 到当前时间均匀截帧，没有发送 `time_range`。
 
-**背景**
-理想 UX：用户看到好的动效 → 点"开始" → 点"结束" → 自动截取这段关键帧 → 发到 vault-autopilot。
-
-**解决方案**
-- [ ] Chrome 扩展实现 start/end 选择 UI
-- [ ] 扩展按时间范围截取帧，组装 keyframe payload 发送
-- [ ] vault-autopilot keyframe 路由已就绪，等扩展对接
+**需要扩展做的**
+- [ ] 读取 `video.currentTime` 作为 Hook 结束点
+- [ ] 从视频当前帧截图（canvas.drawImage），作为代表帧发送
+- [ ] 更完整方案：seek 到均匀时间点截多帧（0, end/4, end/2, 3*end/4, end）
+- [ ] payload 加 `time_range: { start: 0, end: Math.floor(video.currentTime) }`
 
 ---
 
-## P2 — Auto 模式（直接调 AI）测试
+## P1 — [扩展] Keyframe 模式 start/end UI 未实现
 
 **问题**
-Auto 模式已实现，但从未真实测试过。
+Keyframe 按钮无反应。理想 UX：用户看到好的动效 → 点"开始" → 点"结束" → 截取帧段。
 
-**解决方案**
-- [ ] 配置 API provider（Anthropic 或 OpenAI-compat）
+**需要扩展做的**
+- [ ] 第一次点击：记录 `startTime = video.currentTime`，UI 显示"已标记开始"
+- [ ] 第二次点击：记录 `endTime = video.currentTime`，截帧+发送
+- [ ] payload 加 `time_range: { start, end }`
+- [ ] vault-autopilot 侧 keyframe 路由和模板已就绪，等扩展对接
+
+---
+
+## P2 — [插件] Auto 模式端到端测试
+
+**问题**
+Auto 模式（vault-autopilot 直接调 Anthropic/OpenAI/Gemini 写好完整笔记）代码已实现，从未真实测试过。
+
+**步骤**
+- [ ] 在插件设置里配置一个 API provider（Anthropic 或 OpenAI-compat）
+- [ ] 将 hook ClipRule 的 processingMode 改为 auto
 - [ ] curl 发 hook payload，验证笔记是否自动生成
-- [ ] 检查 SOP 是否被正确读取和发送
+- [ ] 检查 SOP 文件是否被正确读取并发送给 AI
 
 ---
 
-## P2 — 帧图片数量控制
+## P2 — [插件] iframe 显示确认
 
 **问题**
-Chrome 扩展可能发来很多帧（最多 20 张），token 成本高。
+最新部署后用户未重启 Obsidian 插件，iframe 模板未生效。
 
-**解决方案**
-- [ ] 验证 `maxFrames`（默认 5）采样逻辑是否均匀分布
-- [ ] MD 里注明"共 N 帧，采样 M 帧"
-
----
-
-## P3 — 分析后一键清理帧图片
-
-**问题**
-Claudian 分析完后，需手动删 Assets/images 里的帧 + MD 里的 Callout 块。
-
-**可能解决方案**
-- Obsidian 插件命令："清理本笔记的帧图片"
-- 或接受手动操作，Callout 块设计足够显眼好删
+**步骤**
+- [ ] Obsidian 里禁用再启用 Vault Autopilot 插件
+- [ ] 发一个 hook payload，确认 MD 里有 `<iframe>` 和 `[Image #1]`
+- [ ] 确认帧图片存在 `Assets/images/` 而非 `Content Creation/`
+- [ ] 确认 Obsidian Settings → Editor → "Allow HTML iframes" 已开启
 
 ---
 
-## P3 — Bilibili iframe 嵌入验证
-
-**问题**
-Bilibili embed URL 格式与 YouTube 不同，BV 号提取和 `?t=` 参数需验证。
-
-**解决方案**
-- [ ] 发一个 Bilibili keyframe payload，检查生成的 iframe 是否在 Obsidian 里正常播放
-
----
-
-## P4 — 多个 SOP 模板
+## P3 — [插件] 分析后一键清理帧图片
 
 **想法**
-同一 mode 有多个分析角度（hook 视觉分析 SOP / 文案分析 SOP）。
+Claudian 分析完后，需手动删 `Assets/images/` 里的帧 + MD 里的 Callout 块。
 
-**现状**
-目前每个 mode 只能配一个 SOP。
+**可能方案**
+- Obsidian 插件命令："清理本笔记的帧图片"（自动删除 Callout 块 + 对应文件）
+- 或接受手动操作，Callout 块设计足够显眼（已实现）
 
 ---
 
-## P4 — 自动删除过期帧
+## P3 — [插件] Bilibili iframe 验证
 
-**想法**
-帧图片存到 `Assets/images/` 后，N 天后自动删除。
+**问题**
+Bilibili embed URL 代码已写，但从未真实测试。
 
-**现状**
-暂无实现计划，手动删除为主。
+- [ ] 发一个 Bilibili keyframe payload，检查生成的 iframe 在 Obsidian 里是否正常播放
+
+---
+
+## P4 — [插件] 多个 SOP 模板
+
+同一 mode 可能有多个分析角度（hook 视觉分析 / 文案分析）。
+目前每个 mode 只能配一个 SOP，如需多角度需手动改设置。
+
+---
+
+## P4 — [插件] 自动删除过期帧
+
+帧图片存到 `Assets/images/` 后，N 天后自动删除。暂无实现计划。
 
 ---
 
 ## 已完成 ✅
 
-- `server.ts` ClipPayload 改为判别联合（screenshot / hook / keyframe / legacy）
-- `clip-router.ts` 三种模式路由逻辑
-- Anthropic / OpenAI-compat / Gemini API 支持多帧 `analyzeMultiFrame`
+### vault-autopilot 插件
+- ClipPayload 判别联合（screenshot / hook / keyframe / legacy）
+- clip-router 三种模式路由
+- Anthropic / OpenAI-compat / Gemini 支持多帧 `analyzeMultiFrame`
 - `processingMode: 'auto' | 'manual'` 设置
-- `maxFrames` 设置
-- YouTube / Bilibili 时间戳链接生成
+- `maxFrames` 设置（默认 5，均匀采样）
+- `framesFolder` 设置（默认 `Assets/images`，帧图片和普通截图放一起）
+- Hook/Keyframe 手动模式模板：iframe 嵌入 + `[Image #N]` Callout 块 + 字幕区
+- YouTube / Bilibili 视频 ID 提取 + iframe URL 构建（`extractVideoId`, `buildVideoEmbed`）
+- HookPayload 加可选 `time_range`，MD 标题显示 Hook 时长
 - hex 颜色代码后处理（`postProcessMarkdown`）
-- vault watcher 正常工作
+- vault watcher 正常工作（文件拖进 watchFolder 触发分析）
+- 设置 UI：Hook / Keyframe 各有 processingMode / maxFrames / framesFolder / SOP / outputFolder / provider
+
+### Chrome 扩展（已完成部分）
+- Hook 模式基础 payload 结构（frames / video_title / url / platform / channel）
+- POST 到 `http://127.0.0.1:27183/clip`
