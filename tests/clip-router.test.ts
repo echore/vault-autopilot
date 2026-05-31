@@ -75,7 +75,7 @@ describe('routeClip — thumbnail', () => {
     await routeClip(payload, new Map(), clipRules, [], vaultOps);
     expect(vaultOps.downloadUrl).toHaveBeenCalledWith(payload.thumbnail_url);
     expect(vaultOps.createBinary).toHaveBeenCalledWith(
-      'Assets/Great Videos/abc123.jpg',
+      'Assets/Great Videos/abc123.webp',
       expect.any(ArrayBuffer),
     );
     const [notePath, noteContent] = (vaultOps.create as jest.Mock).mock.calls[0];
@@ -84,7 +84,7 @@ describe('routeClip — thumbnail', () => {
     expect(noteContent).toContain('video_id: "abc123"');
     expect(noteContent).toContain('channel: "Ali Abdaal"');
     expect(noteContent).toContain('dimensions: [封面标题]');
-    expect(noteContent).toContain('![[abc123.jpg]]');
+    expect(noteContent).toContain('![[abc123.webp]]');
     expect(noteContent).toContain('## 封面标题');
   });
 

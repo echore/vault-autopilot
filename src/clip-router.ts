@@ -129,8 +129,7 @@ async function handleThumbnail(
   await vaultOps.ensureFolder(rule.thumbnailFolder);
   await vaultOps.ensureFolder(rule.outputFolder);
 
-  const ext = payload.thumbnail_url.includes('.webp') ? 'webp' : 'jpg';
-  const thumbnailFile = `${payload.video_id}.${ext}`;
+  const thumbnailFile = `${payload.video_id}.webp`;
   const thumbnailPath = `${rule.thumbnailFolder}/${thumbnailFile}`;
   const imgData = await vaultOps.downloadUrl(payload.thumbnail_url);
   await vaultOps.createBinary(thumbnailPath, imgData);
