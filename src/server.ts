@@ -22,6 +22,7 @@ export type HookPayload = {
   platform?: string;
   url: string;
   captured_at: string;
+  time_range?: { start: number; end: number };
 };
 
 export type KeyframePayload = {

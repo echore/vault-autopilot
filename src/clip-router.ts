@@ -71,12 +71,14 @@ function buildManualTemplate(
     const transcriptLine = payload.transcript
       ? `>\n> **字幕**\n> ${payload.transcript}`
       : '';
+    const durationSuffix = payload.time_range ? ` [${payload.time_range.start}s–${payload.time_range.end}s]` : '';
+    const durationLabel = payload.time_range ? ` | ${payload.time_range.end}s Hook` : '';
     return [
-      `# Hook — ${payload.video_title}`,
+      `# Hook — ${payload.video_title}${durationSuffix}`,
       ``,
       embed,
       ``,
-      `来源：${platform ?? ''} | ${channel ?? ''} | ${payload.url} | ${payload.captured_at}`,
+      `来源：${platform ?? ''} | ${channel ?? ''} | ${payload.url} | ${payload.captured_at}${durationLabel}`,
       ``,
       `> [!NOTE] 分析用帧（Claudian 看完后删除此块 + framesFolder 里的对应文件）`,
       frameLines,
