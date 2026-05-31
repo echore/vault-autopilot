@@ -154,14 +154,7 @@ function buildManualTemplate(
 
   const embed = buildVideoEmbed(payload.url, platform, startSeconds);
   const frameLines = frameNames.map((n, i) => `> **[Image #${i + 1}]** ![[${n}]]`).join('\n');
-  const frameChecklist = [
-    `> `,
-    `> ---`,
-    `> **完成后执行：**`,
-    `> - [ ] 按 SOP 完成分析，填入各章节`,
-    `> - [ ] 删除此整个帧块`,
-    `> - [ ] 删除 framesFolder 中对应的图片文件`,
-  ].join('\n');
+  const frameChecklist = [`> `, `> - [ ] 按 SOP 完成分析，填入各章节`].join('\n');
 
   if (payload.mode === 'hook') {
     const transcriptSection = payload.transcript

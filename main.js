@@ -17451,14 +17451,7 @@ function buildManualTemplate(payload, frameNames, sopContent) {
   const channel = payload.mode === "hook" ? payload.channel : void 0;
   const embed = buildVideoEmbed(payload.url, platform, startSeconds);
   const frameLines = frameNames.map((n2, i2) => `> **[Image #${i2 + 1}]** ![[${n2}]]`).join("\n");
-  const frameChecklist = [
-    `> `,
-    `> ---`,
-    `> **\u5B8C\u6210\u540E\u6267\u884C\uFF1A**`,
-    `> - [ ] \u6309 SOP \u5B8C\u6210\u5206\u6790\uFF0C\u586B\u5165\u5404\u7AE0\u8282`,
-    `> - [ ] \u5220\u9664\u6B64\u6574\u4E2A\u5E27\u5757`,
-    `> - [ ] \u5220\u9664 framesFolder \u4E2D\u5BF9\u5E94\u7684\u56FE\u7247\u6587\u4EF6`
-  ].join("\n");
+  const frameChecklist = [`> `, `> - [ ] \u6309 SOP \u5B8C\u6210\u5206\u6790\uFF0C\u586B\u5165\u5404\u7AE0\u8282`].join("\n");
   if (payload.mode === "hook") {
     const transcriptSection = payload.transcript ? `
 ## \u5B57\u5E55
