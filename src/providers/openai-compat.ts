@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { AIProvider, AnalysisRequest, OpenAICompatProviderConfig } from '../types';
+import { AIProvider, AnalysisRequest, OpenAICompatProviderConfig, MultiFrameRequest, MultiFrameProvider } from '../types';
 
 function imageToDataUrl(buf: Buffer, filePath: string): string {
   const ext = filePath.split('.').pop()?.toLowerCase() || 'png';
@@ -7,7 +7,7 @@ function imageToDataUrl(buf: Buffer, filePath: string): string {
   return `data:${mime[ext] ?? 'image/png'};base64,${buf.toString('base64')}`;
 }
 
-export function createOpenAICompatProvider(config: OpenAICompatProviderConfig): AIProvider {
+export function createOpenAICompatProvider(config: OpenAICompatProviderConfig): MultiFrameProvider {
   const client = new OpenAI({
     apiKey: config.apiKey,
     baseURL: config.baseUrl,
@@ -41,6 +41,24 @@ export function createOpenAICompatProvider(config: OpenAICompatProviderConfig): 
       if (!content) throw new Error('API returned no content');
       return content.trim();
     },
+
+    async analyzeMultiFrame(req: MultiFrameRequest): Promise<string> {
+      const imageContent = req.frames.map((frame) => ({
+        type: 'image_url' as const,
+        image_url: { url: `data:image/png;base64,${frame.toString('base64')}` },
+      }));
+      const response = await client.chat.completions.create({
+        model: config.model,
+        messages: [
+          { role: 'system', content: req.sopContent },
+          { role: 'user', content: [...imageContent, { type: 'text' as const, text: buildMultiFrameContext(req) }] },
+        ],
+        max_tokens: 4096,
+      });
+      const content = response.choices[0]?.message?.content;
+      if (!content) throw new Error('API returned no content');
+      return content.trim();
+    },
   };
 }
 
@@ -50,4 +68,16 @@ function buildTextContext(req: AnalysisRequest): string {
   if (req.meta.title) parts.push(`Title: ${req.meta.title}`);
   if (req.fileType === 'text') parts.push(`\nFile content:\n${req.fileContent.toString('utf8')}`);
   return parts.join('\n') || 'Analyze the attached file.';
+}
+
+function buildMultiFrameContext(req: MultiFrameRequest): string {
+  const parts: string[] = [];
+  if (req.meta.video_title) parts.push(`Video: ${req.meta.video_title}`);
+  if (req.meta.channel) parts.push(`Channel: ${req.meta.channel}`);
+  if (req.meta.platform) parts.push(`Platform: ${req.meta.platform}`);
+  if (req.meta.url) parts.push(`URL: ${req.meta.url}`);
+  if (req.meta.time_range) parts.push(`Time range: ${req.meta.time_range.start}s–${req.meta.time_range.end}s`);
+  if (req.meta.captured_at) parts.push(`Captured: ${req.meta.captured_at}`);
+  if (req.transcript) parts.push(`\nTranscript:\n${req.transcript}`);
+  return parts.join('\n') || 'Analyze the frames.';
 }

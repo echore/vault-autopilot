@@ -1,5 +1,5 @@
 import { createOpenAICompatProvider } from '../../src/providers/openai-compat';
-import { AnalysisRequest } from '../../src/types';
+import { AnalysisRequest, MultiFrameRequest } from '../../src/types';
 
 // Mock the openai module
 jest.mock('openai', () => {
@@ -41,6 +41,66 @@ const textRequest: AnalysisRequest = {
   sopContent: 'Summarize the text.',
   meta: {},
 };
+
+describe('analyzeMultiFrame — OpenAI-compat', () => {
+  let mockCreate: jest.Mock;
+
+  beforeEach(() => {
+    mockCreate = jest.fn().mockResolvedValue({
+      choices: [{ message: { content: '# Analysis\nContent' } }],
+    });
+    MockOpenAI.mockImplementation(() => ({
+      chat: { completions: { create: mockCreate } },
+    }) as any);
+  });
+
+  const multiFrameReq: MultiFrameRequest = {
+    frames: [Buffer.from('frame1'), Buffer.from('frame2')],
+    transcript: 'Hello',
+    sopContent: 'Analyze frames.',
+    meta: { video_title: 'My Video', url: 'https://yt.com', captured_at: '2026-05-30T18:00:00Z' },
+  };
+
+  test('returns trimmed text from response', async () => {
+    const p = createOpenAICompatProvider(config);
+    const result = await (p as any).analyzeMultiFrame(multiFrameReq);
+    expect(result).toBe('# Analysis\nContent');
+  });
+
+  test('sends each frame as a separate image_url content block', async () => {
+    const p = createOpenAICompatProvider(config);
+    await (p as any).analyzeMultiFrame(multiFrameReq);
+    const call = mockCreate.mock.calls[0][0];
+    const userMsg = call.messages.find((m: any) => m.role === 'user');
+    const imageBlocks = userMsg.content.filter((c: any) => c.type === 'image_url');
+    expect(imageBlocks).toHaveLength(2);
+    expect(imageBlocks[0].image_url.url).toContain('data:image/png;base64,');
+    expect(imageBlocks[0].image_url.url).toContain(Buffer.from('frame1').toString('base64'));
+  });
+
+  test('includes transcript in context text block', async () => {
+    const p = createOpenAICompatProvider(config);
+    await (p as any).analyzeMultiFrame(multiFrameReq);
+    const call = mockCreate.mock.calls[0][0];
+    const userMsg = call.messages.find((m: any) => m.role === 'user');
+    const textBlock = userMsg.content.find((c: any) => c.type === 'text');
+    expect(textBlock.text).toContain('Hello');
+  });
+
+  test('uses sopContent as system message', async () => {
+    const p = createOpenAICompatProvider(config);
+    await (p as any).analyzeMultiFrame(multiFrameReq);
+    const call = mockCreate.mock.calls[0][0];
+    const sysMsg = call.messages.find((m: any) => m.role === 'system');
+    expect(sysMsg.content).toBe('Analyze frames.');
+  });
+
+  test('throws when response has no content', async () => {
+    mockCreate.mockResolvedValue({ choices: [{ message: { content: null } }] });
+    const p = createOpenAICompatProvider(config);
+    await expect((p as any).analyzeMultiFrame(multiFrameReq)).rejects.toThrow('no content');
+  });
+});
 
 describe('createOpenAICompatProvider', () => {
   let mockCreate: jest.Mock;
