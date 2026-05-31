@@ -30,8 +30,14 @@ const enabledWatchRule: WatchRule = {
   outputFolder: 'Notes', providerId: 'p1',
 };
 
-const hookClipRule: ClipRule = { sopPath: '/hook-sop.md', outputFolder: 'Hooks', providerId: 'p1', processingMode: 'auto', maxFrames: 5 };
-const keyframeClipRule: ClipRule = { sopPath: '/kf-sop.md', outputFolder: 'Keyframes', providerId: 'p1', processingMode: 'auto', maxFrames: 5 };
+const hookClipRule: ClipRule = {
+  sopPath: '/hook-sop.md', outputFolder: 'Hooks', providerId: 'p1',
+  processingMode: 'auto', maxFrames: 5, framesFolder: 'Assets/images',
+};
+const keyframeClipRule: ClipRule = {
+  sopPath: '/kf-sop.md', outputFolder: 'Keyframes', providerId: 'p1',
+  processingMode: 'auto', maxFrames: 5, framesFolder: 'Assets/images',
+};
 const clipRules = { hook: hookClipRule, keyframe: keyframeClipRule };
 
 // ── isMultiFrameProvider ──────────────────────────────────────────────────────
@@ -123,7 +129,7 @@ describe('routeClip — hook', () => {
 
   test('throws when hook clip rule has no sopPath configured', async () => {
     const vaultOps = makeVaultOps();
-    const emptyRules = { hook: { sopPath: '', outputFolder: 'Hooks', providerId: 'p1', processingMode: 'auto' as const, maxFrames: 5 }, keyframe: keyframeClipRule };
+    const emptyRules = { hook: { sopPath: '', outputFolder: 'Hooks', providerId: 'p1', processingMode: 'auto' as const, maxFrames: 5, framesFolder: 'Assets/images' }, keyframe: keyframeClipRule };
     const payload: ClipPayload = {
       mode: 'hook', frames: [Buffer.from('f').toString('base64')],
       video_title: 'V', url: 'https://yt.com', captured_at: '2026-05-30T18:00:00Z',
@@ -201,7 +207,7 @@ describe('routeClip — keyframe', () => {
 describe('routeClip — manual mode (hook)', () => {
   const manualHookRule: ClipRule = {
     sopPath: '', outputFolder: 'Hooks', providerId: '',
-    processingMode: 'manual', maxFrames: 3,
+    processingMode: 'manual', maxFrames: 3, framesFolder: 'Assets/images',
   };
   const manualClipRules = { hook: manualHookRule, keyframe: keyframeClipRule };
 
@@ -215,7 +221,7 @@ describe('routeClip — manual mode (hook)', () => {
     await routeClip(payload, new Map(), manualClipRules, [], vaultOps);
     expect(vaultOps.createBinary).toHaveBeenCalledTimes(3);
     expect(vaultOps.createBinary).toHaveBeenCalledWith(
-      expect.stringMatching(/Hooks\/hook-.+-f01\.png/),
+      expect.stringMatching(/Assets\/images\/hook-.+-f01\.png/),
       expect.any(ArrayBuffer),
     );
   });
@@ -232,7 +238,9 @@ describe('routeClip — manual mode (hook)', () => {
     const [notePath, noteContent] = (vaultOps.create as jest.Mock).mock.calls[0];
     expect(notePath).toMatch(/Hooks\/hook-.+\.md/);
     expect(noteContent).toContain('# Hook — My Hook');
-    expect(noteContent).toContain('youtube.com');
+    expect(noteContent).toContain('<iframe');
+    expect(noteContent).toContain('youtube.com/embed/');
+    expect(noteContent).toContain('[Image #1]');
     expect(noteContent).toContain('![[');
     expect(noteContent).toContain('Hello world');
     expect(noteContent).toContain('## Hook 类型');
@@ -255,7 +263,7 @@ describe('routeClip — manual mode (hook)', () => {
 describe('routeClip — manual mode (keyframe)', () => {
   const manualKeyframeRule: ClipRule = {
     sopPath: '', outputFolder: 'Keyframes', providerId: '',
-    processingMode: 'manual', maxFrames: 5,
+    processingMode: 'manual', maxFrames: 5, framesFolder: 'Assets/images',
   };
   const manualClipRules = { hook: hookClipRule, keyframe: manualKeyframeRule };
 
@@ -270,7 +278,8 @@ describe('routeClip — manual mode (keyframe)', () => {
     await routeClip(payload, new Map(), manualClipRules, [], vaultOps);
     const [, noteContent] = (vaultOps.create as jest.Mock).mock.calls[0];
     expect(noteContent).toContain('# 关键帧 — My Video [30s–45s]');
-    expect(noteContent).toContain('t=30s');
+    expect(noteContent).toContain('<iframe');
+    expect(noteContent).toContain('start=30');
     expect(noteContent).toContain('## 技法类型');
   });
 });

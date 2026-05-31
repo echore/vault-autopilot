@@ -1,4 +1,4 @@
-import { postProcessMarkdown, sanitize } from '../src/util';
+import { postProcessMarkdown, sanitize, extractVideoId, buildVideoEmbed } from '../src/util';
 
 describe('postProcessMarkdown', () => {
   test('wraps bare 6-digit hex codes in backticks', () => {
@@ -30,5 +30,44 @@ describe('sanitize', () => {
   });
   test('returns empty string for undefined input', () => {
     expect(sanitize(undefined as any)).toBe('');
+  });
+});
+
+describe('extractVideoId', () => {
+  test('extracts ID from youtu.be short URL', () => {
+    expect(extractVideoId('https://youtu.be/MflKu9F4BsE?si=abc', 'youtube')).toBe('MflKu9F4BsE');
+  });
+  test('extracts ID from youtube.com/watch URL', () => {
+    expect(extractVideoId('https://www.youtube.com/watch?v=MflKu9F4BsE', 'youtube')).toBe('MflKu9F4BsE');
+  });
+  test('extracts BV ID from Bilibili URL', () => {
+    expect(extractVideoId('https://www.bilibili.com/video/BV1xx411c7XQ', 'bilibili')).toBe('BV1xx411c7XQ');
+  });
+  test('returns null for unknown platform', () => {
+    expect(extractVideoId('https://example.com/video', 'other')).toBeNull();
+  });
+});
+
+describe('buildVideoEmbed', () => {
+  test('returns YouTube iframe with start time', () => {
+    const result = buildVideoEmbed('https://youtu.be/MflKu9F4BsE?si=abc', 'youtube', 0);
+    expect(result).toContain('<iframe');
+    expect(result).toContain('youtube.com/embed/MflKu9F4BsE');
+    expect(result).toContain('start=0');
+  });
+  test('returns YouTube iframe with non-zero start for keyframe', () => {
+    const result = buildVideoEmbed('https://www.youtube.com/watch?v=MflKu9F4BsE', 'youtube', 30);
+    expect(result).toContain('start=30');
+  });
+  test('returns Bilibili iframe', () => {
+    const result = buildVideoEmbed('https://www.bilibili.com/video/BV1xx411c7XQ', 'bilibili', 15);
+    expect(result).toContain('<iframe');
+    expect(result).toContain('BV1xx411c7XQ');
+    expect(result).toContain('t=15');
+  });
+  test('returns fallback link for unknown platform', () => {
+    const result = buildVideoEmbed('https://example.com/video', 'other', 0);
+    expect(result).toContain('https://example.com/video');
+    expect(result).not.toContain('<iframe');
   });
 });

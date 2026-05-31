@@ -1,6 +1,6 @@
 import { ClipPayload, HookPayload, KeyframePayload, LegacyClipPayload, ScreenshotPayload } from './server';
 import { AIProvider, ClipRule, isMultiFrameProvider, MultiFrameRequest, PluginSettings, WatchRule } from './types';
-import { postProcessMarkdown, sanitize } from './util';
+import { postProcessMarkdown, sanitize, buildVideoEmbed } from './util';
 
 export interface VaultOps {
   ensureFolder(folderPath: string): Promise<void>;
@@ -56,39 +56,32 @@ function sampleFrames(frames: string[], max: number): string[] {
   return Array.from({ length: max }, (_, i) => frames[Math.floor(i * step)]);
 }
 
-function buildTimestampUrl(url: string, platform: string | undefined, startSeconds: number): string {
-  const sep = url.includes('?') ? '&' : '?';
-  if (platform === 'youtube' || url.includes('youtube.com') || url.includes('youtu.be')) {
-    return `${url}${sep}t=${startSeconds}s`;
-  }
-  if (platform === 'bilibili' || url.includes('bilibili.com')) {
-    return `${url}${sep}t=${startSeconds}`;
-  }
-  return url;
-}
-
 function buildManualTemplate(
   payload: HookPayload | KeyframePayload,
   frameNames: string[],
 ): string {
-  const embeds = frameNames.map((n) => `![[${n}]]`).join('\n');
   const startSeconds = payload.mode === 'keyframe' ? payload.time_range.start : 0;
   const platform = payload.mode === 'hook' ? payload.platform : undefined;
   const channel = payload.mode === 'hook' ? payload.channel : undefined;
-  const jumpUrl = buildTimestampUrl(payload.url, platform, startSeconds);
+
+  const embed = buildVideoEmbed(payload.url, platform, startSeconds);
+  const frameLines = frameNames.map((n, i) => `> **[Image #${i + 1}]** ![[${n}]]`).join('\n');
 
   if (payload.mode === 'hook') {
-    const transcriptSection = payload.transcript
-      ? `\n**字幕**\n${payload.transcript}\n`
+    const transcriptLine = payload.transcript
+      ? `>\n> **字幕**\n> ${payload.transcript}`
       : '';
     return [
       `# Hook — ${payload.video_title}`,
       ``,
-      `▶ [跳转原视频](${jumpUrl})`,
+      embed,
+      ``,
       `来源：${platform ?? ''} | ${channel ?? ''} | ${payload.url} | ${payload.captured_at}`,
       ``,
-      embeds,
-      transcriptSection,
+      `> [!NOTE] 分析用帧（Claudian 看完后删除此块 + framesFolder 里的对应文件）`,
+      frameLines,
+      transcriptLine,
+      ``,
       `---`,
       ``,
       `## Hook 类型`,
@@ -107,10 +100,12 @@ function buildManualTemplate(
     return [
       `# 关键帧 — ${payload.video_title} [${start}s–${end}s]`,
       ``,
-      `▶ [跳转原视频 (${start}s–${end}s)](${jumpUrl})`,
-      `来源：${payload.url} | ${payload.captured_at}`,
+      embed,
       ``,
-      embeds,
+      `来源：${payload.url} | ${payload.captured_at} | ${start}s–${end}s`,
+      ``,
+      `> [!NOTE] 分析用帧（Claudian 看完后删除此块 + framesFolder 里的对应文件）`,
+      frameLines,
       ``,
       `---`,
       ``,
@@ -138,12 +133,14 @@ async function handleMultiFrame(
     const max = rule.maxFrames ?? 5;
     const sampled = sampleFrames(payload.frames, max);
     const stem = `${payload.mode}-${sanitize(payload.video_title)}-${Date.now()}`;
+    const framesDir = rule.framesFolder || rule.outputFolder;
+    await vaultOps.ensureFolder(framesDir);
     await vaultOps.ensureFolder(rule.outputFolder);
     const frameNames: string[] = [];
     for (let i = 0; i < sampled.length; i++) {
       const name = `${stem}-f${String(i + 1).padStart(2, '0')}.png`;
       const bytes = Buffer.from(sampled[i], 'base64');
-      await vaultOps.createBinary(`${rule.outputFolder}/${name}`, bytes.buffer as ArrayBuffer);
+      await vaultOps.createBinary(`${framesDir}/${name}`, bytes.buffer as ArrayBuffer);
       frameNames.push(name);
     }
     const template = buildManualTemplate(payload, frameNames);

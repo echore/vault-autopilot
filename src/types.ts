@@ -96,6 +96,7 @@ export interface ClipRule {
   providerId: string;    // must match a ProviderConfig.id
   processingMode: 'auto' | 'manual';
   maxFrames: number;
+  framesFolder: string;  // vault-relative path for frame PNGs (e.g. "Assets/images")
 }
 
 // ── Plugin settings ───────────────────────────────────────────────────────────

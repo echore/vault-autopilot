@@ -11,8 +11,8 @@ export const DEFAULT_SETTINGS: PluginSettings = {
     port: 27183,
   },
   clipRules: {
-    hook: { sopPath: '', outputFolder: '', providerId: '', processingMode: 'manual', maxFrames: 5 },
-    keyframe: { sopPath: '', outputFolder: '', providerId: '', processingMode: 'manual', maxFrames: 5 },
+    hook: { sopPath: '', outputFolder: '', providerId: '', processingMode: 'manual', maxFrames: 5, framesFolder: 'Assets/images' },
+    keyframe: { sopPath: '', outputFolder: '', providerId: '', processingMode: 'manual', maxFrames: 5, framesFolder: 'Assets/images' },
   },
 };
 
@@ -129,6 +129,15 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
               this.plugin.settings.clipRules[mode].maxFrames = n;
               await this.plugin.saveSettings();
             }
+          }));
+      new Setting(containerEl)
+        .setName('Frames folder')
+        .setDesc('Vault-relative path where frame images are saved. Default: Assets/images')
+        .addText(t => t
+          .setValue(this.plugin.settings.clipRules[mode].framesFolder)
+          .onChange(async v => {
+            this.plugin.settings.clipRules[mode].framesFolder = v.trim();
+            await this.plugin.saveSettings();
           }));
       new Setting(containerEl)
         .setName('SOP / prompt path')
