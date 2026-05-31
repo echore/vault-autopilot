@@ -132,15 +132,17 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
               await this.plugin.saveSettings();
             }
           }));
-      new Setting(containerEl)
-        .setName('Frames folder')
-        .setDesc('Vault-relative path where frame images are saved. Default: Assets/images')
-        .addText(t => t
-          .setValue(this.plugin.settings.clipRules[mode].framesFolder)
-          .onChange(async v => {
-            this.plugin.settings.clipRules[mode].framesFolder = v.trim();
-            await this.plugin.saveSettings();
-          }));
+      if (this.plugin.settings.clipRules[mode].processingMode === 'manual') {
+        new Setting(containerEl)
+          .setName('Frames folder')
+          .setDesc('Vault-relative path where frame images are saved. Default: Assets/images')
+          .addText(t => t
+            .setValue(this.plugin.settings.clipRules[mode].framesFolder)
+            .onChange(async v => {
+              this.plugin.settings.clipRules[mode].framesFolder = v.trim();
+              await this.plugin.saveSettings();
+            }));
+      }
       new Setting(containerEl)
         .setName('SOP / prompt path')
         .setDesc('Absolute path to the markdown SOP file.')

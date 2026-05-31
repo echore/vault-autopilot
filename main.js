@@ -6534,10 +6534,12 @@ var VaultAutopilotSettingTab = class extends import_obsidian.PluginSettingTab {
           await this.plugin.saveSettings();
         }
       }));
-      new import_obsidian.Setting(containerEl).setName("Frames folder").setDesc("Vault-relative path where frame images are saved. Default: Assets/images").addText((t2) => t2.setValue(this.plugin.settings.clipRules[mode].framesFolder).onChange(async (v2) => {
-        this.plugin.settings.clipRules[mode].framesFolder = v2.trim();
-        await this.plugin.saveSettings();
-      }));
+      if (this.plugin.settings.clipRules[mode].processingMode === "manual") {
+        new import_obsidian.Setting(containerEl).setName("Frames folder").setDesc("Vault-relative path where frame images are saved. Default: Assets/images").addText((t2) => t2.setValue(this.plugin.settings.clipRules[mode].framesFolder).onChange(async (v2) => {
+          this.plugin.settings.clipRules[mode].framesFolder = v2.trim();
+          await this.plugin.saveSettings();
+        }));
+      }
       new import_obsidian.Setting(containerEl).setName("SOP / prompt path").setDesc("Absolute path to the markdown SOP file.").addText((t2) => t2.setValue(this.plugin.settings.clipRules[mode].sopPath).onChange(async (v2) => {
         this.plugin.settings.clipRules[mode].sopPath = v2.trim();
         await this.plugin.saveSettings();
