@@ -22,7 +22,9 @@ export default class VaultAutopilotPlugin extends Plugin {
     this.addSettingTab(new VaultAutopilotSettingTab(this.app, this));
     this.rebuildProviders();
     runStartupChecks(this.settings);
-    this.registerVaultWatcher();
+    this.app.workspace.onLayoutReady(() => {
+      this.registerVaultWatcher();
+    });
     if (this.settings.httpServer.enabled) this.startServer();
   }
 
@@ -102,7 +104,7 @@ export default class VaultAutopilotPlugin extends Plugin {
 
     // Read companion meta.json if it exists (written by Chrome extension or other clients)
     const meta = await this.readMeta(file.path);
-    const markdown = await processFile(absolutePath, rule, provider, meta);
+    const markdown = postProcessMarkdown(await processFile(absolutePath, rule, provider, meta));
 
     // Write output note
     const stem = path.basename(file.name, path.extname(file.name));
@@ -165,6 +167,10 @@ export default class VaultAutopilotPlugin extends Plugin {
       await this.app.vault.create(logPath, `# Vault Autopilot Errors\n\n${line}`);
     }
   }
+}
+
+function postProcessMarkdown(md: string): string {
+  return md.replace(/(?<!`)(#[0-9A-Fa-f]{6}|#[0-9A-Fa-f]{3})\b(?!`)/g, '`$1`');
 }
 
 function sanitize(str: string): string {
