@@ -10,6 +10,10 @@ export const DEFAULT_SETTINGS: PluginSettings = {
     enabled: true,
     port: 27183,
   },
+  clipRules: {
+    hook: { sopPath: '', outputFolder: '', providerId: '' },
+    keyframe: { sopPath: '', outputFolder: '', providerId: '' },
+  },
 };
 
 export class VaultAutopilotSettingTab extends PluginSettingTab {
@@ -92,6 +96,48 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
 
     for (const [i, rule] of this.plugin.settings.rules.entries()) {
       this.renderRule(containerEl, rule, i);
+    }
+
+    // ── Clip Rules ──────────────────────────────────────────────────────────────
+    new Setting(containerEl).setName('Clip Rules').setHeading();
+    new Setting(containerEl)
+      .setName('Screenshot')
+      .setDesc('Uses the first enabled Watch Rule above (watchFolder + provider + SOP).');
+
+    for (const mode of ['hook', 'keyframe'] as const) {
+      const label = mode === 'hook' ? 'Hook Analysis' : 'Keyframe Analysis';
+      new Setting(containerEl).setName(label).setHeading();
+      new Setting(containerEl)
+        .setName('SOP / prompt path')
+        .setDesc('Absolute path to the markdown SOP file.')
+        .addText(t => t
+          .setValue(this.plugin.settings.clipRules[mode].sopPath)
+          .onChange(async v => {
+            this.plugin.settings.clipRules[mode].sopPath = v.trim();
+            await this.plugin.saveSettings();
+          }));
+      new Setting(containerEl)
+        .setName('Output folder')
+        .setDesc('Vault-relative path. e.g. Notes/Hooks')
+        .addText(t => t
+          .setValue(this.plugin.settings.clipRules[mode].outputFolder)
+          .onChange(async v => {
+            this.plugin.settings.clipRules[mode].outputFolder = v.trim();
+            await this.plugin.saveSettings();
+          }));
+      new Setting(containerEl)
+        .setName('Provider')
+        .setDesc('Must be an API provider (Anthropic, OpenAI-compatible, or Gemini).')
+        .addDropdown(d => {
+          this.plugin.settings.providers.forEach(p =>
+            d.addOption(p.id, p.type === 'cli' ? `CLI: ${(p as any).cliType}` : (p as any).label || p.type)
+          );
+          d.setValue(this.plugin.settings.clipRules[mode].providerId)
+            .onChange(async v => {
+              this.plugin.settings.clipRules[mode].providerId = v;
+              await this.plugin.saveSettings();
+            });
+        });
     }
   }
 

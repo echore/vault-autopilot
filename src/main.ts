@@ -1,5 +1,6 @@
 import * as path from 'path';
 import * as http from 'http';
+import * as fs from 'fs';
 import { Notice, Plugin, TFile } from 'obsidian';
 import { DEFAULT_SETTINGS, VaultAutopilotSettingTab } from './settings';
 import { PluginSettings, WatchRule, AIProvider, ProviderConfig } from './types';
@@ -10,8 +11,9 @@ import { createGeminiAPIProvider } from './providers/gemini-api';
 import { detectBinaryPath } from './path-detector';
 import { processFile, isSupportedFileType } from './processor';
 import { createServer, ClipPayload } from './server';
+import { routeClip, VaultOps } from './clip-router';
 import { runStartupChecks } from './startup-check';
-import { postProcessMarkdown, sanitize } from './util';
+import { postProcessMarkdown } from './util';
 
 export default class VaultAutopilotPlugin extends Plugin {
   settings: PluginSettings = DEFAULT_SETTINGS;
@@ -40,6 +42,10 @@ export default class VaultAutopilotPlugin extends Plugin {
       ...DEFAULT_SETTINGS,
       ...loaded,
       httpServer: { ...DEFAULT_SETTINGS.httpServer, ...(loaded?.httpServer ?? {}) },
+      clipRules: {
+        hook: { ...DEFAULT_SETTINGS.clipRules.hook, ...(loaded?.clipRules?.hook ?? {}) },
+        keyframe: { ...DEFAULT_SETTINGS.clipRules.keyframe, ...(loaded?.clipRules?.keyframe ?? {}) },
+      },
       rules: loaded?.rules ?? DEFAULT_SETTINGS.rules,
       providers: loaded?.providers ?? DEFAULT_SETTINGS.providers,
     };
@@ -138,18 +144,16 @@ export default class VaultAutopilotPlugin extends Plugin {
 
   private startServer(): void {
     const { port } = this.settings.httpServer;
-    this.server = createServer(port, async (payload: ClipPayload) => {
-      // Save image to vault inbox of first enabled rule that watches images
-      const rule = this.settings.rules.find((r) => r.enabled);
-      if (!rule) throw new Error('No enabled watch rules configured');
-      const legacy = payload as import('./server').LegacyClipPayload;
-      const stem = `${Date.now()}-${sanitize(legacy.title)}`;
-      await this.ensureFolder(rule.watchFolder);
-      const meta = JSON.stringify({ source_url: legacy.source_url, title: legacy.title });
-      await this.app.vault.create(`${rule.watchFolder}/${stem}.meta.json`, meta);
-      const bytes = Buffer.from(legacy.image_base64, 'base64');
-      await this.app.vault.createBinary(`${rule.watchFolder}/${stem}.png`, bytes.buffer as ArrayBuffer);
-    });
+    const vaultOps: VaultOps = {
+      ensureFolder: (p) => this.ensureFolder(p),
+      createBinary: async (p, data) => { await this.app.vault.createBinary(p, data); },
+      create: async (p, content) => { await this.app.vault.create(p, content); },
+      readFileSync: (p) => fs.readFileSync(p, 'utf8'),
+    };
+    this.server = createServer(
+      port,
+      (payload) => routeClip(payload, this.providers, this.settings.clipRules, this.settings.rules, vaultOps),
+    );
     this.server.on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'EADDRINUSE') {
         new Notice(`Vault Autopilot: Port ${port} is already in use. Close the other process or change the port in settings.`, 10000);
