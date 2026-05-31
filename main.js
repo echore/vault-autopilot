@@ -17449,6 +17449,14 @@ function buildManualTemplate(payload, frameNames, sopContent) {
   const channel = payload.mode === "hook" ? payload.channel : void 0;
   const embed = buildVideoEmbed(payload.url, platform, startSeconds);
   const frameLines = frameNames.map((n2, i2) => `> **[Image #${i2 + 1}]** ![[${n2}]]`).join("\n");
+  const frameChecklist = [
+    `> `,
+    `> ---`,
+    `> **\u5B8C\u6210\u540E\u6267\u884C\uFF1A**`,
+    `> - [ ] \u5E27\u5DF2\u9605\uFF0C\u5206\u6790\u5DF2\u5199\u5165\u7B14\u8BB0`,
+    `> - [ ] \u5220\u9664\u6B64\u6574\u4E2A\u5E27\u5757`,
+    `> - [ ] \u5220\u9664 framesFolder \u4E2D\u5BF9\u5E94\u7684\u56FE\u7247\u6587\u4EF6`
+  ].join("\n");
   if (payload.mode === "hook") {
     const transcriptLine = payload.transcript ? `>
 > **\u5B57\u5E55**
@@ -17462,9 +17470,10 @@ function buildManualTemplate(payload, frameNames, sopContent) {
       ``,
       `\u6765\u6E90\uFF1A${platform != null ? platform : ""} | ${channel != null ? channel : ""} | ${payload.url} | ${payload.captured_at}${durationLabel}`,
       ``,
-      `> [!NOTE] \u5206\u6790\u7528\u5E27\uFF08Claudian \u770B\u5B8C\u540E\u5220\u9664\u6B64\u5757 + framesFolder \u91CC\u7684\u5BF9\u5E94\u6587\u4EF6\uFF09`,
+      `> [!NOTE] \u5206\u6790\u7528\u5E27`,
       frameLines,
       transcriptLine,
+      frameChecklist,
       ``
     ];
     if (sopContent) parts.push(sopBlock(sopContent), ``);
@@ -17492,8 +17501,9 @@ function buildManualTemplate(payload, frameNames, sopContent) {
       ``,
       `\u6765\u6E90\uFF1A${payload.url} | ${payload.captured_at} | ${start}s\u2013${end}s`,
       ``,
-      `> [!NOTE] \u5206\u6790\u7528\u5E27\uFF08Claudian \u770B\u5B8C\u540E\u5220\u9664\u6B64\u5757 + framesFolder \u91CC\u7684\u5BF9\u5E94\u6587\u4EF6\uFF09`,
+      `> [!NOTE] \u5206\u6790\u7528\u5E27`,
       frameLines,
+      frameChecklist,
       ``
     ];
     if (sopContent) parts.push(sopBlock(sopContent), ``);

@@ -154,6 +154,14 @@ function buildManualTemplate(
 
   const embed = buildVideoEmbed(payload.url, platform, startSeconds);
   const frameLines = frameNames.map((n, i) => `> **[Image #${i + 1}]** ![[${n}]]`).join('\n');
+  const frameChecklist = [
+    `> `,
+    `> ---`,
+    `> **完成后执行：**`,
+    `> - [ ] 帧已阅，分析已写入笔记`,
+    `> - [ ] 删除此整个帧块`,
+    `> - [ ] 删除 framesFolder 中对应的图片文件`,
+  ].join('\n');
 
   if (payload.mode === 'hook') {
     const transcriptLine = payload.transcript
@@ -168,9 +176,10 @@ function buildManualTemplate(
       ``,
       `来源：${platform ?? ''} | ${channel ?? ''} | ${payload.url} | ${payload.captured_at}${durationLabel}`,
       ``,
-      `> [!NOTE] 分析用帧（Claudian 看完后删除此块 + framesFolder 里的对应文件）`,
+      `> [!NOTE] 分析用帧`,
       frameLines,
       transcriptLine,
+      frameChecklist,
       ``,
     ];
     if (sopContent) parts.push(sopBlock(sopContent), ``);
@@ -192,8 +201,9 @@ function buildManualTemplate(
       ``,
       `来源：${payload.url} | ${payload.captured_at} | ${start}s–${end}s`,
       ``,
-      `> [!NOTE] 分析用帧（Claudian 看完后删除此块 + framesFolder 里的对应文件）`,
+      `> [!NOTE] 分析用帧`,
       frameLines,
+      frameChecklist,
       ``,
     ];
     if (sopContent) parts.push(sopBlock(sopContent), ``);
