@@ -17366,7 +17366,7 @@ async function handleLegacyScreenshot(payload, watchRules, vaultOps) {
 }
 function sopBlock(sopContent) {
   const lines = sopContent.split("\n").map((l2) => `> ${l2}`).join("\n");
-  return `> [!TIP] \u5206\u6790\u63D0\u793A
+  return `> [!TIP] \u5206\u6790\u63D0\u793A\uFF08\u5206\u6790\u5B8C\u6210\u540E\u8BF7\u5220\u9664\u6B64\u5757\uFF09
 ${lines}`;
 }
 function readSopSafely(sopPath, vaultOps) {
