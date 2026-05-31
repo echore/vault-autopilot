@@ -11,6 +11,7 @@ import { detectBinaryPath } from './path-detector';
 import { processFile, isSupportedFileType } from './processor';
 import { createServer, ClipPayload } from './server';
 import { runStartupChecks } from './startup-check';
+import { postProcessMarkdown, sanitize } from './util';
 
 export default class VaultAutopilotPlugin extends Plugin {
   settings: PluginSettings = DEFAULT_SETTINGS;
@@ -167,12 +168,4 @@ export default class VaultAutopilotPlugin extends Plugin {
       await this.app.vault.create(logPath, `# Vault Autopilot Errors\n\n${line}`);
     }
   }
-}
-
-function postProcessMarkdown(md: string): string {
-  return md.replace(/(?<!`)(#[0-9A-Fa-f]{6}|#[0-9A-Fa-f]{3})\b(?!`)/g, '`$1`');
-}
-
-function sanitize(str: string): string {
-  return (str || '').replace(/[/\\:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
 }
