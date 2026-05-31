@@ -17376,8 +17376,8 @@ async function routeClip(payload, providers, clipRules, watchRules, vaultOps) {
     const normalized = normalizeScreenshot(payload);
     return handleScreenshot(normalized, providers, clipRules.screenshot, vaultOps);
   }
-  if (payload.mode === "hook") return handleMultiFrame(payload, providers, clipRules.hook, vaultOps);
-  if (payload.mode === "keyframe") return handleMultiFrame(payload, providers, clipRules.keyframe, vaultOps);
+  if (payload.mode === "hook") return handleMultiFrame(payload, providers, clipRules.hook, vaultOps, clipRules.thumbnail.outputFolder);
+  if (payload.mode === "keyframe") return handleMultiFrame(payload, providers, clipRules.keyframe, vaultOps, clipRules.thumbnail.outputFolder);
   throw new Error("Unknown clip mode");
 }
 function isLegacy(p2) {
@@ -17624,25 +17624,67 @@ ${payload.transcript}
     return parts.join("\n");
   }
 }
-async function handleMultiFrame(payload, providers, rule, vaultOps) {
+async function findNoteByVideoId(videoId, folder, vaultOps) {
+  const files = vaultOps.listMarkdownFiles(folder);
+  for (const filePath of files) {
+    const content = await vaultOps.read(filePath);
+    if (content.includes(`video_id: "${videoId}"`)) return { path: filePath, content };
+  }
+  return null;
+}
+function addDimension(content, dimension) {
+  return content.replace(
+    /^(dimensions:\s*\[)([^\]]*)(\])/m,
+    (_2, open, inner, close) => {
+      const dims = inner.split(",").map((d2) => d2.trim()).filter(Boolean);
+      if (!dims.includes(dimension)) dims.push(dimension);
+      return `${open}${dims.join(", ")}${close}`;
+    }
+  );
+}
+function buildAppendSection(payload, frameNames, sopContent, aiResult) {
+  const header = payload.mode === "hook" ? `## \u5185\u5BB9` : `## \u52A8\u6548`;
+  if (aiResult) return `
+${header}
+
+${aiResult}
+`;
+  const frameLines = frameNames.map((n2, i2) => `> **[Image #${i2 + 1}]** ![[${n2}]]`).join("\n");
+  const frameChecklist = [`> `, `> - [ ] \u6309 SOP \u5B8C\u6210\u5206\u6790\uFF0C\u586B\u5165\u5404\u7AE0\u8282`].join("\n");
+  const parts = [``, header, ``, `> [!NOTE] \u5206\u6790\u7528\u5E27`, frameLines, frameChecklist, ``];
+  if (sopContent) parts.push(sopBlock(sopContent), ``);
+  if (payload.mode === "hook" && payload.transcript) {
+    parts.push(`## \u5B57\u5E55`, ``, payload.transcript, ``);
+  }
+  return parts.join("\n");
+}
+async function handleMultiFrame(payload, providers, rule, vaultOps, searchFolder) {
   var _a3;
+  const max = (_a3 = rule.maxFrames) != null ? _a3 : 5;
+  const sampled = sampleFrames(payload.frames, max);
+  const stem = `${payload.mode}-${sanitize(payload.video_title)}-${Date.now()}`;
+  const videoId = extractVideoId(payload.url, payload.mode === "hook" ? payload.platform : void 0);
+  const existing = videoId && searchFolder ? await findNoteByVideoId(videoId, searchFolder, vaultOps) : null;
   if (rule.processingMode === "manual") {
-    const max = (_a3 = rule.maxFrames) != null ? _a3 : 5;
-    const sampled = sampleFrames(payload.frames, max);
-    const stem2 = `${payload.mode}-${sanitize(payload.video_title)}-${Date.now()}`;
     const framesDir = rule.framesFolder || rule.outputFolder;
     await vaultOps.ensureFolder(framesDir);
-    await vaultOps.ensureFolder(rule.outputFolder);
     const frameNames = [];
     for (let i2 = 0; i2 < sampled.length; i2++) {
-      const name = `${stem2}-f${String(i2 + 1).padStart(2, "0")}.png`;
+      const name = `${stem}-f${String(i2 + 1).padStart(2, "0")}.png`;
       const bytes = Buffer.from(sampled[i2], "base64");
       await vaultOps.createBinary(`${framesDir}/${name}`, bytes.buffer);
       frameNames.push(name);
     }
     const sopContent2 = readSopSafely(rule.sopPath, vaultOps);
+    if (existing) {
+      const dimension = payload.mode === "hook" ? "\u5185\u5BB9" : "\u52A8\u6548";
+      const updated = addDimension(existing.content, dimension) + buildAppendSection(payload, frameNames, sopContent2);
+      await vaultOps.modify(existing.path, updated);
+      return;
+    }
+    await vaultOps.ensureFolder(rule.outputFolder);
     const template = buildManualTemplate(payload, frameNames, sopContent2);
-    await vaultOps.create(`${rule.outputFolder}/${stem2}.md`, template);
+    await vaultOps.create(`${rule.outputFolder}/${stem}.md`, template);
     return;
   }
   if (!rule.sopPath || !rule.outputFolder || !rule.providerId) {
@@ -17655,10 +17697,7 @@ async function handleMultiFrame(payload, providers, rule, vaultOps) {
       `Provider "${provider.name}" does not support multi-frame analysis. Use an API provider (Anthropic, OpenAI-compatible, or Gemini).`
     );
   }
-  if (payload.frames.length > 20) {
-    throw new Error(`Too many frames: ${payload.frames.length} (max 20)`);
-  }
-  const frames = payload.frames.map((f2) => Buffer.from(f2, "base64"));
+  const frames = sampled.map((f2) => Buffer.from(f2, "base64"));
   const sopContent = vaultOps.readFileSync(rule.sopPath);
   const meta = {
     video_title: payload.video_title,
@@ -17668,10 +17707,15 @@ async function handleMultiFrame(payload, providers, rule, vaultOps) {
   };
   const transcript = payload.mode === "hook" ? payload.transcript : void 0;
   const result = await provider.analyzeMultiFrame({ frames, transcript, sopContent, meta });
-  const markdown = postProcessMarkdown(result);
-  const stem = `${payload.mode}-${sanitize(payload.video_title)}-${Date.now()}`;
+  const aiResult = postProcessMarkdown(result);
+  if (existing) {
+    const dimension = payload.mode === "hook" ? "\u5185\u5BB9" : "\u52A8\u6548";
+    const updated = addDimension(existing.content, dimension) + buildAppendSection(payload, [], void 0, aiResult);
+    await vaultOps.modify(existing.path, updated);
+    return;
+  }
   await vaultOps.ensureFolder(rule.outputFolder);
-  await vaultOps.create(`${rule.outputFolder}/${stem}.md`, markdown);
+  await vaultOps.create(`${rule.outputFolder}/${stem}.md`, aiResult);
 }
 
 // src/startup-check.ts
@@ -17840,6 +17884,19 @@ var VaultAutopilotPlugin = class extends import_obsidian3.Plugin {
       downloadUrl: async (url) => {
         const resp = await (0, import_obsidian3.requestUrl)({ url, method: "GET" });
         return resp.arrayBuffer;
+      },
+      listMarkdownFiles: (folderPath) => {
+        return this.app.vault.getFiles().filter((f2) => f2.path.startsWith(folderPath + "/") && f2.extension === "md").map((f2) => f2.path);
+      },
+      read: async (filePath) => {
+        const file = this.app.vault.getAbstractFileByPath(filePath);
+        if (!(file instanceof import_obsidian3.TFile)) throw new Error(`File not found: ${filePath}`);
+        return this.app.vault.read(file);
+      },
+      modify: async (filePath, content) => {
+        const file = this.app.vault.getAbstractFileByPath(filePath);
+        if (!(file instanceof import_obsidian3.TFile)) throw new Error(`File not found: ${filePath}`);
+        await this.app.vault.modify(file, content);
       }
     };
     this.server = createServer2(

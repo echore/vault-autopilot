@@ -1,6 +1,6 @@
 import { ClipPayload, HookPayload, KeyframePayload, LegacyClipPayload, ScreenshotPayload, ThumbnailPayload } from './server';
 import { AIProvider, ClipRule, isMultiFrameProvider, MultiFrameRequest, PluginSettings, ScreenshotClipRule, ThumbnailClipRule, WatchRule } from './types';
-import { postProcessMarkdown, sanitize, buildVideoEmbed } from './util';
+import { postProcessMarkdown, sanitize, buildVideoEmbed, extractVideoId } from './util';
 
 export interface VaultOps {
   ensureFolder(folderPath: string): Promise<void>;
@@ -8,6 +8,9 @@ export interface VaultOps {
   create(filePath: string, content: string): Promise<void>;
   readFileSync(absolutePath: string): string;
   downloadUrl(url: string): Promise<ArrayBuffer>;
+  listMarkdownFiles(folderPath: string): string[];
+  read(filePath: string): Promise<string>;
+  modify(filePath: string, content: string): Promise<void>;
 }
 
 export async function routeClip(
@@ -25,8 +28,8 @@ export async function routeClip(
     const normalized = normalizeScreenshot(payload);
     return handleScreenshot(normalized, providers, clipRules.screenshot, vaultOps);
   }
-  if (payload.mode === 'hook') return handleMultiFrame(payload, providers, clipRules.hook, vaultOps);
-  if (payload.mode === 'keyframe') return handleMultiFrame(payload, providers, clipRules.keyframe, vaultOps);
+  if (payload.mode === 'hook') return handleMultiFrame(payload, providers, clipRules.hook, vaultOps, clipRules.thumbnail.outputFolder);
+  if (payload.mode === 'keyframe') return handleMultiFrame(payload, providers, clipRules.keyframe, vaultOps, clipRules.thumbnail.outputFolder);
   throw new Error('Unknown clip mode');
 }
 
@@ -298,19 +301,70 @@ function buildManualTemplate(
   }
 }
 
+async function findNoteByVideoId(
+  videoId: string,
+  folder: string,
+  vaultOps: VaultOps,
+): Promise<{ path: string; content: string } | null> {
+  const files = vaultOps.listMarkdownFiles(folder);
+  for (const filePath of files) {
+    const content = await vaultOps.read(filePath);
+    if (content.includes(`video_id: "${videoId}"`)) return { path: filePath, content };
+  }
+  return null;
+}
+
+function addDimension(content: string, dimension: string): string {
+  return content.replace(
+    /^(dimensions:\s*\[)([^\]]*)(\])/m,
+    (_, open, inner, close) => {
+      const dims = inner.split(',').map((d: string) => d.trim()).filter(Boolean);
+      if (!dims.includes(dimension)) dims.push(dimension);
+      return `${open}${dims.join(', ')}${close}`;
+    },
+  );
+}
+
+function buildAppendSection(
+  payload: HookPayload | KeyframePayload,
+  frameNames: string[],
+  sopContent?: string,
+  aiResult?: string,
+): string {
+  const header = payload.mode === 'hook' ? `## 内容` : `## 动效`;
+  if (aiResult) return `\n${header}\n\n${aiResult}\n`;
+
+  const frameLines = frameNames.map((n, i) => `> **[Image #${i + 1}]** ![[${n}]]`).join('\n');
+  const frameChecklist = [`> `, `> - [ ] 按 SOP 完成分析，填入各章节`].join('\n');
+  const parts = [``, header, ``, `> [!NOTE] 分析用帧`, frameLines, frameChecklist, ``];
+  if (sopContent) parts.push(sopBlock(sopContent), ``);
+  if (payload.mode === 'hook' && payload.transcript) {
+    parts.push(`## 字幕`, ``, payload.transcript, ``);
+  }
+  return parts.join('\n');
+}
+
 async function handleMultiFrame(
   payload: HookPayload | KeyframePayload,
   providers: Map<string, AIProvider>,
   rule: ClipRule,
   vaultOps: VaultOps,
+  searchFolder: string,
 ): Promise<void> {
+  // ── Save frames (both modes need them for manual; auto uses them for AI) ──────
+  const max = rule.maxFrames ?? 5;
+  const sampled = sampleFrames(payload.frames, max);
+  const stem = `${payload.mode}-${sanitize(payload.video_title)}-${Date.now()}`;
+
+  // ── Check for existing Great Videos note to append to ────────────────────────
+  const videoId = extractVideoId(payload.url, payload.mode === 'hook' ? payload.platform : undefined);
+  const existing = videoId && searchFolder
+    ? await findNoteByVideoId(videoId, searchFolder, vaultOps)
+    : null;
+
   if (rule.processingMode === 'manual') {
-    const max = rule.maxFrames ?? 5;
-    const sampled = sampleFrames(payload.frames, max);
-    const stem = `${payload.mode}-${sanitize(payload.video_title)}-${Date.now()}`;
     const framesDir = rule.framesFolder || rule.outputFolder;
     await vaultOps.ensureFolder(framesDir);
-    await vaultOps.ensureFolder(rule.outputFolder);
     const frameNames: string[] = [];
     for (let i = 0; i < sampled.length; i++) {
       const name = `${stem}-f${String(i + 1).padStart(2, '0')}.png`;
@@ -319,6 +373,13 @@ async function handleMultiFrame(
       frameNames.push(name);
     }
     const sopContent = readSopSafely(rule.sopPath, vaultOps);
+    if (existing) {
+      const dimension = payload.mode === 'hook' ? '内容' : '动效';
+      const updated = addDimension(existing.content, dimension) + buildAppendSection(payload, frameNames, sopContent);
+      await vaultOps.modify(existing.path, updated);
+      return;
+    }
+    await vaultOps.ensureFolder(rule.outputFolder);
     const template = buildManualTemplate(payload, frameNames, sopContent);
     await vaultOps.create(`${rule.outputFolder}/${stem}.md`, template);
     return;
@@ -335,10 +396,7 @@ async function handleMultiFrame(
       `Use an API provider (Anthropic, OpenAI-compatible, or Gemini).`,
     );
   }
-  if (payload.frames.length > 20) {
-    throw new Error(`Too many frames: ${payload.frames.length} (max 20)`);
-  }
-  const frames = payload.frames.map((f) => Buffer.from(f, 'base64'));
+  const frames = sampled.map((f) => Buffer.from(f, 'base64'));
   const sopContent = vaultOps.readFileSync(rule.sopPath);
   const meta: MultiFrameRequest['meta'] = {
     video_title: payload.video_title,
@@ -350,8 +408,13 @@ async function handleMultiFrame(
   };
   const transcript = payload.mode === 'hook' ? payload.transcript : undefined;
   const result = await provider.analyzeMultiFrame({ frames, transcript, sopContent, meta });
-  const markdown = postProcessMarkdown(result);
-  const stem = `${payload.mode}-${sanitize(payload.video_title)}-${Date.now()}`;
+  const aiResult = postProcessMarkdown(result);
+  if (existing) {
+    const dimension = payload.mode === 'hook' ? '内容' : '动效';
+    const updated = addDimension(existing.content, dimension) + buildAppendSection(payload, [], undefined, aiResult);
+    await vaultOps.modify(existing.path, updated);
+    return;
+  }
   await vaultOps.ensureFolder(rule.outputFolder);
-  await vaultOps.create(`${rule.outputFolder}/${stem}.md`, markdown);
+  await vaultOps.create(`${rule.outputFolder}/${stem}.md`, aiResult);
 }

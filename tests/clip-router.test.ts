@@ -22,6 +22,9 @@ function makeVaultOps(): jest.Mocked<VaultOps> {
     create: jest.fn().mockResolvedValue(undefined),
     readFileSync: jest.fn().mockReturnValue('# SOP\nAnalyze this.'),
     downloadUrl: jest.fn().mockResolvedValue(new ArrayBuffer(8)),
+    listMarkdownFiles: jest.fn().mockReturnValue([]),
+    read: jest.fn().mockResolvedValue(''),
+    modify: jest.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -267,7 +270,7 @@ describe('routeClip — hook', () => {
       .rejects.toThrow('does not support multi-frame');
   });
 
-  test('throws when frames array exceeds 20', async () => {
+  test('21 raw frames are sampled down to maxFrames before AI call', async () => {
     const provider = makeMultiFrameProvider('p1');
     const providers = new Map<string, AIProvider>([['p1', provider as any]]);
     const vaultOps = makeVaultOps();
@@ -276,8 +279,9 @@ describe('routeClip — hook', () => {
       mode: 'hook', frames, video_title: 'V',
       url: 'https://yt.com', captured_at: '2026-05-30T18:00:00Z',
     };
-    await expect(routeClip(payload, providers, clipRules, [], vaultOps))
-      .rejects.toThrow('Too many frames');
+    await routeClip(payload, providers, clipRules, [], vaultOps);
+    const { frames: sentFrames } = (provider.analyzeMultiFrame as jest.Mock).mock.calls[0][0];
+    expect(sentFrames.length).toBeLessThanOrEqual(hookClipRule.maxFrames);
   });
 });
 
@@ -387,5 +391,83 @@ describe('routeClip — manual mode (keyframe)', () => {
     expect(noteContent).toContain('<iframe');
     expect(noteContent).toContain('start=30');
     expect(noteContent).toContain('## 技法类型');
+  });
+});
+
+// ── V2: append to existing note ───────────────────────────────────────────────
+
+describe('routeClip — append to existing Great Videos note', () => {
+  const existingNote = [
+    `---`,
+    `type: video`,
+    `video_id: "abc123"`,
+    `dimensions: [封面标题]`,
+    `---`,
+    ``,
+    `# My Video`,
+    ``,
+    `## 封面标题`,
+    `分析内容`,
+  ].join('\n');
+
+  test('hook: finds existing note by video_id and appends ## 内容 section', async () => {
+    const vaultOps = makeVaultOps();
+    (vaultOps.listMarkdownFiles as jest.Mock).mockReturnValue(['Content Creation/Great Videos/note.md']);
+    (vaultOps.read as jest.Mock).mockResolvedValue(existingNote);
+    const manualHookRule = { ...hookClipRule, processingMode: 'manual' as const, sopPath: '' };
+    const payload: ClipPayload = {
+      mode: 'hook',
+      frames: [Buffer.from('f1').toString('base64')],
+      video_title: 'My Video',
+      url: 'https://www.youtube.com/watch?v=abc123',
+      captured_at: '2026-05-31T00:00:00Z',
+    };
+    await routeClip(payload, new Map(), { ...clipRules, hook: manualHookRule }, [], vaultOps);
+    expect(vaultOps.modify).toHaveBeenCalledWith(
+      'Content Creation/Great Videos/note.md',
+      expect.stringContaining('## 内容'),
+    );
+    const [, modifiedContent] = (vaultOps.modify as jest.Mock).mock.calls[0];
+    expect(modifiedContent).toContain('dimensions: [封面标题, 内容]');
+    expect(modifiedContent).toContain('[Image #1]');
+    expect(vaultOps.create).not.toHaveBeenCalled();
+  });
+
+  test('keyframe: finds existing note and appends ## 动效 section', async () => {
+    const vaultOps = makeVaultOps();
+    (vaultOps.listMarkdownFiles as jest.Mock).mockReturnValue(['Content Creation/Great Videos/note.md']);
+    (vaultOps.read as jest.Mock).mockResolvedValue(existingNote);
+    const manualKeyframeRule = { ...keyframeClipRule, processingMode: 'manual' as const, sopPath: '' };
+    const payload: ClipPayload = {
+      mode: 'keyframe',
+      frames: [Buffer.from('f1').toString('base64')],
+      video_title: 'My Video',
+      url: 'https://www.youtube.com/watch?v=abc123',
+      time_range: { start: 10, end: 20 },
+      captured_at: '2026-05-31T00:00:00Z',
+    };
+    await routeClip(payload, new Map(), { ...clipRules, keyframe: manualKeyframeRule }, [], vaultOps);
+    const [, modifiedContent] = (vaultOps.modify as jest.Mock).mock.calls[0];
+    expect(modifiedContent).toContain('## 动效');
+    expect(modifiedContent).toContain('dimensions: [封面标题, 动效]');
+  });
+
+  test('no existing note: creates new note as before', async () => {
+    const vaultOps = makeVaultOps();
+    (vaultOps.listMarkdownFiles as jest.Mock).mockReturnValue([]);
+    const manualHookRule = { ...hookClipRule, processingMode: 'manual' as const, sopPath: '' };
+    const payload: ClipPayload = {
+      mode: 'hook',
+      frames: [Buffer.from('f1').toString('base64')],
+      video_title: 'New Video',
+      url: 'https://www.youtube.com/watch?v=newvid',
+      captured_at: '2026-05-31T00:00:00Z',
+    };
+    await routeClip(payload, new Map(), { ...clipRules, hook: manualHookRule }, [], vaultOps);
+    expect(vaultOps.modify).not.toHaveBeenCalled();
+    expect(vaultOps.create).toHaveBeenCalledWith(
+      expect.stringContaining('Hooks/'),
+      expect.stringContaining('# Hook'),
+    );
   });
 });

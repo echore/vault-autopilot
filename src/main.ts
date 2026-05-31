@@ -155,6 +155,21 @@ export default class VaultAutopilotPlugin extends Plugin {
         const resp = await requestUrl({ url, method: 'GET' });
         return resp.arrayBuffer;
       },
+      listMarkdownFiles: (folderPath) => {
+        return this.app.vault.getFiles()
+          .filter(f => f.path.startsWith(folderPath + '/') && f.extension === 'md')
+          .map(f => f.path);
+      },
+      read: async (filePath) => {
+        const file = this.app.vault.getAbstractFileByPath(filePath);
+        if (!(file instanceof TFile)) throw new Error(`File not found: ${filePath}`);
+        return this.app.vault.read(file);
+      },
+      modify: async (filePath, content) => {
+        const file = this.app.vault.getAbstractFileByPath(filePath);
+        if (!(file instanceof TFile)) throw new Error(`File not found: ${filePath}`);
+        await this.app.vault.modify(file, content);
+      },
     };
     this.server = createServer(
       port,
