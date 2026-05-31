@@ -17364,21 +17364,33 @@ async function handleLegacyScreenshot(payload, watchRules, vaultOps) {
   const bytes = Buffer.from(payload.image_base64, "base64");
   await vaultOps.createBinary(`${rule.watchFolder}/${stem}.png`, bytes.buffer);
 }
-function buildScreenshotTemplate(payload, imageNames) {
+function sopBlock(sopContent) {
+  const lines = sopContent.split("\n").map((l2) => `> ${l2}`).join("\n");
+  return `> [!TIP] \u5206\u6790\u63D0\u793A
+${lines}`;
+}
+function readSopSafely(sopPath, vaultOps) {
+  if (!sopPath) return void 0;
+  try {
+    return vaultOps.readFileSync(sopPath);
+  } catch (e2) {
+    return void 0;
+  }
+}
+function buildScreenshotTemplate(payload, imageNames, sopContent) {
   const imageLines = imageNames.map((n2) => `> ![[${n2}]]`).join("\n");
-  return [
+  const parts = [
     `# Screenshot \u2014 ${payload.title}`,
     ``,
     `\u6765\u6E90\uFF1A${payload.url}`,
     ``,
     `> [!NOTE] \u622A\u56FE`,
     imageLines,
-    ``,
-    `---`,
-    ``,
-    `## \u7B14\u8BB0`,
     ``
-  ].join("\n");
+  ];
+  if (sopContent) parts.push(sopBlock(sopContent), ``);
+  parts.push(`---`, ``, `## \u7B14\u8BB0`, ``);
+  return parts.join("\n");
 }
 async function handleScreenshot(payload, providers, rule, vaultOps) {
   const stem = `screenshot-${sanitize(payload.title)}-${Date.now()}`;
@@ -17393,7 +17405,8 @@ async function handleScreenshot(payload, providers, rule, vaultOps) {
     imageNames.push(name);
   }
   if (rule.processingMode === "manual") {
-    const template = buildScreenshotTemplate(payload, imageNames);
+    const sopContent2 = readSopSafely(rule.sopPath, vaultOps);
+    const template = buildScreenshotTemplate(payload, imageNames, sopContent2);
     await vaultOps.create(`${rule.outputFolder}/${stem}.md`, template);
     return;
   }
@@ -17422,7 +17435,7 @@ function sampleFrames(frames, max) {
   const step = frames.length / max;
   return Array.from({ length: max }, (_2, i2) => frames[Math.floor(i2 * step)]);
 }
-function buildManualTemplate(payload, frameNames) {
+function buildManualTemplate(payload, frameNames, sopContent) {
   const startSeconds = payload.mode === "keyframe" ? payload.time_range.start : 0;
   const platform = payload.mode === "hook" ? payload.platform : void 0;
   const channel = payload.mode === "hook" ? payload.channel : void 0;
@@ -17434,7 +17447,7 @@ function buildManualTemplate(payload, frameNames) {
 > ${payload.transcript}` : "";
     const durationSuffix = payload.time_range ? ` [${payload.time_range.start}s\u2013${payload.time_range.end}s]` : "";
     const durationLabel = payload.time_range ? ` | ${payload.time_range.end}s Hook` : "";
-    return [
+    const parts = [
       `# Hook \u2014 ${payload.video_title}${durationSuffix}`,
       ``,
       embed,
@@ -17444,7 +17457,10 @@ function buildManualTemplate(payload, frameNames) {
       `> [!NOTE] \u5206\u6790\u7528\u5E27\uFF08Claudian \u770B\u5B8C\u540E\u5220\u9664\u6B64\u5757 + framesFolder \u91CC\u7684\u5BF9\u5E94\u6587\u4EF6\uFF09`,
       frameLines,
       transcriptLine,
-      ``,
+      ``
+    ];
+    if (sopContent) parts.push(sopBlock(sopContent), ``);
+    parts.push(
       `---`,
       ``,
       `## Hook \u7C7B\u578B`,
@@ -17457,10 +17473,11 @@ function buildManualTemplate(payload, frameNames) {
       ``,
       `## \u6211\u7684\u60F3\u6CD5`,
       ``
-    ].join("\n");
+    );
+    return parts.join("\n");
   } else {
     const { start, end } = payload.time_range;
-    return [
+    const parts = [
       `# \u5173\u952E\u5E27 \u2014 ${payload.video_title} [${start}s\u2013${end}s]`,
       ``,
       embed,
@@ -17469,7 +17486,10 @@ function buildManualTemplate(payload, frameNames) {
       ``,
       `> [!NOTE] \u5206\u6790\u7528\u5E27\uFF08Claudian \u770B\u5B8C\u540E\u5220\u9664\u6B64\u5757 + framesFolder \u91CC\u7684\u5BF9\u5E94\u6587\u4EF6\uFF09`,
       frameLines,
-      ``,
+      ``
+    ];
+    if (sopContent) parts.push(sopBlock(sopContent), ``);
+    parts.push(
       `---`,
       ``,
       `## \u6280\u6CD5\u7C7B\u578B`,
@@ -17482,7 +17502,8 @@ function buildManualTemplate(payload, frameNames) {
       ``,
       `## \u6211\u7684\u60F3\u6CD5`,
       ``
-    ].join("\n");
+    );
+    return parts.join("\n");
   }
 }
 async function handleMultiFrame(payload, providers, rule, vaultOps) {
@@ -17501,7 +17522,8 @@ async function handleMultiFrame(payload, providers, rule, vaultOps) {
       await vaultOps.createBinary(`${framesDir}/${name}`, bytes.buffer);
       frameNames.push(name);
     }
-    const template = buildManualTemplate(payload, frameNames);
+    const sopContent2 = readSopSafely(rule.sopPath, vaultOps);
+    const template = buildManualTemplate(payload, frameNames, sopContent2);
     await vaultOps.create(`${rule.outputFolder}/${stem2}.md`, template);
     return;
   }

@@ -56,9 +56,19 @@ async function handleLegacyScreenshot(
   await vaultOps.createBinary(`${rule.watchFolder}/${stem}.png`, bytes.buffer as ArrayBuffer);
 }
 
-function buildScreenshotTemplate(payload: ScreenshotPayload, imageNames: string[]): string {
+function sopBlock(sopContent: string): string {
+  const lines = sopContent.split('\n').map((l) => `> ${l}`).join('\n');
+  return `> [!TIP] 分析提示\n${lines}`;
+}
+
+function readSopSafely(sopPath: string, vaultOps: VaultOps): string | undefined {
+  if (!sopPath) return undefined;
+  try { return vaultOps.readFileSync(sopPath); } catch { return undefined; }
+}
+
+function buildScreenshotTemplate(payload: ScreenshotPayload, imageNames: string[], sopContent?: string): string {
   const imageLines = imageNames.map((n) => `> ![[${n}]]`).join('\n');
-  return [
+  const parts = [
     `# Screenshot — ${payload.title}`,
     ``,
     `来源：${payload.url}`,
@@ -66,11 +76,10 @@ function buildScreenshotTemplate(payload: ScreenshotPayload, imageNames: string[
     `> [!NOTE] 截图`,
     imageLines,
     ``,
-    `---`,
-    ``,
-    `## 笔记`,
-    ``,
-  ].join('\n');
+  ];
+  if (sopContent) parts.push(sopBlock(sopContent), ``);
+  parts.push(`---`, ``, `## 笔记`, ``);
+  return parts.join('\n');
 }
 
 async function handleScreenshot(
@@ -93,7 +102,8 @@ async function handleScreenshot(
   }
 
   if (rule.processingMode === 'manual') {
-    const template = buildScreenshotTemplate(payload, imageNames);
+    const sopContent = readSopSafely(rule.sopPath, vaultOps);
+    const template = buildScreenshotTemplate(payload, imageNames, sopContent);
     await vaultOps.create(`${rule.outputFolder}/${stem}.md`, template);
     return;
   }
@@ -129,6 +139,7 @@ function sampleFrames(frames: string[], max: number): string[] {
 function buildManualTemplate(
   payload: HookPayload | KeyframePayload,
   frameNames: string[],
+  sopContent?: string,
 ): string {
   const startSeconds = payload.mode === 'keyframe' ? payload.time_range.start : 0;
   const platform = payload.mode === 'hook' ? payload.platform : undefined;
@@ -143,7 +154,7 @@ function buildManualTemplate(
       : '';
     const durationSuffix = payload.time_range ? ` [${payload.time_range.start}s–${payload.time_range.end}s]` : '';
     const durationLabel = payload.time_range ? ` | ${payload.time_range.end}s Hook` : '';
-    return [
+    const parts = [
       `# Hook — ${payload.video_title}${durationSuffix}`,
       ``,
       embed,
@@ -154,22 +165,20 @@ function buildManualTemplate(
       frameLines,
       transcriptLine,
       ``,
-      `---`,
-      ``,
-      `## Hook 类型`,
-      ``,
-      `## 具体手法`,
-      ``,
-      `## 为什么有效`,
-      ``,
-      `## 如何复制`,
-      ``,
-      `## 我的想法`,
-      ``,
-    ].join('\n');
+    ];
+    if (sopContent) parts.push(sopBlock(sopContent), ``);
+    parts.push(
+      `---`, ``,
+      `## Hook 类型`, ``,
+      `## 具体手法`, ``,
+      `## 为什么有效`, ``,
+      `## 如何复制`, ``,
+      `## 我的想法`, ``,
+    );
+    return parts.join('\n');
   } else {
     const { start, end } = payload.time_range;
-    return [
+    const parts = [
       `# 关键帧 — ${payload.video_title} [${start}s–${end}s]`,
       ``,
       embed,
@@ -179,19 +188,17 @@ function buildManualTemplate(
       `> [!NOTE] 分析用帧（Claudian 看完后删除此块 + framesFolder 里的对应文件）`,
       frameLines,
       ``,
-      `---`,
-      ``,
-      `## 技法类型`,
-      ``,
-      `## 技术实现`,
-      ``,
-      `## 视觉目的`,
-      ``,
-      `## 如何复制`,
-      ``,
-      `## 我的想法`,
-      ``,
-    ].join('\n');
+    ];
+    if (sopContent) parts.push(sopBlock(sopContent), ``);
+    parts.push(
+      `---`, ``,
+      `## 技法类型`, ``,
+      `## 技术实现`, ``,
+      `## 视觉目的`, ``,
+      `## 如何复制`, ``,
+      `## 我的想法`, ``,
+    );
+    return parts.join('\n');
   }
 }
 
@@ -215,7 +222,8 @@ async function handleMultiFrame(
       await vaultOps.createBinary(`${framesDir}/${name}`, bytes.buffer as ArrayBuffer);
       frameNames.push(name);
     }
-    const template = buildManualTemplate(payload, frameNames);
+    const sopContent = readSopSafely(rule.sopPath, vaultOps);
+    const template = buildManualTemplate(payload, frameNames, sopContent);
     await vaultOps.create(`${rule.outputFolder}/${stem}.md`, template);
     return;
   }
