@@ -173,7 +173,12 @@ export default class VaultAutopilotPlugin extends Plugin {
     };
     this.server = createServer(
       port,
-      (payload) => routeClip(payload, this.providers, this.settings.clipRules, this.settings.rules, vaultOps),
+      async (payload) => {
+        const notePath = await routeClip(payload, this.providers, this.settings.clipRules, this.settings.rules, vaultOps);
+        if (!notePath) return undefined;
+        const vault = encodeURIComponent(this.app.vault.getName());
+        return `obsidian://open?vault=${vault}&file=${encodeURIComponent(notePath)}`;
+      },
     );
     this.server.on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'EADDRINUSE') {

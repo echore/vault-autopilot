@@ -19,7 +19,7 @@ export async function routeClip(
   clipRules: PluginSettings['clipRules'],
   watchRules: WatchRule[],
   vaultOps: VaultOps,
-): Promise<void> {
+): Promise<string | undefined> {
   if (isLegacy(payload)) {
     return handleLegacyScreenshot(payload, watchRules, vaultOps);
   }
@@ -48,7 +48,7 @@ async function handleLegacyScreenshot(
   payload: LegacyClipPayload,
   watchRules: WatchRule[],
   vaultOps: VaultOps,
-): Promise<void> {
+): Promise<undefined> {
   const rule = watchRules.find((r) => r.enabled);
   if (!rule) throw new Error('No enabled watch rules configured');
   const stem = `${Date.now()}-${sanitize(payload.title)}`;
@@ -122,7 +122,7 @@ async function handleThumbnail(
   providers: Map<string, AIProvider>,
   rule: ThumbnailClipRule,
   vaultOps: VaultOps,
-): Promise<void> {
+): Promise<string> {
   if (!rule.outputFolder || !rule.thumbnailFolder) {
     throw new Error('Thumbnail output folder or thumbnail folder is not configured. Go to Settings → Clip Rules → Thumbnail.');
   }
@@ -140,7 +140,7 @@ async function handleThumbnail(
   if (rule.processingMode === 'manual') {
     const sopContent = readSopSafely(rule.sopPath, vaultOps);
     await vaultOps.create(notePath, buildThumbnailNote(payload, thumbnailFile, sopContent));
-    return;
+    return notePath;
   }
 
   if (!rule.sopPath || !rule.providerId) {
@@ -161,6 +161,7 @@ async function handleThumbnail(
     meta: { video_title: payload.title, channel: payload.channel, url: payload.video_url },
   });
   await vaultOps.create(notePath, buildThumbnailNote(payload, thumbnailFile, postProcessMarkdown(result)));
+  return notePath;
 }
 
 function buildScreenshotTemplate(payload: ScreenshotPayload, imageNames: string[], sopContent?: string): string {
@@ -184,11 +185,12 @@ async function handleScreenshot(
   providers: Map<string, AIProvider>,
   rule: ScreenshotClipRule,
   vaultOps: VaultOps,
-): Promise<void> {
+): Promise<string> {
   if (!rule.outputFolder) {
     throw new Error('Screenshot output folder is not configured. Go to Settings → Clip Rules → Screenshot → Output folder.');
   }
   const stem = `screenshot-${sanitize(payload.title)}-${Date.now()}`;
+  const notePath = `${rule.outputFolder}/${stem}.md`;
   const framesDir = rule.framesFolder || rule.outputFolder;
   await vaultOps.ensureFolder(framesDir);
   await vaultOps.ensureFolder(rule.outputFolder);
@@ -204,8 +206,8 @@ async function handleScreenshot(
   if (rule.processingMode === 'manual') {
     const sopContent = readSopSafely(rule.sopPath, vaultOps);
     const template = buildScreenshotTemplate(payload, imageNames, sopContent);
-    await vaultOps.create(`${rule.outputFolder}/${stem}.md`, template);
-    return;
+    await vaultOps.create(notePath, template);
+    return notePath;
   }
 
   if (!rule.sopPath || !rule.outputFolder || !rule.providerId) {
@@ -227,7 +229,8 @@ async function handleScreenshot(
     meta: { url: payload.url },
   });
   const markdown = postProcessMarkdown(result);
-  await vaultOps.create(`${rule.outputFolder}/${stem}.md`, markdown);
+  await vaultOps.create(notePath, markdown);
+  return notePath;
 }
 
 function sampleFrames(frames: string[], max: number): string[] {
@@ -354,7 +357,7 @@ async function handleMultiFrame(
   rule: ClipRule,
   vaultOps: VaultOps,
   searchFolder: string,
-): Promise<void> {
+): Promise<string> {
   // ── Save frames (both modes need them for manual; auto uses them for AI) ──────
   const max = rule.maxFrames ?? 5;
   const sampled = sampleFrames(payload.frames, max);
@@ -381,12 +384,13 @@ async function handleMultiFrame(
       const dimension = payload.mode === 'hook' ? '内容' : '动效';
       const updated = addDimension(existing.content, dimension) + buildAppendSection(payload, frameNames, sopContent);
       await vaultOps.modify(existing.path, updated);
-      return;
+      return existing.path;
     }
     await vaultOps.ensureFolder(rule.outputFolder);
     const template = buildManualTemplate(payload, frameNames, sopContent);
-    await vaultOps.create(`${rule.outputFolder}/${stem}.md`, template);
-    return;
+    const notePath = `${rule.outputFolder}/${stem}.md`;
+    await vaultOps.create(notePath, template);
+    return notePath;
   }
 
   if (!rule.sopPath || !rule.outputFolder || !rule.providerId) {
@@ -417,8 +421,10 @@ async function handleMultiFrame(
     const dimension = payload.mode === 'hook' ? '内容' : '动效';
     const updated = addDimension(existing.content, dimension) + buildAppendSection(payload, [], undefined, aiResult);
     await vaultOps.modify(existing.path, updated);
-    return;
+    return existing.path;
   }
   await vaultOps.ensureFolder(rule.outputFolder);
-  await vaultOps.create(`${rule.outputFolder}/${stem}.md`, aiResult);
+  const notePath = `${rule.outputFolder}/${stem}.md`;
+  await vaultOps.create(notePath, aiResult);
+  return notePath;
 }

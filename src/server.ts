@@ -54,7 +54,9 @@ export type ClipPayload =
   | KeyframePayload
   | LegacyClipPayload;
 
-export type ClipHandler = (payload: ClipPayload) => Promise<void>;
+// Returns an obsidian:// deep link to the created/updated note, or undefined
+// when the clip produced no note (e.g. legacy image drop).
+export type ClipHandler = (payload: ClipPayload) => Promise<string | undefined>;
 
 export function createServer(port: number, onClip: ClipHandler): http.Server {
   const server = http.createServer((req, res) => {
@@ -89,9 +91,9 @@ export function createServer(port: number, onClip: ClipHandler): http.Server {
     req.on('end', async () => {
       try {
         const payload = JSON.parse(body) as ClipPayload;
-        await onClip(payload);
+        const obsidianUrl = await onClip(payload);
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true }));
+        res.end(JSON.stringify(obsidianUrl ? { success: true, obsidianUrl } : { success: true }));
       } catch (err) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: false, error: String(err) }));

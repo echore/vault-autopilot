@@ -150,7 +150,8 @@ describe('routeClip — screenshot', () => {
       url: 'https://x.com',
       title: 'My Screenshot',
     };
-    await routeClip(payload, new Map(), clipRules, [], vaultOps);
+    const result = await routeClip(payload, new Map(), clipRules, [], vaultOps);
+    expect(result).toMatch(/^Screenshots\/screenshot-.+\.md$/);
     expect(vaultOps.createBinary).toHaveBeenCalledTimes(2);
     expect(vaultOps.createBinary).toHaveBeenCalledWith(
       expect.stringContaining('Assets/images/'),
@@ -450,6 +451,22 @@ describe('routeClip — append to existing Great Videos note', () => {
     const [, modifiedContent] = (vaultOps.modify as jest.Mock).mock.calls[0];
     expect(modifiedContent).toContain('## 动效');
     expect(modifiedContent).toContain('dimensions: [封面标题, 动效]');
+  });
+
+  test('append returns the existing note path (for obsidian deep link)', async () => {
+    const vaultOps = makeVaultOps();
+    (vaultOps.listMarkdownFiles as jest.Mock).mockReturnValue(['Content Creation/Great Videos/note.md']);
+    (vaultOps.read as jest.Mock).mockResolvedValue(existingNote);
+    const manualHookRule = { ...hookClipRule, processingMode: 'manual' as const, sopPath: '' };
+    const payload: ClipPayload = {
+      mode: 'hook',
+      frames: [Buffer.from('f1').toString('base64')],
+      video_title: 'My Video',
+      url: 'https://www.youtube.com/watch?v=abc123',
+      captured_at: '2026-05-31T00:00:00Z',
+    };
+    const result = await routeClip(payload, new Map(), { ...clipRules, hook: manualHookRule }, [], vaultOps);
+    expect(result).toBe('Content Creation/Great Videos/note.md');
   });
 
   test('no existing note: creates new note as before', async () => {

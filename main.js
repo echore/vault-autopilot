@@ -17312,9 +17312,9 @@ function createServer2(port, onClip) {
     req.on("end", async () => {
       try {
         const payload = JSON.parse(body);
-        await onClip(payload);
+        const obsidianUrl = await onClip(payload);
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ success: true }));
+        res.end(JSON.stringify(obsidianUrl ? { success: true, obsidianUrl } : { success: true }));
       } catch (err) {
         res.writeHead(500, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ success: false, error: String(err) }));
@@ -17472,7 +17472,7 @@ async function handleThumbnail(payload, providers, rule, vaultOps) {
   if (rule.processingMode === "manual") {
     const sopContent2 = readSopSafely(rule.sopPath, vaultOps);
     await vaultOps.create(notePath, buildThumbnailNote(payload, thumbnailFile, sopContent2));
-    return;
+    return notePath;
   }
   if (!rule.sopPath || !rule.providerId) {
     throw new Error("Thumbnail clip rule is not fully configured (sopPath / providerId missing)");
@@ -17491,6 +17491,7 @@ async function handleThumbnail(payload, providers, rule, vaultOps) {
     meta: { video_title: payload.title, channel: payload.channel, url: payload.video_url }
   });
   await vaultOps.create(notePath, buildThumbnailNote(payload, thumbnailFile, postProcessMarkdown(result)));
+  return notePath;
 }
 function buildScreenshotTemplate(payload, imageNames, sopContent) {
   const imageLines = imageNames.map((n2) => `> ![[${n2}]]`).join("\n");
@@ -17512,6 +17513,7 @@ async function handleScreenshot(payload, providers, rule, vaultOps) {
     throw new Error("Screenshot output folder is not configured. Go to Settings \u2192 Clip Rules \u2192 Screenshot \u2192 Output folder.");
   }
   const stem = `screenshot-${sanitize(payload.title)}-${Date.now()}`;
+  const notePath = `${rule.outputFolder}/${stem}.md`;
   const framesDir = rule.framesFolder || rule.outputFolder;
   await vaultOps.ensureFolder(framesDir);
   await vaultOps.ensureFolder(rule.outputFolder);
@@ -17525,8 +17527,8 @@ async function handleScreenshot(payload, providers, rule, vaultOps) {
   if (rule.processingMode === "manual") {
     const sopContent2 = readSopSafely(rule.sopPath, vaultOps);
     const template = buildScreenshotTemplate(payload, imageNames, sopContent2);
-    await vaultOps.create(`${rule.outputFolder}/${stem}.md`, template);
-    return;
+    await vaultOps.create(notePath, template);
+    return notePath;
   }
   if (!rule.sopPath || !rule.outputFolder || !rule.providerId) {
     throw new Error("Screenshot clip rule is not configured");
@@ -17546,7 +17548,8 @@ async function handleScreenshot(payload, providers, rule, vaultOps) {
     meta: { url: payload.url }
   });
   const markdown = postProcessMarkdown(result);
-  await vaultOps.create(`${rule.outputFolder}/${stem}.md`, markdown);
+  await vaultOps.create(notePath, markdown);
+  return notePath;
 }
 function sampleFrames(frames, max) {
   if (frames.length <= max) return frames;
@@ -17684,12 +17687,13 @@ async function handleMultiFrame(payload, providers, rule, vaultOps, searchFolder
       const dimension = payload.mode === "hook" ? "\u5185\u5BB9" : "\u52A8\u6548";
       const updated = addDimension(existing.content, dimension) + buildAppendSection(payload, frameNames, sopContent2);
       await vaultOps.modify(existing.path, updated);
-      return;
+      return existing.path;
     }
     await vaultOps.ensureFolder(rule.outputFolder);
     const template = buildManualTemplate(payload, frameNames, sopContent2);
-    await vaultOps.create(`${rule.outputFolder}/${stem}.md`, template);
-    return;
+    const notePath2 = `${rule.outputFolder}/${stem}.md`;
+    await vaultOps.create(notePath2, template);
+    return notePath2;
   }
   if (!rule.sopPath || !rule.outputFolder || !rule.providerId) {
     throw new Error(`Clip rule for "${payload.mode}" is not configured`);
@@ -17716,10 +17720,12 @@ async function handleMultiFrame(payload, providers, rule, vaultOps, searchFolder
     const dimension = payload.mode === "hook" ? "\u5185\u5BB9" : "\u52A8\u6548";
     const updated = addDimension(existing.content, dimension) + buildAppendSection(payload, [], void 0, aiResult);
     await vaultOps.modify(existing.path, updated);
-    return;
+    return existing.path;
   }
   await vaultOps.ensureFolder(rule.outputFolder);
-  await vaultOps.create(`${rule.outputFolder}/${stem}.md`, aiResult);
+  const notePath = `${rule.outputFolder}/${stem}.md`;
+  await vaultOps.create(notePath, aiResult);
+  return notePath;
 }
 
 // src/startup-check.ts
@@ -17905,7 +17911,12 @@ var VaultAutopilotPlugin = class extends import_obsidian3.Plugin {
     };
     this.server = createServer2(
       port,
-      (payload) => routeClip(payload, this.providers, this.settings.clipRules, this.settings.rules, vaultOps)
+      async (payload) => {
+        const notePath = await routeClip(payload, this.providers, this.settings.clipRules, this.settings.rules, vaultOps);
+        if (!notePath) return void 0;
+        const vault = encodeURIComponent(this.app.vault.getName());
+        return `obsidian://open?vault=${vault}&file=${encodeURIComponent(notePath)}`;
+      }
     );
     this.server.on("error", (err) => {
       if (err.code === "EADDRINUSE") {
