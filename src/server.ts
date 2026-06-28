@@ -41,9 +41,10 @@ export type ThumbnailPayload = {
   video_url: string;
   thumbnail_url: string;
   title: string;
-  channel: string;
-  channel_handle?: string;
-  views?: string;
+  source_name?: string;
+  channel?: string | null;
+  channel_handle?: string | null;
+  views?: string | null;
   captured_at: string;
 };
 

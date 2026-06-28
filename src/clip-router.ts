@@ -89,7 +89,8 @@ function buildThumbnailNote(payload: ThumbnailPayload, thumbnailFile: string, so
     `---`,
     `type: video`,
     `platform: ${payload.platform}`,
-    `channel: "${payload.channel}"`,
+    ...(payload.source_name ? [`source: "${payload.source_name}"`] : []),
+    ...(payload.channel ? [`channel: "${payload.channel}"`] : []),
     ...(payload.channel_handle ? [`channel_handle: "${payload.channel_handle}"`] : []),
     `video_id: "${payload.video_id}"`,
     `video_url: "${payload.video_url}"`,
@@ -106,7 +107,7 @@ function buildThumbnailNote(payload: ThumbnailPayload, thumbnailFile: string, so
     ``,
     `# ${payload.title}`,
     ``,
-    `<iframe width="100%" height="315" src="https://www.youtube.com/embed/${payload.video_id}" frameborder="0" allowfullscreen></iframe>`,
+    buildVideoEmbed(payload.video_url, payload.platform, 0),
     ``,
     `![[${thumbnailFile}]]`,
     ``,
@@ -129,7 +130,8 @@ async function handleThumbnail(
   await vaultOps.ensureFolder(rule.thumbnailFolder);
   await vaultOps.ensureFolder(rule.outputFolder);
 
-  const thumbnailFile = `${payload.video_id}.webp`;
+  const urlExt = payload.thumbnail_url.split('?')[0].match(/\.(\w+)$/)?.[1] ?? 'webp';
+  const thumbnailFile = `${payload.video_id}.${urlExt}`;
   const thumbnailPath = `${rule.thumbnailFolder}/${thumbnailFile}`;
   const imgData = await vaultOps.downloadUrl(payload.thumbnail_url, payload.video_url);
   await vaultOps.createBinary(thumbnailPath, imgData);

@@ -75,7 +75,7 @@ describe('routeClip — thumbnail', () => {
     await routeClip(payload, new Map(), clipRules, [], vaultOps);
     expect(vaultOps.downloadUrl).toHaveBeenCalledWith(payload.thumbnail_url, payload.video_url);
     expect(vaultOps.createBinary).toHaveBeenCalledWith(
-      'Assets/Great Videos/abc123.webp',
+      'Assets/Great Videos/abc123.jpg',
       expect.any(ArrayBuffer),
     );
     const [notePath, noteContent] = (vaultOps.create as jest.Mock).mock.calls[0];
@@ -84,7 +84,7 @@ describe('routeClip — thumbnail', () => {
     expect(noteContent).toContain('video_id: "abc123"');
     expect(noteContent).toContain('channel: "Ali Abdaal"');
     expect(noteContent).toContain('dimensions: [封面标题]');
-    expect(noteContent).toContain('![[abc123.webp]]');
+    expect(noteContent).toContain('![[abc123.jpg]]');
     expect(noteContent).toContain('## 封面标题');
   });
 
@@ -117,6 +117,29 @@ describe('routeClip — thumbnail', () => {
     const [, noteContent] = (vaultOps.create as jest.Mock).mock.calls[0];
     expect(noteContent).toContain('## 封面标题');
     expect(noteContent).toContain('# Analysis');
+  });
+
+  test('non-YT/Bili platform: jump-link instead of YouTube iframe, no channel/views lines', async () => {
+    const vaultOps = makeVaultOps();
+    const generic: ClipPayload = {
+      mode: 'thumbnail',
+      platform: 'other',
+      video_id: 'twitter-com-i-status-123',
+      video_url: 'https://twitter.com/u/status/123',
+      thumbnail_url: 'https://pbs.twimg.com/x.jpg',
+      title: 'A Tweet Video',
+      source_name: 'Twitter',
+      channel: null,
+      views: null,
+      captured_at: '2026-06-27T00:00:00Z',
+    };
+    await routeClip(generic, new Map(), clipRules, [], vaultOps);
+    const [, noteContent] = (vaultOps.create as jest.Mock).mock.calls[0];
+    expect(noteContent).not.toContain('youtube.com/embed');
+    expect(noteContent).toContain('[▶ 跳转原视频](https://twitter.com/u/status/123)');
+    expect(noteContent).not.toContain('channel: "');
+    expect(noteContent).not.toContain('views: "');
+    expect(noteContent).toContain('![[twitter-com-i-status-123.jpg]]');
   });
 });
 
