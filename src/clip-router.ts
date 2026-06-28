@@ -1,6 +1,7 @@
 import { ClipPayload, HookPayload, KeyframePayload, LegacyClipPayload, ScreenshotPayload, ThumbnailPayload } from './server';
 import { AIProvider, ClipRule, isMultiFrameProvider, MultiFrameRequest, PluginSettings, ScreenshotClipRule, ThumbnailClipRule, WatchRule } from './types';
 import { postProcessMarkdown, sanitize, buildVideoEmbed, extractVideoId } from './util';
+import { buildAnchor, mergeSection, coverSection, hookSection, keyframeSection, VideoNoteMeta, NewSection } from './video-note';
 
 export interface VaultOps {
   ensureFolder(folderPath: string): Promise<void>;
@@ -19,9 +20,10 @@ export async function routeClip(
   clipRules: PluginSettings['clipRules'],
   watchRules: WatchRule[],
   vaultOps: VaultOps,
-): Promise<string | undefined> {
+): Promise<{ notePath?: string; notice?: string }> {
   if (isLegacy(payload)) {
-    return handleLegacyScreenshot(payload, watchRules, vaultOps);
+    await handleLegacyScreenshot(payload, watchRules, vaultOps);
+    return {};
   }
   if (payload.mode === 'thumbnail') return handleThumbnail(payload, providers, clipRules.thumbnail, vaultOps);
   if (payload.mode === 'screenshot') {
@@ -61,109 +63,30 @@ async function handleLegacyScreenshot(
   await vaultOps.createBinary(`${rule.watchFolder}/${stem}.png`, bytes.buffer as ArrayBuffer);
 }
 
-function sopBlock(sopContent: string): string {
-  const lines = sopContent.split('\n').map((l) => `> ${l}`).join('\n');
-  const checklist = [
-    `> `,
-    `> ---`,
-    `> **完成后执行：**`,
-    `> - [ ] 分析已写入笔记各章节`,
-    `> - [ ] 删除此整个提示块`,
-  ].join('\n');
-  return `> [!TIP] 分析提示\n${lines}\n${checklist}`;
-}
-
 function readSopSafely(sopPath: string, vaultOps: VaultOps): string | undefined {
   if (!sopPath) return undefined;
   try { return vaultOps.readFileSync(sopPath); } catch { return undefined; }
 }
 
-function thumbnailNoteStem(payload: ThumbnailPayload): string {
-  const titleSlug = payload.title.slice(0, 40).trim();
-  return payload.channel ? `${payload.channel} - ${titleSlug}` : titleSlug;
-}
-
-function buildThumbnailNote(payload: ThumbnailPayload, thumbnailFile: string, sopContent?: string, coverAnalysis?: string): string {
-  const today = new Date().toISOString().slice(0, 10);
-  const frontmatter = [
-    `---`,
-    `type: video`,
-    `platform: ${payload.platform}`,
-    ...(payload.source_name ? [`source: "${payload.source_name}"`] : []),
-    ...(payload.channel ? [`channel: "${payload.channel}"`] : []),
-    ...(payload.channel_handle ? [`channel_handle: "${payload.channel_handle}"`] : []),
-    `video_id: "${payload.video_id}"`,
-    `video_url: "${payload.video_url}"`,
-    `title: "${payload.title}"`,
-    ...(payload.views ? [`views: "${payload.views}"`] : []),
-    `analyzed_at: ${today}`,
-    `tags: []`,
-    `dimensions: [封面标题]`,
-    `depth: normal`,
-    `---`,
-  ].join('\n');
-
-  const bodyParts = [
-    ``,
-    `# ${payload.title}`,
-    ``,
-    buildVideoEmbed(payload.video_url, payload.platform, 0),
-    ``,
-    `![[${thumbnailFile}]]`,
-    ``,
-  ];
-  if (sopContent) bodyParts.push(sopBlock(sopContent), ``);
-  bodyParts.push(`## 封面标题`, ``, coverAnalysis ?? ``);
-
-  return frontmatter + bodyParts.join('\n');
-}
-
-async function handleThumbnail(
-  payload: ThumbnailPayload,
-  providers: Map<string, AIProvider>,
-  rule: ThumbnailClipRule,
+async function upsertVideoNote(
+  meta: VideoNoteMeta,
+  section: NewSection,
   vaultOps: VaultOps,
-): Promise<string> {
-  if (!rule.outputFolder || !rule.thumbnailFolder) {
-    throw new Error('Thumbnail output folder or thumbnail folder is not configured. Go to Settings → Clip Rules → Thumbnail.');
+  folder: string,
+): Promise<{ notePath: string; notice?: string }> {
+  await vaultOps.ensureFolder(folder);
+  const existing = meta.videoId ? await findNoteByVideoId(meta.videoId, folder, vaultOps) : null;
+  if (existing) {
+    const { content, skipped } = mergeSection(existing.content, section);
+    if (skipped) return { notePath: existing.path, notice: `「${section.kind}」已存在，未覆盖。想重做请先删掉该小节再点。` };
+    await vaultOps.modify(existing.path, content);
+    return { notePath: existing.path };
   }
-  await vaultOps.ensureFolder(rule.thumbnailFolder);
-  await vaultOps.ensureFolder(rule.outputFolder);
-
-  const urlExt = payload.thumbnail_url.split('?')[0].match(/\.(\w+)$/)?.[1] ?? 'webp';
-  const thumbnailFile = `${payload.video_id}.${urlExt}`;
-  const thumbnailPath = `${rule.thumbnailFolder}/${thumbnailFile}`;
-  const imgData = await vaultOps.downloadUrl(payload.thumbnail_url);
-  await vaultOps.createBinary(thumbnailPath, imgData);
-
-  const stem = thumbnailNoteStem(payload);
-  const notePath = `${rule.outputFolder}/${stem}.md`;
-
-  if (rule.processingMode === 'manual') {
-    const sopContent = readSopSafely(rule.sopPath, vaultOps);
-    await vaultOps.create(notePath, buildThumbnailNote(payload, thumbnailFile, sopContent));
-    return notePath;
-  }
-
-  if (!rule.sopPath || !rule.providerId) {
-    throw new Error('Thumbnail clip rule is not fully configured (sopPath / providerId missing)');
-  }
-  const provider = providers.get(rule.providerId);
-  if (!provider) throw new Error(`Provider "${rule.providerId}" not found`);
-  if (!isMultiFrameProvider(provider)) {
-    throw new Error(
-      `Provider "${provider.name}" does not support image analysis. ` +
-      `Use an API provider (Anthropic, OpenAI-compatible, or Gemini).`,
-    );
-  }
-  const sopContent = vaultOps.readFileSync(rule.sopPath);
-  const result = await provider.analyzeMultiFrame({
-    frames: [Buffer.from(imgData)],
-    sopContent,
-    meta: { video_title: payload.title, channel: payload.channel, url: payload.video_url },
-  });
-  await vaultOps.create(notePath, buildThumbnailNote(payload, thumbnailFile, postProcessMarkdown(result)));
-  return notePath;
+  const { content } = mergeSection(buildAnchor(meta), section);
+  const stem = meta.channel ? `${sanitize(meta.channel)} - ${sanitize(meta.title)}` : sanitize(meta.title);
+  const notePath = `${folder}/${stem || 'video'}.md`;
+  await vaultOps.create(notePath, content);
+  return { notePath };
 }
 
 function buildScreenshotTemplate(payload: ScreenshotPayload, imageNames: string[], sopContent?: string): string {
@@ -177,7 +100,12 @@ function buildScreenshotTemplate(payload: ScreenshotPayload, imageNames: string[
     imageLines,
     ``,
   ];
-  if (sopContent) parts.push(sopBlock(sopContent), ``);
+  // sopBlock is now in video-note; inline the template here for screenshots
+  if (sopContent) {
+    const lines = sopContent.split('\n').map((l) => `> ${l}`).join('\n');
+    const checklist = [`> `, `> ---`, `> **完成后执行：**`, `> - [ ] 分析已写入笔记各章节`, `> - [ ] 删除此整个提示块`].join('\n');
+    parts.push(`> [!TIP] 分析提示\n${lines}\n${checklist}`, ``);
+  }
   parts.push(`---`, ``, `## 笔记`, ``);
   return parts.join('\n');
 }
@@ -187,7 +115,7 @@ async function handleScreenshot(
   providers: Map<string, AIProvider>,
   rule: ScreenshotClipRule,
   vaultOps: VaultOps,
-): Promise<string> {
+): Promise<{ notePath: string }> {
   if (!rule.outputFolder) {
     throw new Error('Screenshot output folder is not configured. Go to Settings → Clip Rules → Screenshot → Output folder.');
   }
@@ -209,7 +137,7 @@ async function handleScreenshot(
     const sopContent = readSopSafely(rule.sopPath, vaultOps);
     const template = buildScreenshotTemplate(payload, imageNames, sopContent);
     await vaultOps.create(notePath, template);
-    return notePath;
+    return { notePath };
   }
 
   if (!rule.sopPath || !rule.outputFolder || !rule.providerId) {
@@ -232,82 +160,13 @@ async function handleScreenshot(
   });
   const markdown = postProcessMarkdown(result);
   await vaultOps.create(notePath, markdown);
-  return notePath;
+  return { notePath };
 }
 
 function sampleFrames(frames: string[], max: number): string[] {
   if (frames.length <= max) return frames;
   const step = frames.length / max;
   return Array.from({ length: max }, (_, i) => frames[Math.floor(i * step)]);
-}
-
-function buildManualTemplate(
-  payload: HookPayload | KeyframePayload,
-  frameNames: string[],
-  sopContent?: string,
-): string {
-  const startSeconds = payload.mode === 'keyframe' ? payload.time_range.start : 0;
-  const platform = payload.mode === 'hook' ? payload.platform : undefined;
-  const channel = payload.mode === 'hook' ? payload.channel : undefined;
-
-  const embed = buildVideoEmbed(payload.url, platform, startSeconds);
-  const frameLines = frameNames.map((n, i) => `> **[Image #${i + 1}]** ![[${n}]]`).join('\n');
-  const frameChecklist = [`> `, `> - [ ] 按 SOP 完成分析，填入各章节`].join('\n');
-
-  if (payload.mode === 'hook') {
-    const transcriptSection = payload.transcript
-      ? `\n## 字幕\n\n${payload.transcript}\n`
-      : '';
-    const durationSuffix = payload.time_range ? ` [${payload.time_range.start}s–${payload.time_range.end}s]` : '';
-    const durationLabel = payload.time_range ? ` | ${payload.time_range.end}s Hook` : '';
-    const parts = [
-      `# Hook — ${payload.video_title}${durationSuffix}`,
-      ``,
-      embed,
-      ``,
-      `来源：${platform ?? ''} | ${channel ?? ''} | ${payload.url} | ${payload.captured_at}${durationLabel}`,
-      ``,
-      `> [!NOTE] 分析用帧`,
-      frameLines,
-      frameChecklist,
-      ``,
-    ];
-    if (sopContent) parts.push(sopBlock(sopContent), ``);
-    parts.push(`---`, ``);
-    if (transcriptSection) parts.push(transcriptSection);
-    parts.push(
-      `## Hook 类型`, ``,
-      `## 具体手法`, ``,
-      `## 为什么有效`, ``,
-      `## 如何复制`, ``,
-      `## 我的想法`, ``,
-    );
-    return parts.join('\n');
-  } else {
-    const { start, end } = payload.time_range;
-    const parts = [
-      `# 关键帧 — ${payload.video_title} [${start}s–${end}s]`,
-      ``,
-      embed,
-      ``,
-      `来源：${payload.url} | ${payload.captured_at} | ${start}s–${end}s`,
-      ``,
-      `> [!NOTE] 分析用帧`,
-      frameLines,
-      frameChecklist,
-      ``,
-    ];
-    if (sopContent) parts.push(sopBlock(sopContent), ``);
-    parts.push(
-      `---`, ``,
-      `## 技法类型`, ``,
-      `## 技术实现`, ``,
-      `## 视觉目的`, ``,
-      `## 如何复制`, ``,
-      `## 我的想法`, ``,
-    );
-    return parts.join('\n');
-  }
 }
 
 async function findNoteByVideoId(
@@ -323,34 +182,44 @@ async function findNoteByVideoId(
   return null;
 }
 
-function addDimension(content: string, dimension: string): string {
-  return content.replace(
-    /^(dimensions:\s*\[)([^\]]*)(\])/m,
-    (_, open, inner, close) => {
-      const dims = inner.split(',').map((d: string) => d.trim()).filter(Boolean);
-      if (!dims.includes(dimension)) dims.push(dimension);
-      return `${open}${dims.join(', ')}${close}`;
-    },
-  );
-}
-
-function buildAppendSection(
-  payload: HookPayload | KeyframePayload,
-  frameNames: string[],
-  sopContent?: string,
-  aiResult?: string,
-): string {
-  const header = payload.mode === 'hook' ? `## 内容` : `## 动效`;
-  if (aiResult) return `\n${header}\n\n${aiResult}\n`;
-
-  const frameLines = frameNames.map((n, i) => `> **[Image #${i + 1}]** ![[${n}]]`).join('\n');
-  const frameChecklist = [`> `, `> - [ ] 按 SOP 完成分析，填入各章节`].join('\n');
-  const parts = [``, header, ``, `> [!NOTE] 分析用帧`, frameLines, frameChecklist, ``];
-  if (sopContent) parts.push(sopBlock(sopContent), ``);
-  if (payload.mode === 'hook' && payload.transcript) {
-    parts.push(`## 字幕`, ``, payload.transcript, ``);
+async function handleThumbnail(
+  payload: ThumbnailPayload,
+  providers: Map<string, AIProvider>,
+  rule: ThumbnailClipRule,
+  vaultOps: VaultOps,
+): Promise<{ notePath: string; notice?: string }> {
+  if (!rule.outputFolder || !rule.thumbnailFolder) {
+    throw new Error('Thumbnail output folder or thumbnail folder is not configured. Go to Settings → Clip Rules → Thumbnail.');
   }
-  return parts.join('\n');
+  await vaultOps.ensureFolder(rule.thumbnailFolder);
+
+  const urlExt = payload.thumbnail_url.split('?')[0].match(/\.(\w+)$/)?.[1] ?? 'webp';
+  const thumbnailFile = `${payload.video_id}.${urlExt}`;
+  const thumbnailPath = `${rule.thumbnailFolder}/${thumbnailFile}`;
+  const imgData = await vaultOps.downloadUrl(payload.thumbnail_url);
+  await vaultOps.createBinary(thumbnailPath, imgData);
+
+  const sopContent = rule.processingMode === 'manual'
+    ? readSopSafely(rule.sopPath, vaultOps)
+    : undefined;
+  let aiResult: string | undefined;
+  if (rule.processingMode !== 'manual') {
+    if (!rule.sopPath || !rule.providerId) throw new Error('Thumbnail clip rule is not fully configured (sopPath / providerId missing)');
+    const provider = providers.get(rule.providerId);
+    if (!provider) throw new Error(`Provider "${rule.providerId}" not found`);
+    if (!isMultiFrameProvider(provider)) throw new Error(`Provider "${provider.name}" does not support image analysis. Use an API provider.`);
+    const sop = vaultOps.readFileSync(rule.sopPath);
+    aiResult = postProcessMarkdown(await provider.analyzeMultiFrame({ frames: [Buffer.from(imgData)], sopContent: sop, meta: { video_title: payload.title, channel: payload.channel, url: payload.video_url } }));
+  }
+  const section = coverSection(thumbnailFile, aiResult ?? sopContent);
+  const meta: VideoNoteMeta = {
+    platform: payload.platform,
+    videoId: extractVideoId(payload.video_url, payload.platform) ?? payload.video_id,
+    videoUrl: payload.video_url,
+    title: payload.title,
+    channel: payload.channel,
+  };
+  return upsertVideoNote(meta, section, vaultOps, rule.outputFolder);
 }
 
 async function handleMultiFrame(
@@ -359,17 +228,20 @@ async function handleMultiFrame(
   rule: ClipRule,
   vaultOps: VaultOps,
   searchFolder: string,
-): Promise<string> {
+): Promise<{ notePath: string; notice?: string }> {
   // ── Save frames (both modes need them for manual; auto uses them for AI) ──────
   const max = rule.maxFrames ?? 5;
   const sampled = sampleFrames(payload.frames, max);
   const stem = `${payload.mode}-${sanitize(payload.video_title)}-${Date.now()}`;
 
-  // ── Check for existing Great Videos note to append to ────────────────────────
   const videoId = extractVideoId(payload.url, payload.mode === 'hook' ? payload.platform : undefined);
-  const existing = videoId && searchFolder
-    ? await findNoteByVideoId(videoId, searchFolder, vaultOps)
-    : null;
+  const meta: VideoNoteMeta = {
+    platform: payload.mode === 'hook' ? (payload.platform ?? 'youtube') : 'youtube',
+    videoId: videoId ?? '',
+    videoUrl: payload.url,
+    title: payload.video_title,
+    channel: payload.mode === 'hook' ? payload.channel : undefined,
+  };
 
   if (rule.processingMode === 'manual') {
     const framesDir = rule.framesFolder || rule.outputFolder;
@@ -382,17 +254,19 @@ async function handleMultiFrame(
       frameNames.push(name);
     }
     const sopContent = readSopSafely(rule.sopPath, vaultOps);
-    if (existing) {
-      const dimension = payload.mode === 'hook' ? '内容' : '动效';
-      const updated = addDimension(existing.content, dimension) + buildAppendSection(payload, frameNames, sopContent);
-      await vaultOps.modify(existing.path, updated);
-      return existing.path;
+    let section: NewSection;
+    if (payload.mode === 'hook') {
+      section = hookSection(
+        { url: payload.url, platform: payload.platform, endSeconds: payload.time_range?.end ?? 15, frameNames, transcript: payload.transcript, aiResult: undefined },
+        sopContent,
+      );
+    } else {
+      section = keyframeSection(
+        { url: payload.url, platform: 'youtube', start: payload.time_range.start, end: payload.time_range.end, frameNames, aiResult: undefined },
+        sopContent,
+      );
     }
-    await vaultOps.ensureFolder(rule.outputFolder);
-    const template = buildManualTemplate(payload, frameNames, sopContent);
-    const notePath = `${rule.outputFolder}/${stem}.md`;
-    await vaultOps.create(notePath, template);
-    return notePath;
+    return upsertVideoNote(meta, section, vaultOps, searchFolder);
   }
 
   if (!rule.sopPath || !rule.outputFolder || !rule.providerId) {
@@ -402,13 +276,13 @@ async function handleMultiFrame(
   if (!provider) throw new Error(`Provider "${rule.providerId}" not found`);
   if (!isMultiFrameProvider(provider)) {
     throw new Error(
-      `Provider "${provider.name}" does not support multi-frame analysis. ` +
+      `Provider "${payload.mode === 'hook' ? 'hook' : rule.providerId}" does not support multi-frame analysis. ` +
       `Use an API provider (Anthropic, OpenAI-compatible, or Gemini).`,
     );
   }
   const frames = sampled.map((f) => Buffer.from(f, 'base64'));
   const sopContent = vaultOps.readFileSync(rule.sopPath);
-  const meta: MultiFrameRequest['meta'] = {
+  const metaReq: MultiFrameRequest['meta'] = {
     video_title: payload.video_title,
     url: payload.url,
     captured_at: payload.captured_at,
@@ -417,16 +291,20 @@ async function handleMultiFrame(
       : { time_range: payload.time_range }),
   };
   const transcript = payload.mode === 'hook' ? payload.transcript : undefined;
-  const result = await provider.analyzeMultiFrame({ frames, transcript, sopContent, meta });
+  const result = await provider.analyzeMultiFrame({ frames, transcript, sopContent, meta: metaReq });
   const aiResult = postProcessMarkdown(result);
-  if (existing) {
-    const dimension = payload.mode === 'hook' ? '内容' : '动效';
-    const updated = addDimension(existing.content, dimension) + buildAppendSection(payload, [], undefined, aiResult);
-    await vaultOps.modify(existing.path, updated);
-    return existing.path;
+
+  let section: NewSection;
+  if (payload.mode === 'hook') {
+    section = hookSection(
+      { url: payload.url, platform: payload.platform, endSeconds: payload.time_range?.end ?? 15, frameNames: [], transcript: payload.transcript, aiResult },
+      sopContent,
+    );
+  } else {
+    section = keyframeSection(
+      { url: payload.url, platform: 'youtube', start: payload.time_range.start, end: payload.time_range.end, frameNames: [], aiResult },
+      sopContent,
+    );
   }
-  await vaultOps.ensureFolder(rule.outputFolder);
-  const notePath = `${rule.outputFolder}/${stem}.md`;
-  await vaultOps.create(notePath, aiResult);
-  return notePath;
+  return upsertVideoNote(meta, section, vaultOps, searchFolder);
 }

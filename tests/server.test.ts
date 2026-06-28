@@ -17,7 +17,7 @@ describe('createServer', () => {
   let handler: jest.Mock;
 
   beforeEach((done) => {
-    handler = jest.fn().mockResolvedValue(undefined);
+    handler = jest.fn().mockResolvedValue({});
     server = createServer(PORT, handler);
     server.on('listening', done);
   });
@@ -33,7 +33,7 @@ describe('createServer', () => {
   });
 
   test('POST /clip includes obsidianUrl when handler returns one', async () => {
-    handler.mockResolvedValue('obsidian://open?vault=V&file=Notes%2Ffoo.md');
+    handler.mockResolvedValue({ obsidianUrl: 'obsidian://open?vault=V&file=Notes%2Ffoo.md' });
     const { status, body } = await request('POST', '/clip', { image_base64: 'abc', source_url: '', title: 'T' });
     expect(status).toBe(200);
     expect(body).toEqual({ success: true, obsidianUrl: 'obsidian://open?vault=V&file=Notes%2Ffoo.md' });
