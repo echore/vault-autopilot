@@ -21,8 +21,8 @@ export function parseSelection(text: string, count: number, total: number): numb
 }
 
 const PROMPTS: Record<string, string> = {
-  hook: '这些是一个视频开头的候选帧。请挑出最抓眼球、最有视觉冲击或动效的画面，避开纯黑场和静止的口播人脸定格。',
-  keyframe: '这些是一段视频的候选帧。请挑出动效、转场、运镜或动作最明显的画面，避开纯人脸定格和几乎静止的画面。',
+  hook: '这些是一个视频开头的候选帧。请挑出画面上图形/文字/动效元素最丰富、最抓眼球的画面；务必挑彼此差异大的，绝不要选几乎一样或同一镜头的两张；能避开纯人脸定格就避开。',
+  keyframe: '这些是一段视频的候选帧。请挑出动效、转场、图形、文字或动作最明显的画面；务必挑彼此差异大的，绝不要选几乎一样或同一镜头的两张；能避开纯人脸定格、静止画面就避开。',
 };
 
 // Ask the vision model which `count` frames to keep. Uses Obsidian's requestUrl so
