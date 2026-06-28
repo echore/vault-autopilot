@@ -149,7 +149,12 @@ export default class VaultAutopilotPlugin extends Plugin {
     const { port } = this.settings.httpServer;
     const vaultOps: VaultOps = {
       ensureFolder: (p) => this.ensureFolder(p),
-      createBinary: async (p, data) => { await this.app.vault.createBinary(p, data); },
+      createBinary: async (p, data) => {
+        // Overwrite if it already exists (e.g. an auto-saved cover) — createBinary throws otherwise.
+        const existing = this.app.vault.getAbstractFileByPath(p);
+        if (existing instanceof TFile) await this.app.vault.modifyBinary(existing, data);
+        else await this.app.vault.createBinary(p, data);
+      },
       create: async (p, content) => { await this.app.vault.create(p, content); },
       readFileSync: (p) => fs.readFileSync(p, 'utf8'),
       downloadUrl: async (url) => {
