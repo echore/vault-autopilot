@@ -78,6 +78,13 @@ test('keyframe section cues to the segment start with no end cap', () => {
   expect(s.text).toContain('## 动效 ① · 45s–52s');
 });
 
+test('keyframe on a Bilibili url builds a Bilibili player cued to start', () => {
+  const s = keyframeSection({ url: 'https://www.bilibili.com/video/BV1xx411c7mD/', platform: 'bilibili', start: 30, end: 40, frameNames: ['k.png'] });
+  expect(s.text).toContain('player.bilibili.com/player.html?bvid=BV1xx411c7mD');
+  expect(s.text).toContain('t=30');
+  expect(s.text).not.toContain('youtube.com/embed');
+});
+
 test('keyframe float times become integer seconds in embed and heading', () => {
   const s = keyframeSection({ url: meta.videoUrl, platform: 'youtube', start: 369.35182, end: 386.119189, frameNames: ['k.png'] });
   expect(s.text).toContain('embed/abc123?start=369');

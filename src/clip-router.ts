@@ -1,6 +1,6 @@
 import { ClipPayload, HookPayload, KeyframePayload, LegacyClipPayload, ScreenshotPayload, ThumbnailPayload } from './server';
 import { AIProvider, ClipRule, isMultiFrameProvider, MultiFrameRequest, PluginSettings, ScreenshotClipRule, ThumbnailClipRule, WatchRule } from './types';
-import { postProcessMarkdown, sanitize, buildVideoEmbed, extractVideoId } from './util';
+import { postProcessMarkdown, sanitize, buildVideoEmbed, extractVideoId, detectPlatform } from './util';
 import { buildAnchor, mergeSection, coverSection, hookSection, keyframeSection, VideoNoteMeta, NewSection } from './video-note';
 
 export interface VaultOps {
@@ -234,9 +234,10 @@ async function handleMultiFrame(
   const sampled = sampleFrames(payload.frames, max);
   const stem = `${payload.mode}-${sanitize(payload.video_title)}-${Date.now()}`;
 
-  const videoId = extractVideoId(payload.url, payload.mode === 'hook' ? payload.platform : undefined);
+  const platform = detectPlatform(payload.url);
+  const videoId = extractVideoId(payload.url, platform);
   const meta: VideoNoteMeta = {
-    platform: payload.mode === 'hook' ? (payload.platform ?? 'youtube') : 'youtube',
+    platform,
     videoId: videoId ?? '',
     videoUrl: payload.url,
     title: payload.video_title,
@@ -257,12 +258,12 @@ async function handleMultiFrame(
     let section: NewSection;
     if (payload.mode === 'hook') {
       section = hookSection(
-        { url: payload.url, platform: payload.platform, endSeconds: payload.time_range?.end ?? 15, frameNames, transcript: payload.transcript, aiResult: undefined },
+        { url: payload.url, platform, endSeconds: payload.time_range?.end ?? 15, frameNames, transcript: payload.transcript, aiResult: undefined },
         sopContent,
       );
     } else {
       section = keyframeSection(
-        { url: payload.url, platform: 'youtube', start: payload.time_range.start, end: payload.time_range.end, frameNames, aiResult: undefined },
+        { url: payload.url, platform, start: payload.time_range.start, end: payload.time_range.end, frameNames, aiResult: undefined },
         sopContent,
       );
     }

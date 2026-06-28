@@ -23,6 +23,12 @@ export function extractVideoId(url: string, platform: string | undefined): strin
   return null;
 }
 
+export function detectPlatform(url: string): string {
+  if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
+  if (url.includes('bilibili.com')) return 'bilibili';
+  return 'other';
+}
+
 export function buildVideoEmbed(url: string, platform: string | undefined, startSeconds: number, endSeconds?: number): string {
   const p = (platform ?? '').toLowerCase();
   // Players only accept integer seconds — a float (from video.currentTime) is
