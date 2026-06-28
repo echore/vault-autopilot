@@ -294,7 +294,9 @@ async function handleMultiFrame(
   const count = (payload.frames_select && payload.frames_select > 0) ? payload.frames_select : (rule.maxFrames ?? 5);
   let sampled: string[];
   let aiNotice: string | undefined;
-  if (frameSelector?.apiKey) {
+  if (count >= payload.frames.length) {
+    sampled = payload.frames; // already curated upstream (e.g. user picked) — save all as-is
+  } else if (frameSelector?.apiKey) {
     try {
       const idx = await selectFrames(payload.frames.map((f) => Buffer.from(f, 'base64')), count, payload.mode, frameSelector);
       sampled = idx.map((i) => payload.frames[i]);
