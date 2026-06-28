@@ -1,6 +1,7 @@
 import { ClipPayload, HookPayload, KeyframePayload, LegacyClipPayload, ScreenshotPayload, ThumbnailPayload } from './server';
-import { AIProvider, ClipRule, isMultiFrameProvider, MultiFrameRequest, PluginSettings, ScreenshotClipRule, ThumbnailClipRule, WatchRule } from './types';
+import { AIProvider, ClipRule, isMultiFrameProvider, MultiFrameRequest, PluginSettings, ScreenshotClipRule, ThumbnailClipRule, WatchRule, FrameSelectorSettings } from './types';
 import { postProcessMarkdown, sanitize, buildVideoEmbed, extractVideoId, detectPlatform, videoKey } from './util';
+import { selectFrames } from './frame-select';
 import { buildAnchor, mergeSection, coverSection, hookSection, keyframeSection, screenshotSection, VideoNoteMeta, NewSection } from './video-note';
 
 export interface VaultOps {
@@ -21,6 +22,7 @@ export async function routeClip(
   clipRules: PluginSettings['clipRules'],
   watchRules: WatchRule[],
   vaultOps: VaultOps,
+  frameSelector?: FrameSelectorSettings,
 ): Promise<{ notePath?: string; notice?: string }> {
   if (isLegacy(payload)) {
     await handleLegacyScreenshot(payload, watchRules, vaultOps);
@@ -31,8 +33,8 @@ export async function routeClip(
     const normalized = normalizeScreenshot(payload);
     return handleScreenshot(normalized, providers, clipRules.screenshot, vaultOps, clipRules.thumbnail.outputFolder, clipRules.thumbnail.thumbnailFolder);
   }
-  if (payload.mode === 'hook') return handleMultiFrame(payload, providers, clipRules.hook, vaultOps, clipRules.thumbnail.outputFolder, clipRules.thumbnail.thumbnailFolder);
-  if (payload.mode === 'keyframe') return handleMultiFrame(payload, providers, clipRules.keyframe, vaultOps, clipRules.thumbnail.outputFolder, clipRules.thumbnail.thumbnailFolder);
+  if (payload.mode === 'hook') return handleMultiFrame(payload, providers, clipRules.hook, vaultOps, clipRules.thumbnail.outputFolder, clipRules.thumbnail.thumbnailFolder, frameSelector);
+  if (payload.mode === 'keyframe') return handleMultiFrame(payload, providers, clipRules.keyframe, vaultOps, clipRules.thumbnail.outputFolder, clipRules.thumbnail.thumbnailFolder, frameSelector);
   throw new Error('Unknown clip mode');
 }
 
@@ -279,10 +281,21 @@ async function handleMultiFrame(
   vaultOps: VaultOps,
   searchFolder: string,
   assetFolder: string,
+  frameSelector?: FrameSelectorSettings,
 ): Promise<{ notePath: string; notice?: string }> {
-  // ── Save frames (both modes need them for manual; auto uses them for AI) ──────
-  const max = rule.maxFrames ?? 5;
-  const sampled = sampleFrames(payload.frames, max);
+  // ── Pick which frames to keep from the candidates the extension sent ──────────
+  const count = (payload.frames_select && payload.frames_select > 0) ? payload.frames_select : (rule.maxFrames ?? 5);
+  let sampled: string[];
+  try {
+    if (frameSelector?.apiKey) {
+      const idx = await selectFrames(payload.frames.map((f) => Buffer.from(f, 'base64')), count, payload.mode, frameSelector);
+      sampled = idx.map((i) => payload.frames[i]);
+    } else {
+      sampled = sampleFrames(payload.frames, count);
+    }
+  } catch (_) {
+    sampled = sampleFrames(payload.frames, count); // heuristic fallback on any AI failure
+  }
   const stem = `${payload.mode}-${sanitize(payload.video_title)}-${Date.now()}`;
 
   const platform = detectPlatform(payload.url);

@@ -25,6 +25,7 @@ export type HookPayload = {
   captured_at: string;
   time_range?: { start: number; end: number };
   cover_url?: string;
+  frames_select?: number;
 };
 
 export type KeyframePayload = {
@@ -35,6 +36,7 @@ export type KeyframePayload = {
   time_range: { start: number; end: number };
   captured_at: string;
   cover_url?: string;
+  frames_select?: number;
 };
 
 export type ThumbnailPayload = {
