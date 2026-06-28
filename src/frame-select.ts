@@ -20,9 +20,12 @@ export function parseSelection(text: string, count: number, total: number): numb
   return keep;
 }
 
+// Note: each input is a STILL frame — the model can judge what's visible in one
+// image (graphics, text, icons, overlays, big poses, faces, blank) but NOT motion
+// between frames. So we ask only for visible properties, not "动效/转场".
 const PROMPTS: Record<string, string> = {
-  hook: '这些是一个视频开头的候选帧。请挑出画面上图形/文字/动效元素最丰富、最抓眼球的画面；务必挑彼此差异大的，绝不要选几乎一样或同一镜头的两张；能避开纯人脸定格就避开。',
-  keyframe: '这些是一段视频的候选帧。请挑出动效、转场、图形、文字或动作最明显的画面；务必挑彼此差异大的，绝不要选几乎一样或同一镜头的两张；能避开纯人脸定格、静止画面就避开。',
+  hook: '这些是从一个视频开头截的静止帧。请挑出画面信息最丰富的几张——优先有图形、文字、图标、特效叠加，或人物动作幅度大的画面；务必挑彼此差异大的，绝不要选几乎一样或同一镜头的两张；尽量避开只有一张人脸、没有别的内容的定格。',
+  keyframe: '这些是从一段视频截的静止帧。请挑出画面信息最丰富的几张——优先有图形、文字、图标、特效叠加，或人物动作幅度大的画面；务必挑彼此差异大的，绝不要选几乎一样或同一镜头的两张；尽量避开只有一张人脸、没有别的内容的定格。',
 };
 
 // Ask the vision model which `count` frames to keep. Uses Obsidian's requestUrl so
