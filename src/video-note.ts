@@ -42,8 +42,10 @@ export function hookSection(
   p: { url: string; platform?: string; endSeconds: number; frameNames: string[]; transcript?: string; aiResult?: string },
   sop?: string,
 ): NewSection {
-  const embed = buildVideoEmbed(p.url, p.platform, 0, p.endSeconds);
-  const parts = [`## 内容 · 0s–${p.endSeconds}s`, ``, embed, ``];
+  // Hook is always at the very front — embed the whole video from the start
+  // (no end cap; the captured cut-off point doesn't matter for a hook).
+  const embed = buildVideoEmbed(p.url, p.platform, 0);
+  const parts = [`## 内容`, ``, embed, ``];
   if (p.aiResult) {
     parts.push(p.aiResult, ``);
   } else {
@@ -58,7 +60,8 @@ export function keyframeSection(
   p: { url: string; platform?: string; start: number; end: number; frameNames: string[]; aiResult?: string },
   sop?: string,
 ): NewSection {
-  const embed = buildVideoEmbed(p.url, p.platform, p.start, p.end);
+  // Cue the player to the START of this segment (no end cap).
+  const embed = buildVideoEmbed(p.url, p.platform, p.start);
   const parts = [`## 动效 ① · ${p.start}s–${p.end}s`, ``, embed, ``];
   if (p.aiResult) {
     parts.push(p.aiResult, ``);

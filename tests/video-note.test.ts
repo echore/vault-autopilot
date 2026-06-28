@@ -61,11 +61,19 @@ test('a ## line inside a user code fence is NOT treated as a section', () => {
   expect(r.content).toContain('## 动效 ② · 130s–138s');
 });
 
-test('hook section embeds a 0-end clip and keeps frames + 字幕', () => {
+test('hook section embeds the whole video from start (no end) + frames + 字幕', () => {
   const s = hookSection({ url: meta.videoUrl, platform: 'youtube', endSeconds: 15, frameNames: ['f1.png'], transcript: 'hello' });
   expect(s.kind).toBe('内容');
-  expect(s.text).toContain('embed/abc123?start=0&end=15');
+  expect(s.text).toContain('embed/abc123?start=0');
+  expect(s.text).not.toContain('end=');
   expect(s.text).toContain('![[f1.png]]');
   expect(s.text).toContain('### 字幕');
   expect(s.text).toContain('hello');
+});
+
+test('keyframe section cues to the segment start with no end cap', () => {
+  const s = keyframeSection({ url: meta.videoUrl, platform: 'youtube', start: 45, end: 52, frameNames: ['k.png'] });
+  expect(s.text).toContain('embed/abc123?start=45');
+  expect(s.text).not.toContain('end=');
+  expect(s.text).toContain('## 动效 ① · 45s–52s');
 });
