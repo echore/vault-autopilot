@@ -587,4 +587,19 @@ describe('routeClip — unified video note (manual)', () => {
     expect(note).toContain('video_id: "https://x.com/u/status/123"');
     expect(note.indexOf('## 内容')).toBeLessThan(note.indexOf('## 动效'));
   });
+
+  test('screenshot folds into the existing video note; otherwise standalone', async () => {
+    const { v, store } = vaultWithStore();
+    const url = 'https://www.youtube.com/watch?v=abc123';
+    await routeClip(hookPayload, new Map(), manual, [], v); // creates the video note
+    await routeClip({ mode: 'screenshot', images: ['Zg=='], url, title: 'Bee' }, new Map(), manual, [], v);
+    expect(Object.keys(store).length).toBe(1); // merged, not a new note
+    const note = store[Object.keys(store)[0]];
+    expect(note).toContain('## 截图');
+    expect(note).toContain('dimensions: [内容, 截图]');
+
+    // a screenshot on an un-studied page stays standalone
+    await routeClip({ mode: 'screenshot', images: ['Zg=='], url: 'https://example.com/random', title: 'Rand' }, new Map(), manual, [], v);
+    expect(Object.keys(store).length).toBe(2);
+  });
 });

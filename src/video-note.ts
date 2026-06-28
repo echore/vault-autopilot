@@ -1,7 +1,7 @@
 import { buildVideoEmbed, sanitize } from './util';
 
-export type SectionKind = '封面标题' | '内容' | '动效';
-const RANK: Record<SectionKind, number> = { '封面标题': 0, '内容': 1, '动效': 2 };
+export type SectionKind = '封面标题' | '内容' | '动效' | '截图';
+const RANK: Record<SectionKind, number> = { '封面标题': 0, '内容': 1, '动效': 2, '截图': 3 };
 
 export interface VideoNoteMeta {
   platform: string;
@@ -73,6 +73,14 @@ export function keyframeSection(
   return { kind: '动效', startSeconds: p.start, text: parts.join('\n') };
 }
 
+export function screenshotSection(imageNames: string[], sop?: string, aiResult?: string): NewSection {
+  const imgs = imageNames.map((n) => `![[${n}]]`).join('\n');
+  const parts = [`## 截图 ①`, ``, imgs, ``];
+  if (aiResult) parts.push(aiResult, ``);
+  else if (sop) parts.push(sopBlock(sop), ``);
+  return { kind: '截图', startSeconds: 0, text: parts.join('\n') };
+}
+
 export function buildAnchor(meta: VideoNoteMeta): string {
   const today = new Date().toISOString().slice(0, 10);
   const fm = [
@@ -91,6 +99,7 @@ function kindOf(heading: string): SectionKind | null {
   if (heading.startsWith('封面标题')) return '封面标题';
   if (heading.startsWith('内容')) return '内容';
   if (heading.startsWith('动效')) return '动效';
+  if (heading.startsWith('截图')) return '截图';
   return null;
 }
 
@@ -124,7 +133,7 @@ function parseSections(body: string): { head: string; sections: ParsedSection[] 
   return { head: head.join('\n'), sections };
 }
 
-const DIMENSION_ORDER: SectionKind[] = ['封面标题', '内容', '动效'];
+const DIMENSION_ORDER: SectionKind[] = ['封面标题', '内容', '动效', '截图'];
 
 function addDimension(frontmatter: string, dim: string): string {
   return frontmatter.replace(/^(dimensions:\s*\[)([^\]]*)(\])/m, (_, open, inner, close) => {
@@ -136,11 +145,11 @@ function addDimension(frontmatter: string, dim: string): string {
 }
 
 function renumber(sections: ParsedSection[]): ParsedSection[] {
-  let n = 0;
+  const counters: Partial<Record<SectionKind, number>> = {};
   return sections.map((s) => {
-    if (s.kind !== '动效') return s;
-    n += 1;
-    const text = s.text.replace(/^(## 动效 )\S+( ·.*)?$/m, `$1${circledNumber(n)}$2`);
+    if (s.kind !== '动效' && s.kind !== '截图') return s;
+    counters[s.kind] = (counters[s.kind] ?? 0) + 1;
+    const text = s.text.replace(new RegExp(`^(## ${s.kind} )\\S+( ·.*)?$`, 'm'), `$1${circledNumber(counters[s.kind]!)}$2`);
     return { ...s, text };
   });
 }
@@ -152,7 +161,7 @@ export function mergeSection(existing: string, section: NewSection): { content: 
 
   const { head, sections } = parseSections(body);
 
-  if (section.kind !== '动效' && sections.some((s) => s.kind === section.kind)) {
+  if (section.kind !== '动效' && section.kind !== '截图' && sections.some((s) => s.kind === section.kind)) {
     return { content: existing, skipped: true };
   }
 

@@ -1,4 +1,15 @@
-import { buildAnchor, mergeSection, coverSection, hookSection, keyframeSection, VideoNoteMeta } from '../src/video-note';
+import { buildAnchor, mergeSection, coverSection, hookSection, keyframeSection, screenshotSection, VideoNoteMeta } from '../src/video-note';
+
+test('screenshot sections sort after 动效 and renumber ①②', () => {
+  let c = buildAnchor({ platform: 'youtube', videoId: 'abc123', videoUrl: 'https://www.youtube.com/watch?v=abc123', title: 'Bee' });
+  c = mergeSection(c, keyframeSection({ url: 'https://www.youtube.com/watch?v=abc123', platform: 'youtube', start: 45, end: 52, frameNames: ['k.png'] })).content;
+  c = mergeSection(c, screenshotSection(['s1.png'])).content;
+  c = mergeSection(c, screenshotSection(['s2.png'])).content;
+  expect(c.indexOf('## 动效')).toBeLessThan(c.indexOf('## 截图'));
+  expect(c).toContain('## 截图 ①');
+  expect(c).toContain('## 截图 ②');
+  expect(c).toContain('dimensions: [动效, 截图]');
+});
 
 const meta: VideoNoteMeta = {
   platform: 'youtube', videoId: 'abc123',

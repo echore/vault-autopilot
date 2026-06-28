@@ -1,7 +1,7 @@
 import { ClipPayload, HookPayload, KeyframePayload, LegacyClipPayload, ScreenshotPayload, ThumbnailPayload } from './server';
 import { AIProvider, ClipRule, isMultiFrameProvider, MultiFrameRequest, PluginSettings, ScreenshotClipRule, ThumbnailClipRule, WatchRule } from './types';
 import { postProcessMarkdown, sanitize, buildVideoEmbed, detectPlatform, videoKey } from './util';
-import { buildAnchor, mergeSection, coverSection, hookSection, keyframeSection, VideoNoteMeta, NewSection } from './video-note';
+import { buildAnchor, mergeSection, coverSection, hookSection, keyframeSection, screenshotSection, VideoNoteMeta, NewSection } from './video-note';
 
 export interface VaultOps {
   ensureFolder(folderPath: string): Promise<void>;
@@ -28,7 +28,7 @@ export async function routeClip(
   if (payload.mode === 'thumbnail') return handleThumbnail(payload, providers, clipRules.thumbnail, vaultOps);
   if (payload.mode === 'screenshot') {
     const normalized = normalizeScreenshot(payload);
-    return handleScreenshot(normalized, providers, clipRules.screenshot, vaultOps);
+    return handleScreenshot(normalized, providers, clipRules.screenshot, vaultOps, clipRules.thumbnail.outputFolder);
   }
   if (payload.mode === 'hook') return handleMultiFrame(payload, providers, clipRules.hook, vaultOps, clipRules.thumbnail.outputFolder);
   if (payload.mode === 'keyframe') return handleMultiFrame(payload, providers, clipRules.keyframe, vaultOps, clipRules.thumbnail.outputFolder);
@@ -115,6 +115,7 @@ async function handleScreenshot(
   providers: Map<string, AIProvider>,
   rule: ScreenshotClipRule,
   vaultOps: VaultOps,
+  searchFolder: string,
 ): Promise<{ notePath: string }> {
   if (!rule.outputFolder) {
     throw new Error('Screenshot output folder is not configured. Go to Settings → Clip Rules → Screenshot → Output folder.');
@@ -133,8 +134,16 @@ async function handleScreenshot(
     imageNames.push(name);
   }
 
+  // If this page already has a video/post study note, fold the screenshot in.
+  const existing = await findNoteByVideoId(videoKey(payload.url), searchFolder, vaultOps);
+
   if (rule.processingMode === 'manual') {
     const sopContent = readSopSafely(rule.sopPath, vaultOps);
+    if (existing) {
+      const { content } = mergeSection(existing.content, screenshotSection(imageNames, sopContent));
+      await vaultOps.modify(existing.path, content);
+      return { notePath: existing.path };
+    }
     const template = buildScreenshotTemplate(payload, imageNames, sopContent);
     await vaultOps.create(notePath, template);
     return { notePath };
@@ -159,6 +168,11 @@ async function handleScreenshot(
     meta: { url: payload.url },
   });
   const markdown = postProcessMarkdown(result);
+  if (existing) {
+    const { content } = mergeSection(existing.content, screenshotSection(imageNames, undefined, markdown));
+    await vaultOps.modify(existing.path, content);
+    return { notePath: existing.path };
+  }
   await vaultOps.create(notePath, markdown);
   return { notePath };
 }
