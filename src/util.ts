@@ -25,16 +25,19 @@ export function extractVideoId(url: string, platform: string | undefined): strin
 
 export function buildVideoEmbed(url: string, platform: string | undefined, startSeconds: number, endSeconds?: number): string {
   const p = (platform ?? '').toLowerCase();
+  // Players only accept integer seconds — a float (from video.currentTime) is
+  // silently ignored and playback falls back to 0.
+  const start = Math.floor(startSeconds);
   if (p === 'youtube' || url.includes('youtube.com') || url.includes('youtu.be')) {
     const id = extractVideoId(url, platform);
     if (id) {
-      const endParam = endSeconds != null ? `&end=${endSeconds}` : '';
-      return `<iframe width="100%" height="315" src="https://www.youtube.com/embed/${id}?start=${startSeconds}${endParam}" frameborder="0" allowfullscreen></iframe>`;
+      const endParam = endSeconds != null ? `&end=${Math.floor(endSeconds)}` : '';
+      return `<iframe width="100%" height="315" src="https://www.youtube.com/embed/${id}?start=${start}${endParam}" frameborder="0" allowfullscreen></iframe>`;
     }
   }
   if (p === 'bilibili' || url.includes('bilibili.com')) {
     const id = extractVideoId(url, platform);
-    if (id) return `<iframe width="100%" height="315" src="https://player.bilibili.com/player.html?bvid=${id}&page=1&t=${startSeconds}" frameborder="0" allowfullscreen></iframe>`;
+    if (id) return `<iframe width="100%" height="315" src="https://player.bilibili.com/player.html?bvid=${id}&page=1&t=${start}" frameborder="0" allowfullscreen></iframe>`;
   }
   return `[▶ 跳转原视频](${url})`;
 }

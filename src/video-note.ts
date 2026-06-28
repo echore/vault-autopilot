@@ -62,7 +62,8 @@ export function keyframeSection(
 ): NewSection {
   // Cue the player to the START of this segment (no end cap).
   const embed = buildVideoEmbed(p.url, p.platform, p.start);
-  const parts = [`## 动效 ① · ${p.start}s–${p.end}s`, ``, embed, ``];
+  // Integer seconds in the heading: clean display + parseable for re-sorting.
+  const parts = [`## 动效 ① · ${Math.floor(p.start)}s–${Math.round(p.end)}s`, ``, embed, ``];
   if (p.aiResult) {
     parts.push(p.aiResult, ``);
   } else {

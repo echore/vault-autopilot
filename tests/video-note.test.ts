@@ -77,3 +77,10 @@ test('keyframe section cues to the segment start with no end cap', () => {
   expect(s.text).not.toContain('end=');
   expect(s.text).toContain('## 动效 ① · 45s–52s');
 });
+
+test('keyframe float times become integer seconds in embed and heading', () => {
+  const s = keyframeSection({ url: meta.videoUrl, platform: 'youtube', start: 369.35182, end: 386.119189, frameNames: ['k.png'] });
+  expect(s.text).toContain('embed/abc123?start=369');
+  expect(s.text).not.toContain('369.35');
+  expect(s.text).toContain('## 动效 ① · 369s–386s');
+});
