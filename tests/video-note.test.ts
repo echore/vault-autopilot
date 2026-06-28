@@ -5,10 +5,34 @@ test('screenshot sections sort after 动效 and renumber ①②', () => {
   c = mergeSection(c, keyframeSection({ url: 'https://www.youtube.com/watch?v=abc123', platform: 'youtube', start: 45, end: 52, frameNames: ['k.png'] })).content;
   c = mergeSection(c, screenshotSection(['s1.png'])).content;
   c = mergeSection(c, screenshotSection(['s2.png'])).content;
-  expect(c.indexOf('## 动效')).toBeLessThan(c.indexOf('## 截图'));
-  expect(c).toContain('## 截图 ①');
-  expect(c).toContain('## 截图 ②');
+  expect(c.indexOf('## ✨ 动效')).toBeLessThan(c.indexOf('## 📸 截图'));
+  expect(c).toContain('## 📸 截图 ①');
+  expect(c).toContain('## 📸 截图 ②');
   expect(c).toContain('dimensions: [动效, 截图]');
+});
+
+test('render adds emoji headings, --- dividers (no stacking), and a top overview', () => {
+  let c = buildAnchor({ platform: 'youtube', videoId: 'abc123', videoUrl: 'https://www.youtube.com/watch?v=abc123', title: 'Bee', channel: 'Ali' });
+  c = mergeSection(c, coverSection('cover.webp')).content;
+  c = mergeSection(c, keyframeSection({ url: 'https://www.youtube.com/watch?v=abc123', platform: 'youtube', start: 10, end: 14, frameNames: ['k.png'] })).content;
+  const bodyDividers = (s: string) => ((s.replace(/^---\n[\s\S]*?\n---\n/, '').match(/^---$/gm)) || []).length;
+  // dividers separate the two sections, exactly once
+  expect(bodyDividers(c)).toBe(1);
+  // emoji headings + overview callout
+  expect(c).toContain('## 🖼️ 封面标题');
+  expect(c).toContain('## ✨ 动效 ①');
+  expect(c).toContain('> [!abstract] Ali · youtube');
+  // a third merge must not stack a second divider between the same pair
+  c = mergeSection(c, screenshotSection(['s.png'])).content;
+  expect(bodyDividers(c)).toBe(2); // 3 sections → 2 dividers
+});
+
+test('upgrades an old emoji-less heading on the next merge', () => {
+  // simulate a note created before the emoji change
+  const old = `---\ntype: video\nplatform: youtube\nvideo_id: "abc123"\nvideo_url: "u"\ntitle: "Bee"\ndimensions: [内容]\n---\n\n# Bee\n\n## 内容\n\nbody\n`;
+  const c = mergeSection(old, screenshotSection(['s.png'])).content;
+  expect(c).toContain('## 🎬 内容');
+  expect(c).not.toMatch(/^## 内容$/m);
 });
 
 const meta: VideoNoteMeta = {
@@ -29,9 +53,9 @@ test('cover then hook then keyframe ends ordered cover<hook<动效', () => {
   c = mergeSection(c, hookSection({ url: meta.videoUrl, platform: 'youtube', endSeconds: 15, frameNames: ['f1.png'] })).content;
   c = mergeSection(c, coverSection('cover.jpg')).content;
   c = mergeSection(c, keyframeSection({ url: meta.videoUrl, platform: 'youtube', start: 45, end: 52, frameNames: ['k1.png'] })).content;
-  const iCover = c.indexOf('## 封面标题');
-  const iHook = c.indexOf('## 内容');
-  const iKf = c.indexOf('## 动效');
+  const iCover = c.indexOf('## 🖼️ 封面标题');
+  const iHook = c.indexOf('## 🎬 内容');
+  const iKf = c.indexOf('## ✨ 动效');
   expect(iCover).toBeGreaterThanOrEqual(0);
   expect(iCover).toBeLessThan(iHook);
   expect(iHook).toBeLessThan(iKf);
@@ -45,8 +69,8 @@ test('multiple 动效 sort by start time and renumber ①②', () => {
   const first = c.indexOf('45s');
   const second = c.indexOf('130s');
   expect(first).toBeLessThan(second);
-  expect(c).toContain('## 动效 ① · 45s–52s');
-  expect(c).toContain('## 动效 ② · 130s–138s');
+  expect(c).toContain('## ✨ 动效 ① · 45s–52s');
+  expect(c).toContain('## ✨ 动效 ② · 130s–138s');
 });
 
 test('singular 内容 re-capture is skipped and preserves user text', () => {
@@ -56,7 +80,7 @@ test('singular 内容 re-capture is skipped and preserves user text', () => {
   const r = mergeSection(c, hookSection({ url: meta.videoUrl, platform: 'youtube', endSeconds: 15, frameNames: ['f2.png'] }));
   expect(r.skipped).toBe(true);
   expect(r.content).toContain('MY ANALYSIS');
-  expect((r.content.match(/## 内容/g) || []).length).toBe(1);
+  expect((r.content.match(/## 🎬 内容/g) || []).length).toBe(1);
 });
 
 test('a ## line inside a user code fence is NOT treated as a section', () => {
@@ -66,10 +90,10 @@ test('a ## line inside a user code fence is NOT treated as a section', () => {
   c = c.replace('![[k.png]]', '![[k.png]]\n\n```md\n## 这是示例标题\n```');
   const r = mergeSection(c, keyframeSection({ url: meta.videoUrl, platform: 'youtube', start: 130, end: 138, frameNames: ['k2.png'] }));
   // only two real 动效 sections, fenced example untouched, correct numbering
-  expect((r.content.match(/^## 动效/gm) || []).length).toBe(2);
+  expect((r.content.match(/^## ✨ 动效/gm) || []).length).toBe(2);
   expect(r.content).toContain('## 这是示例标题');
-  expect(r.content).toContain('## 动效 ① · 45s–52s');
-  expect(r.content).toContain('## 动效 ② · 130s–138s');
+  expect(r.content).toContain('## ✨ 动效 ① · 45s–52s');
+  expect(r.content).toContain('## ✨ 动效 ② · 130s–138s');
 });
 
 test('hook section embeds the whole video from start (no end) + frames + 字幕', () => {

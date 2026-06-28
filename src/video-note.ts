@@ -2,6 +2,7 @@ import { buildVideoEmbed, sanitize } from './util';
 
 export type SectionKind = '封面标题' | '内容' | '动效' | '截图';
 const RANK: Record<SectionKind, number> = { '封面标题': 0, '内容': 1, '动效': 2, '截图': 3 };
+const EMOJI: Record<SectionKind, string> = { '封面标题': '🖼️', '内容': '🎬', '动效': '✨', '截图': '📸' };
 
 export interface VideoNoteMeta {
   platform: string;
@@ -96,11 +97,40 @@ export function buildAnchor(meta: VideoNoteMeta): string {
 interface ParsedSection { kind: SectionKind; startSeconds: number; text: string; }
 
 function kindOf(heading: string): SectionKind | null {
-  if (heading.startsWith('封面标题')) return '封面标题';
-  if (heading.startsWith('内容')) return '内容';
-  if (heading.startsWith('动效')) return '动效';
-  if (heading.startsWith('截图')) return '截图';
+  // Substring match so an emoji prefix (## 🎬 内容) still resolves to its kind.
+  for (const k of ['封面标题', '内容', '动效', '截图'] as SectionKind[]) {
+    if (heading.includes(k)) return k;
+  }
   return null;
+}
+
+// Force every heading to `## <emoji> <kind…>`, upgrading old headings (no emoji)
+// and de-duplicating any existing emoji, so the note stays visually consistent.
+function emojiHeading(text: string, kind: SectionKind): string {
+  return text.replace(/^## .*$/m, (line) => {
+    const heading = line.slice(3);
+    const idx = heading.indexOf(kind);
+    const tail = idx >= 0 ? heading.slice(idx) : kind;
+    return `## ${EMOJI[kind]} ${tail}`;
+  });
+}
+
+// Drop a trailing horizontal rule (the inter-section separator) plus surrounding
+// whitespace, so re-rendering never stacks `---` lines across merges.
+function stripTrailingRule(t: string): string {
+  return t.replace(/\s+$/, '').replace(/\n-{3,}$/, '').replace(/\s+$/, '');
+}
+
+// Rebuild the top [!abstract] overview from the frontmatter + the dimensions
+// currently present, preserving any other preamble the user added.
+function syncOverview(head: string, frontmatter: string, dims: SectionKind[]): string {
+  const channel = frontmatter.match(/^channel:\s*"?(.*?)"?\s*$/m)?.[1];
+  const platform = frontmatter.match(/^platform:\s*(.*?)\s*$/m)?.[1];
+  const label = [channel, platform].filter(Boolean).join(' · ') || '视频';
+  const overview = `> [!abstract] ${label}\n> ${dims.map((d) => `${EMOJI[d]} ${d}`).join(' · ')}`;
+  const cleaned = head.replace(/\n*> \[!abstract\][^\n]*(?:\n>[^\n]*)*/g, '');
+  if (/^# .+$/m.test(cleaned)) return cleaned.replace(/^(# .+)$/m, `$1\n\n${overview}`);
+  return `${cleaned.replace(/\s+$/, '')}\n\n${overview}`;
 }
 
 function parseSections(body: string): { head: string; sections: ParsedSection[] } {
@@ -149,7 +179,7 @@ function renumber(sections: ParsedSection[]): ParsedSection[] {
   return sections.map((s) => {
     if (s.kind !== '动效' && s.kind !== '截图') return s;
     counters[s.kind] = (counters[s.kind] ?? 0) + 1;
-    const text = s.text.replace(new RegExp(`^(## ${s.kind} )\\S+( ·.*)?$`, 'm'), `$1${circledNumber(counters[s.kind]!)}$2`);
+    const text = s.text.replace(new RegExp(`^(## .*?${s.kind} )\\S+( ·.*)?$`, 'm'), `$1${circledNumber(counters[s.kind]!)}$2`);
     return { ...s, text };
   });
 }
@@ -172,7 +202,10 @@ export function mergeSection(existing: string, section: NewSection): { content: 
   const ordered = renumber(all);
 
   const newFrontmatter = addDimension(frontmatter, section.kind);
-  const newBody = [head.replace(/\s+$/, ''), '', ordered.map((s) => s.text.replace(/\s+$/, '')).join('\n\n'), ''].join('\n');
+  const dims = DIMENSION_ORDER.filter((k) => ordered.some((s) => s.kind === k));
+  const newHead = syncOverview(head, newFrontmatter, dims).replace(/\s+$/, '');
+  const renderedSections = ordered.map((s) => stripTrailingRule(emojiHeading(s.text, s.kind))).join('\n\n---\n\n');
+  const newBody = [newHead, '', renderedSections, ''].join('\n');
   return { content: `${newFrontmatter}${newBody}`, skipped: false };
 }
 
