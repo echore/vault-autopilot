@@ -151,8 +151,12 @@ export default class VaultAutopilotPlugin extends Plugin {
       createBinary: async (p, data) => { await this.app.vault.createBinary(p, data); },
       create: async (p, content) => { await this.app.vault.create(p, content); },
       readFileSync: (p) => fs.readFileSync(p, 'utf8'),
-      downloadUrl: async (url) => {
-        const resp = await requestUrl({ url, method: 'GET' });
+      downloadUrl: async (url, referer) => {
+        const resp = await requestUrl({
+          url,
+          method: 'GET',
+          headers: referer ? { Referer: referer } : undefined,
+        });
         return resp.arrayBuffer;
       },
       listMarkdownFiles: (folderPath) => {

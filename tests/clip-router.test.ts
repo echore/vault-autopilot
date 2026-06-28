@@ -73,7 +73,7 @@ describe('routeClip — thumbnail', () => {
   test('manual: downloads thumbnail and creates note with correct frontmatter', async () => {
     const vaultOps = makeVaultOps();
     await routeClip(payload, new Map(), clipRules, [], vaultOps);
-    expect(vaultOps.downloadUrl).toHaveBeenCalledWith(payload.thumbnail_url);
+    expect(vaultOps.downloadUrl).toHaveBeenCalledWith(payload.thumbnail_url, payload.video_url);
     expect(vaultOps.createBinary).toHaveBeenCalledWith(
       'Assets/Great Videos/abc123.webp',
       expect.any(ArrayBuffer),
@@ -86,6 +86,15 @@ describe('routeClip — thumbnail', () => {
     expect(noteContent).toContain('dimensions: [封面标题]');
     expect(noteContent).toContain('![[abc123.webp]]');
     expect(noteContent).toContain('## 封面标题');
+  });
+
+  test('downloads the cover with a Referer of the video page', async () => {
+    const vaultOps = makeVaultOps();
+    await routeClip(payload, new Map(), clipRules, [], vaultOps);
+    expect(vaultOps.downloadUrl).toHaveBeenCalledWith(
+      payload.thumbnail_url,
+      payload.video_url,
+    );
   });
 
   test('auto: calls analyzeMultiFrame with thumbnail buffer and writes AI result', async () => {

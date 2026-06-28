@@ -7,7 +7,7 @@ export interface VaultOps {
   createBinary(filePath: string, data: ArrayBuffer): Promise<void>;
   create(filePath: string, content: string): Promise<void>;
   readFileSync(absolutePath: string): string;
-  downloadUrl(url: string): Promise<ArrayBuffer>;
+  downloadUrl(url: string, referer?: string): Promise<ArrayBuffer>;
   listMarkdownFiles(folderPath: string): string[];
   read(filePath: string): Promise<string>;
   modify(filePath: string, content: string): Promise<void>;
@@ -131,7 +131,7 @@ async function handleThumbnail(
 
   const thumbnailFile = `${payload.video_id}.webp`;
   const thumbnailPath = `${rule.thumbnailFolder}/${thumbnailFile}`;
-  const imgData = await vaultOps.downloadUrl(payload.thumbnail_url);
+  const imgData = await vaultOps.downloadUrl(payload.thumbnail_url, payload.video_url);
   await vaultOps.createBinary(thumbnailPath, imgData);
 
   const stem = thumbnailNoteStem(payload);
