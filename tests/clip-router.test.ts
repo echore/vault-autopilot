@@ -603,6 +603,14 @@ describe('routeClip — unified video note (manual)', () => {
     expect(Object.keys(store).length).toBe(2);
   });
 
+  test('two different videos with the same author+title get distinct filenames', async () => {
+    const { v, store } = vaultWithStore();
+    const base = { mode: 'hook' as const, frames: ['Zg=='], video_title: 'Same Title', channel: 'Ch', captured_at: '2026-06-28T00:00:00Z' };
+    await routeClip({ ...base, url: 'https://www.youtube.com/watch?v=vid1' } as ClipPayload, new Map(), manual, [], v);
+    await routeClip({ ...base, url: 'https://www.youtube.com/watch?v=vid2' } as ClipPayload, new Map(), manual, [], v);
+    expect(Object.keys(store).length).toBe(2); // no overwrite / no crash
+  });
+
   test('screenshot FIRST on a video page anchors the note (any order)', async () => {
     const { v, store } = vaultWithStore();
     const url = 'https://www.youtube.com/watch?v=zzz999';

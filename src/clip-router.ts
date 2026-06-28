@@ -83,10 +83,24 @@ async function upsertVideoNote(
     return { notePath: existing.path };
   }
   const { content } = mergeSection(buildAnchor(meta), section);
-  const stem = meta.channel ? `${sanitize(meta.channel)} - ${sanitize(meta.title)}` : sanitize(meta.title);
-  const notePath = `${folder}/${stem || 'video'}.md`;
+  let stem = (meta.channel ? `${sanitize(meta.channel)} - ${sanitize(meta.title)}` : sanitize(meta.title)) || 'video';
+  // Different videos that share author + (truncated) title would collide on the
+  // filename; disambiguate with a short fingerprint so the second one is unique.
+  if (vaultOps.listMarkdownFiles(folder).includes(`${folder}/${stem}.md`)) {
+    stem = `${stem} · ${fileFingerprint(meta.videoId)}`;
+  }
+  const notePath = `${folder}/${stem}.md`;
   await vaultOps.create(notePath, content);
   return { notePath };
+}
+
+function fileFingerprint(videoId: string): string {
+  // Clean platform ids (YouTube/Bilibili/Xiaohongshu) are already short & safe.
+  if (/^[A-Za-z0-9_-]{1,24}$/.test(videoId)) return videoId;
+  // URL-based keys: a short stable hash.
+  let h = 0;
+  for (let i = 0; i < videoId.length; i++) h = (h * 31 + videoId.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
 }
 
 function buildScreenshotTemplate(payload: ScreenshotPayload, imageNames: string[], sopContent?: string): string {
