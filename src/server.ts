@@ -11,6 +11,7 @@ export type ScreenshotPayload = {
   images: string[];
   url: string;
   title: string;
+  cover_url?: string;
 };
 
 export type HookPayload = {
@@ -23,6 +24,7 @@ export type HookPayload = {
   url: string;
   captured_at: string;
   time_range?: { start: number; end: number };
+  cover_url?: string;
 };
 
 export type KeyframePayload = {
@@ -32,6 +34,7 @@ export type KeyframePayload = {
   url: string;
   time_range: { start: number; end: number };
   captured_at: string;
+  cover_url?: string;
 };
 
 export type ThumbnailPayload = {

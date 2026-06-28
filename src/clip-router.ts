@@ -9,6 +9,7 @@ export interface VaultOps {
   create(filePath: string, content: string): Promise<void>;
   readFileSync(absolutePath: string): string;
   downloadUrl(url: string): Promise<ArrayBuffer>;
+  fileExists(filePath: string): boolean;
   listMarkdownFiles(folderPath: string): string[];
   read(filePath: string): Promise<string>;
   modify(filePath: string, content: string): Promise<void>;
@@ -28,10 +29,10 @@ export async function routeClip(
   if (payload.mode === 'thumbnail') return handleThumbnail(payload, providers, clipRules.thumbnail, vaultOps);
   if (payload.mode === 'screenshot') {
     const normalized = normalizeScreenshot(payload);
-    return handleScreenshot(normalized, providers, clipRules.screenshot, vaultOps, clipRules.thumbnail.outputFolder);
+    return handleScreenshot(normalized, providers, clipRules.screenshot, vaultOps, clipRules.thumbnail.outputFolder, clipRules.thumbnail.thumbnailFolder);
   }
-  if (payload.mode === 'hook') return handleMultiFrame(payload, providers, clipRules.hook, vaultOps, clipRules.thumbnail.outputFolder);
-  if (payload.mode === 'keyframe') return handleMultiFrame(payload, providers, clipRules.keyframe, vaultOps, clipRules.thumbnail.outputFolder);
+  if (payload.mode === 'hook') return handleMultiFrame(payload, providers, clipRules.hook, vaultOps, clipRules.thumbnail.outputFolder, clipRules.thumbnail.thumbnailFolder);
+  if (payload.mode === 'keyframe') return handleMultiFrame(payload, providers, clipRules.keyframe, vaultOps, clipRules.thumbnail.outputFolder, clipRules.thumbnail.thumbnailFolder);
   throw new Error('Unknown clip mode');
 }
 
@@ -103,6 +104,20 @@ function fileFingerprint(videoId: string): string {
   return (h >>> 0).toString(36);
 }
 
+// Ensure the video's cover exists at `<assetFolder>/<videoId>.webp` — the exact
+// path the Great Videos gallery index reads — so every note shows a cover even
+// without an explicit 收藏封面. Only clean platform ids map to a valid filename;
+// best-effort, a missing cover never fails the clip.
+async function ensureCover(videoId: string, coverUrl: string | undefined, vaultOps: VaultOps, assetFolder: string): Promise<void> {
+  if (!coverUrl || !/^[A-Za-z0-9_-]{1,24}$/.test(videoId)) return;
+  const path = `${assetFolder}/${videoId}.webp`;
+  if (vaultOps.fileExists(path)) return;
+  try {
+    await vaultOps.ensureFolder(assetFolder);
+    await vaultOps.createBinary(path, await vaultOps.downloadUrl(coverUrl));
+  } catch (_) { /* best-effort */ }
+}
+
 function buildScreenshotTemplate(payload: ScreenshotPayload, imageNames: string[], sopContent?: string): string {
   const imageLines = imageNames.map((n) => `> ![[${n}]]`).join('\n');
   const parts = [
@@ -130,6 +145,7 @@ async function handleScreenshot(
   rule: ScreenshotClipRule,
   vaultOps: VaultOps,
   searchFolder: string,
+  assetFolder: string,
 ): Promise<{ notePath: string }> {
   if (!rule.outputFolder) {
     throw new Error('Screenshot output folder is not configured. Go to Settings → Clip Rules → Screenshot → Output folder.');
@@ -159,7 +175,9 @@ async function handleScreenshot(
   if (rule.processingMode === 'manual') {
     const sopContent = readSopSafely(rule.sopPath, vaultOps);
     if (intoVideoNote) {
-      return upsertVideoNote(meta, screenshotSection(imageNames, sopContent), vaultOps, searchFolder);
+      const r = await upsertVideoNote(meta, screenshotSection(imageNames, sopContent), vaultOps, searchFolder);
+      await ensureCover(meta.videoId, payload.cover_url, vaultOps, assetFolder);
+      return r;
     }
     const template = buildScreenshotTemplate(payload, imageNames, sopContent);
     await vaultOps.create(notePath, template);
@@ -186,7 +204,9 @@ async function handleScreenshot(
   });
   const markdown = postProcessMarkdown(result);
   if (intoVideoNote) {
-    return upsertVideoNote(meta, screenshotSection(imageNames, undefined, markdown), vaultOps, searchFolder);
+    const r = await upsertVideoNote(meta, screenshotSection(imageNames, undefined, markdown), vaultOps, searchFolder);
+    await ensureCover(meta.videoId, payload.cover_url, vaultOps, assetFolder);
+    return r;
   }
   await vaultOps.create(notePath, markdown);
   return { notePath };
@@ -222,8 +242,9 @@ async function handleThumbnail(
   }
   await vaultOps.ensureFolder(rule.thumbnailFolder);
 
-  const urlExt = payload.thumbnail_url.split('?')[0].match(/\.(\w+)$/)?.[1] ?? 'webp';
-  const thumbnailFile = `${payload.video_id}.${urlExt}`;
+  // Always .webp — the gallery index reads `<video_id>.webp` exactly. (The bytes
+  // are jpg/png; Obsidian's <img> renders by content-sniffing, not extension.)
+  const thumbnailFile = `${payload.video_id}.webp`;
   const thumbnailPath = `${rule.thumbnailFolder}/${thumbnailFile}`;
   const imgData = await vaultOps.downloadUrl(payload.thumbnail_url);
   await vaultOps.createBinary(thumbnailPath, imgData);
@@ -257,6 +278,7 @@ async function handleMultiFrame(
   rule: ClipRule,
   vaultOps: VaultOps,
   searchFolder: string,
+  assetFolder: string,
 ): Promise<{ notePath: string; notice?: string }> {
   // ── Save frames (both modes need them for manual; auto uses them for AI) ──────
   const max = rule.maxFrames ?? 5;
@@ -296,7 +318,9 @@ async function handleMultiFrame(
         sopContent,
       );
     }
-    return upsertVideoNote(meta, section, vaultOps, searchFolder);
+    const result = await upsertVideoNote(meta, section, vaultOps, searchFolder);
+    await ensureCover(meta.videoId, payload.cover_url, vaultOps, assetFolder);
+    return result;
   }
 
   if (!rule.sopPath || !rule.outputFolder || !rule.providerId) {

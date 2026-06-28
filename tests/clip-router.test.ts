@@ -22,6 +22,7 @@ function makeVaultOps(): jest.Mocked<VaultOps> {
     create: jest.fn().mockResolvedValue(undefined),
     readFileSync: jest.fn().mockReturnValue('# SOP\nAnalyze this.'),
     downloadUrl: jest.fn().mockResolvedValue(new ArrayBuffer(8)),
+    fileExists: jest.fn().mockReturnValue(false),
     listMarkdownFiles: jest.fn().mockReturnValue([]),
     read: jest.fn().mockResolvedValue(''),
     modify: jest.fn().mockResolvedValue(undefined),
@@ -75,7 +76,7 @@ describe('routeClip — thumbnail', () => {
     await routeClip(payload, new Map(), clipRules, [], vaultOps);
     expect(vaultOps.downloadUrl).toHaveBeenCalledWith(payload.thumbnail_url);
     expect(vaultOps.createBinary).toHaveBeenCalledWith(
-      'Assets/Great Videos/abc123.jpg',
+      'Assets/Great Videos/abc123.webp',
       expect.any(ArrayBuffer),
     );
     const [notePath, noteContent] = (vaultOps.create as jest.Mock).mock.calls[0];
@@ -84,7 +85,7 @@ describe('routeClip — thumbnail', () => {
     expect(noteContent).toContain('video_id: "abc123"');
     expect(noteContent).toContain('channel: "Ali Abdaal"');
     expect(noteContent).toContain('dimensions: [封面标题]');
-    expect(noteContent).toContain('![[abc123.jpg]]');
+    expect(noteContent).toContain('![[abc123.webp]]');
     expect(noteContent).toContain('## 封面标题');
   });
 
@@ -128,7 +129,7 @@ describe('routeClip — thumbnail', () => {
     const [, noteContent] = (vaultOps.create as jest.Mock).mock.calls[0];
     expect(noteContent).not.toContain('youtube.com/embed');
     expect(noteContent).not.toContain('channel: "');
-    expect(noteContent).toContain('![[twitter-com-i-status-123.jpg]]');
+    expect(noteContent).toContain('![[twitter-com-i-status-123.webp]]');
     expect(noteContent).toContain('## 封面标题');
   });
 });
@@ -586,6 +587,19 @@ describe('routeClip — unified video note (manual)', () => {
     const note = store[Object.keys(store)[0]];
     expect(note).toContain('video_id: "https://x.com/u/status/123"');
     expect(note.indexOf('## 内容')).toBeLessThan(note.indexOf('## 动效'));
+  });
+
+  test('hook with cover_url saves the gallery cover at <video_id>.webp', async () => {
+    const { v } = vaultWithStore();
+    await routeClip({ mode: 'hook', frames: ['Zg=='], video_title: 'Bee', url: 'https://www.youtube.com/watch?v=abc123', cover_url: 'https://img.youtube.com/vi/abc123/maxresdefault.jpg', captured_at: '2026-06-28T00:00:00Z' } as ClipPayload, new Map(), manual, [], v);
+    expect(v.createBinary).toHaveBeenCalledWith('Assets/Great Videos/abc123.webp', expect.any(ArrayBuffer));
+  });
+
+  test('cover is not re-downloaded when it already exists', async () => {
+    const { v } = vaultWithStore();
+    (v.fileExists as jest.Mock).mockReturnValue(true);
+    await routeClip({ mode: 'hook', frames: ['Zg=='], video_title: 'Bee', url: 'https://www.youtube.com/watch?v=abc123', cover_url: 'https://x/cover.jpg', captured_at: '2026-06-28T00:00:00Z' } as ClipPayload, new Map(), manual, [], v);
+    expect(v.createBinary).not.toHaveBeenCalledWith('Assets/Great Videos/abc123.webp', expect.anything());
   });
 
   test('screenshot folds into the existing video note; otherwise standalone', async () => {

@@ -155,6 +155,7 @@ export default class VaultAutopilotPlugin extends Plugin {
         const resp = await requestUrl({ url, method: 'GET' });
         return resp.arrayBuffer;
       },
+      fileExists: (p) => this.app.vault.getAbstractFileByPath(p) != null,
       listMarkdownFiles: (folderPath) => {
         return this.app.vault.getFiles()
           .filter(f => f.path.startsWith(folderPath + '/') && f.extension === 'md')
