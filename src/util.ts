@@ -23,11 +23,14 @@ export function extractVideoId(url: string, platform: string | undefined): strin
   return null;
 }
 
-export function buildVideoEmbed(url: string, platform: string | undefined, startSeconds: number): string {
+export function buildVideoEmbed(url: string, platform: string | undefined, startSeconds: number, endSeconds?: number): string {
   const p = (platform ?? '').toLowerCase();
   if (p === 'youtube' || url.includes('youtube.com') || url.includes('youtu.be')) {
     const id = extractVideoId(url, platform);
-    if (id) return `<iframe width="100%" height="315" src="https://www.youtube.com/embed/${id}?start=${startSeconds}" frameborder="0" allowfullscreen></iframe>`;
+    if (id) {
+      const endParam = endSeconds != null ? `&end=${endSeconds}` : '';
+      return `<iframe width="100%" height="315" src="https://www.youtube.com/embed/${id}?start=${startSeconds}${endParam}" frameborder="0" allowfullscreen></iframe>`;
+    }
   }
   if (p === 'bilibili' || url.includes('bilibili.com')) {
     const id = extractVideoId(url, platform);
