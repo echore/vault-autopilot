@@ -598,8 +598,20 @@ describe('routeClip — unified video note (manual)', () => {
     expect(note).toContain('## 截图');
     expect(note).toContain('dimensions: [内容, 截图]');
 
-    // a screenshot on an un-studied page stays standalone
+    // a screenshot on an un-studied plain webpage stays standalone
     await routeClip({ mode: 'screenshot', images: ['Zg=='], url: 'https://example.com/random', title: 'Rand' }, new Map(), manual, [], v);
     expect(Object.keys(store).length).toBe(2);
+  });
+
+  test('screenshot FIRST on a video page anchors the note (any order)', async () => {
+    const { v, store } = vaultWithStore();
+    const url = 'https://www.youtube.com/watch?v=zzz999';
+    await routeClip({ mode: 'screenshot', images: ['Zg=='], url, title: 'Vid - YouTube' }, new Map(), manual, [], v);
+    await routeClip({ mode: 'hook', frames: ['Zg=='], video_title: 'Vid', url, captured_at: '2026-06-28T00:00:00Z' }, new Map(), manual, [], v);
+    expect(Object.keys(store).length).toBe(1); // screenshot anchored it, hook merged in
+    const note = store[Object.keys(store)[0]];
+    expect(note).toContain('## 截图');
+    expect(note).toContain('## 内容');
+    expect(note.indexOf('## 内容')).toBeLessThan(note.indexOf('## 截图'));
   });
 });

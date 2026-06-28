@@ -1,6 +1,6 @@
 import { ClipPayload, HookPayload, KeyframePayload, LegacyClipPayload, ScreenshotPayload, ThumbnailPayload } from './server';
 import { AIProvider, ClipRule, isMultiFrameProvider, MultiFrameRequest, PluginSettings, ScreenshotClipRule, ThumbnailClipRule, WatchRule } from './types';
-import { postProcessMarkdown, sanitize, buildVideoEmbed, detectPlatform, videoKey } from './util';
+import { postProcessMarkdown, sanitize, buildVideoEmbed, extractVideoId, detectPlatform, videoKey } from './util';
 import { buildAnchor, mergeSection, coverSection, hookSection, keyframeSection, screenshotSection, VideoNoteMeta, NewSection } from './video-note';
 
 export interface VaultOps {
@@ -134,15 +134,18 @@ async function handleScreenshot(
     imageNames.push(name);
   }
 
-  // If this page already has a video/post study note, fold the screenshot in.
-  const existing = await findNoteByVideoId(videoKey(payload.url), searchFolder, vaultOps);
+  // Fold the screenshot into this page's video/post note when the page is a
+  // recognized video/post (anchor created if needed, so order doesn't matter) or
+  // already has a note; a plain-webpage screenshot stays standalone.
+  const key = videoKey(payload.url);
+  const existing = await findNoteByVideoId(key, searchFolder, vaultOps);
+  const intoVideoNote = !!existing || extractVideoId(payload.url, undefined) != null;
+  const meta: VideoNoteMeta = { platform: detectPlatform(payload.url), videoId: key, videoUrl: payload.url, title: payload.title };
 
   if (rule.processingMode === 'manual') {
     const sopContent = readSopSafely(rule.sopPath, vaultOps);
-    if (existing) {
-      const { content } = mergeSection(existing.content, screenshotSection(imageNames, sopContent));
-      await vaultOps.modify(existing.path, content);
-      return { notePath: existing.path };
+    if (intoVideoNote) {
+      return upsertVideoNote(meta, screenshotSection(imageNames, sopContent), vaultOps, searchFolder);
     }
     const template = buildScreenshotTemplate(payload, imageNames, sopContent);
     await vaultOps.create(notePath, template);
@@ -168,10 +171,8 @@ async function handleScreenshot(
     meta: { url: payload.url },
   });
   const markdown = postProcessMarkdown(result);
-  if (existing) {
-    const { content } = mergeSection(existing.content, screenshotSection(imageNames, undefined, markdown));
-    await vaultOps.modify(existing.path, content);
-    return { notePath: existing.path };
+  if (intoVideoNote) {
+    return upsertVideoNote(meta, screenshotSection(imageNames, undefined, markdown), vaultOps, searchFolder);
   }
   await vaultOps.create(notePath, markdown);
   return { notePath };
