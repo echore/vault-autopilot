@@ -88,6 +88,13 @@ describe('routeClip — thumbnail', () => {
     expect(noteContent).toContain('## 封面标题');
   });
 
+  test('note filename omits the author segment when channel is empty', async () => {
+    const vaultOps = makeVaultOps();
+    const noChannel = { ...payload, channel: '' } as ClipPayload;
+    const result = await routeClip(noChannel, new Map(), clipRules, [], vaultOps);
+    expect(result).toBe('Content Creation/Great Videos/How to Get Rich on Easy Mode.md');
+  });
+
   test('downloads the cover with a Referer of the video page', async () => {
     const vaultOps = makeVaultOps();
     await routeClip(payload, new Map(), clipRules, [], vaultOps);

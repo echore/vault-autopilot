@@ -80,7 +80,7 @@ function readSopSafely(sopPath: string, vaultOps: VaultOps): string | undefined 
 
 function thumbnailNoteStem(payload: ThumbnailPayload): string {
   const titleSlug = payload.title.slice(0, 40).trim();
-  return `${payload.channel} - ${titleSlug}`;
+  return payload.channel ? `${payload.channel} - ${titleSlug}` : titleSlug;
 }
 
 function buildThumbnailNote(payload: ThumbnailPayload, thumbnailFile: string, sopContent?: string, coverAnalysis?: string): string {
