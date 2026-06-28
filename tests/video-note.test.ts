@@ -40,12 +40,25 @@ test('multiple 动效 sort by start time and renumber ①②', () => {
 
 test('singular 内容 re-capture is skipped and preserves user text', () => {
   let c = buildAnchor(meta);
-  c = mergeSection(c, hookSection({ url: meta.videoUrl, platform: 'youtube', endSeconds: 15, frameNames: ['f1.png'] })).content;
+  c = mergeSection(c, hookSection({ url: meta.videoUrl, platform: 'youtube', endSeconds: 15, frameNames: ['f1.png'], transcript: 'sub' })).content;
   c = c.replace('### 字幕', 'MY ANALYSIS\n\n### 字幕'); // user edits
   const r = mergeSection(c, hookSection({ url: meta.videoUrl, platform: 'youtube', endSeconds: 15, frameNames: ['f2.png'] }));
   expect(r.skipped).toBe(true);
   expect(r.content).toContain('MY ANALYSIS');
   expect((r.content.match(/## 内容/g) || []).length).toBe(1);
+});
+
+test('a ## line inside a user code fence is NOT treated as a section', () => {
+  let c = buildAnchor(meta);
+  c = mergeSection(c, keyframeSection({ url: meta.videoUrl, platform: 'youtube', start: 45, end: 52, frameNames: ['k.png'] })).content;
+  // user pastes a fenced markdown example containing a "## " line into their analysis
+  c = c.replace('![[k.png]]', '![[k.png]]\n\n```md\n## 这是示例标题\n```');
+  const r = mergeSection(c, keyframeSection({ url: meta.videoUrl, platform: 'youtube', start: 130, end: 138, frameNames: ['k2.png'] }));
+  // only two real 动效 sections, fenced example untouched, correct numbering
+  expect((r.content.match(/^## 动效/gm) || []).length).toBe(2);
+  expect(r.content).toContain('## 这是示例标题');
+  expect(r.content).toContain('## 动效 ① · 45s–52s');
+  expect(r.content).toContain('## 动效 ② · 130s–138s');
 });
 
 test('hook section embeds a 0-end clip and keeps frames + 字幕', () => {

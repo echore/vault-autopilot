@@ -48,7 +48,7 @@ export function hookSection(
     parts.push(p.aiResult, ``);
   } else {
     parts.push(framesBlock(p.frameNames), ``);
-    parts.push(`### 字幕`, ``, p.transcript ?? ``, ``);
+    if (p.transcript) parts.push(`### 字幕`, ``, p.transcript, ``);
     if (sop) parts.push(sopBlock(sop), ``);
   }
   return { kind: '内容', startSeconds: 0, text: parts.join('\n') };
@@ -103,8 +103,10 @@ function parseSections(body: string): { head: string; sections: ParsedSection[] 
       sections.push({ kind, startSeconds: m ? parseInt(m[1], 10) : 0, text: cur.join('\n') });
     }
   };
+  let inFence = false;
   for (const line of lines) {
-    if (line.startsWith('## ')) {
+    if (/^\s*(```|~~~)/.test(line)) inFence = !inFence;
+    if (!inFence && line.startsWith('## ')) {
       flush();
       cur = [line];
       curHeading = line.slice(3).trim();
