@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import { requestUrl } from 'obsidian';
 import { FrameSelectorSettings } from './types';
 
 // Robustly turn the model's reply into exactly `count` valid, distinct indices.
@@ -25,25 +25,31 @@ const PROMPTS: Record<string, string> = {
   keyframe: '这些是一段视频的候选帧。请挑出动效、转场、运镜或动作最明显的画面，避开纯人脸定格和几乎静止的画面。',
 };
 
-// Ask the vision model which `count` frames to keep. Throws on any failure so the
-// caller can fall back to a heuristic selection.
+// Ask the vision model which `count` frames to keep. Uses Obsidian's requestUrl so
+// the Authorization header is sent reliably (the OpenAI SDK's fetch drops it in the
+// Electron renderer). Throws on any failure so the caller can fall back.
 export async function selectFrames(
   frames: Buffer[],
   count: number,
   mode: string,
   cfg: FrameSelectorSettings,
 ): Promise<number[]> {
-  const client = new OpenAI({ apiKey: cfg.apiKey, baseURL: cfg.baseUrl, dangerouslyAllowBrowser: true });
   const labelled = frames.flatMap((f, i) => [
-    { type: 'text' as const, text: `[${i}]` },
-    { type: 'image_url' as const, image_url: { url: `data:image/jpeg;base64,${f.toString('base64')}` } },
+    { type: 'text', text: `[${i}]` },
+    { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${f.toString('base64')}` } },
   ]);
   const prompt = `${PROMPTS[mode] ?? PROMPTS.keyframe}\n每张图前面都有编号 [n]。从中选出最好的 ${count} 张，只返回 JSON：{"keep":[编号,...]}，不要任何其它文字。`;
-  const resp = await client.chat.completions.create({
-    model: cfg.model,
-    messages: [{ role: 'user', content: [...labelled, { type: 'text' as const, text: prompt }] }],
-    max_tokens: 200,
+  const url = cfg.baseUrl.replace(/\/+$/, '') + '/chat/completions';
+  const resp = await requestUrl({
+    url,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey}` },
+    body: JSON.stringify({
+      model: cfg.model,
+      messages: [{ role: 'user', content: [...labelled, { type: 'text', text: prompt }] }],
+      max_tokens: 200,
+    }),
   });
-  const text = resp.choices[0]?.message?.content ?? '';
+  const text: string = resp.json?.choices?.[0]?.message?.content ?? '';
   return parseSelection(text, count, frames.length);
 }
