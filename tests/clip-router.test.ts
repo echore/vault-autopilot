@@ -563,4 +563,18 @@ describe('routeClip — unified video note (manual)', () => {
     const note = store[Object.keys(store)[0]];
     expect((note.match(/## 内容/g) || []).length).toBe(1);
   });
+
+  test('Xiaohongshu hook + keyframe merge into ONE note (link fallback embed)', async () => {
+    const { v, store } = vaultWithStore();
+    const url = 'https://www.xiaohongshu.com/explore/xhs123abc';
+    await routeClip({ mode: 'hook', frames: ['Zg=='], video_title: 'XHS', url, captured_at: '2026-06-28T00:00:00Z' }, new Map(), manual, [], v);
+    await routeClip({ mode: 'keyframe', frames: ['Zg=='], video_title: 'XHS', url, time_range: { start: 5, end: 9 }, captured_at: '2026-06-28T00:00:00Z' }, new Map(), manual, [], v);
+    expect(Object.keys(store).length).toBe(1);
+    const note = store[Object.keys(store)[0]];
+    expect(note).toContain('platform: xiaohongshu');
+    expect(note).toContain('video_id: "xhs123abc"');
+    expect(note.indexOf('## 内容')).toBeLessThan(note.indexOf('## 动效'));
+    expect(note).toContain('[▶ 跳转原视频]'); // no inline player for xhs
+    expect(note).not.toContain('youtube.com/embed');
+  });
 });

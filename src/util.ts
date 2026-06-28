@@ -20,12 +20,17 @@ export function extractVideoId(url: string, platform: string | undefined): strin
     const bv = url.match(/\/(BV[a-zA-Z0-9]+)/);
     if (bv) return bv[1];
   }
+  if (p === 'xiaohongshu' || url.includes('xiaohongshu.com')) {
+    const m = url.match(/\/(?:explore|discovery\/item)\/(\w+)/);
+    if (m) return m[1];
+  }
   return null;
 }
 
 export function detectPlatform(url: string): string {
   if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
   if (url.includes('bilibili.com')) return 'bilibili';
+  if (url.includes('xiaohongshu.com')) return 'xiaohongshu';
   return 'other';
 }
 
