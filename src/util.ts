@@ -27,6 +27,22 @@ export function extractVideoId(url: string, platform: string | undefined): strin
   return null;
 }
 
+function canonicalUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    return (u.origin + u.pathname).replace(/\/+$/, '');
+  } catch {
+    return url;
+  }
+}
+
+// Key used to merge captures of the same thing into one note. Platform ids
+// (YouTube/Bilibili/Xiaohongshu) collapse a video's many URL variants; for any
+// other platform the page URL (minus query/hash) is a stable enough key.
+export function videoKey(url: string, platform?: string): string {
+  return extractVideoId(url, platform) ?? canonicalUrl(url);
+}
+
 export function detectPlatform(url: string): string {
   if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
   if (url.includes('bilibili.com')) return 'bilibili';

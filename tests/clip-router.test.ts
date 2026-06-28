@@ -577,4 +577,14 @@ describe('routeClip — unified video note (manual)', () => {
     expect(note).toContain('[▶ 跳转原视频]'); // no inline player for xhs
     expect(note).not.toContain('youtube.com/embed');
   });
+
+  test('any platform merges by URL: Twitter hook + keyframe → one note', async () => {
+    const { v, store } = vaultWithStore();
+    await routeClip({ mode: 'hook', frames: ['Zg=='], video_title: 'Tweet', url: 'https://x.com/u/status/123?s=20', captured_at: '2026-06-28T00:00:00Z' }, new Map(), manual, [], v);
+    await routeClip({ mode: 'keyframe', frames: ['Zg=='], video_title: 'Tweet', url: 'https://x.com/u/status/123', time_range: { start: 5, end: 9 }, captured_at: '2026-06-28T00:00:00Z' }, new Map(), manual, [], v);
+    expect(Object.keys(store).length).toBe(1);
+    const note = store[Object.keys(store)[0]];
+    expect(note).toContain('video_id: "https://x.com/u/status/123"');
+    expect(note.indexOf('## 内容')).toBeLessThan(note.indexOf('## 动效'));
+  });
 });

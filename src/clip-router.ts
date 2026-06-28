@@ -1,6 +1,6 @@
 import { ClipPayload, HookPayload, KeyframePayload, LegacyClipPayload, ScreenshotPayload, ThumbnailPayload } from './server';
 import { AIProvider, ClipRule, isMultiFrameProvider, MultiFrameRequest, PluginSettings, ScreenshotClipRule, ThumbnailClipRule, WatchRule } from './types';
-import { postProcessMarkdown, sanitize, buildVideoEmbed, extractVideoId, detectPlatform } from './util';
+import { postProcessMarkdown, sanitize, buildVideoEmbed, detectPlatform, videoKey } from './util';
 import { buildAnchor, mergeSection, coverSection, hookSection, keyframeSection, VideoNoteMeta, NewSection } from './video-note';
 
 export interface VaultOps {
@@ -214,7 +214,7 @@ async function handleThumbnail(
   const section = coverSection(thumbnailFile, aiResult ?? sopContent);
   const meta: VideoNoteMeta = {
     platform: payload.platform,
-    videoId: extractVideoId(payload.video_url, payload.platform) ?? payload.video_id,
+    videoId: videoKey(payload.video_url, payload.platform),
     videoUrl: payload.video_url,
     title: payload.title,
     channel: payload.channel,
@@ -235,10 +235,10 @@ async function handleMultiFrame(
   const stem = `${payload.mode}-${sanitize(payload.video_title)}-${Date.now()}`;
 
   const platform = detectPlatform(payload.url);
-  const videoId = extractVideoId(payload.url, platform);
+  const videoId = videoKey(payload.url, platform);
   const meta: VideoNoteMeta = {
     platform,
-    videoId: videoId ?? '',
+    videoId,
     videoUrl: payload.url,
     title: payload.video_title,
     channel: payload.mode === 'hook' ? payload.channel : undefined,
