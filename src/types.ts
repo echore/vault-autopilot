@@ -3,8 +3,6 @@
 export interface ClipRule {
   sopPath: string;       // absolute path to SOP markdown file
   outputFolder: string;  // vault-relative path
-  providerId: string;
-  processingMode: 'auto' | 'manual';
   maxFrames: number;
   framesFolder: string;  // vault-relative path for frame PNGs (e.g. "Assets/images")
 }
@@ -12,8 +10,6 @@ export interface ClipRule {
 export interface ScreenshotClipRule {
   sopPath: string;
   outputFolder: string;
-  providerId: string;
-  processingMode: 'auto' | 'manual';
   framesFolder: string;
 }
 
@@ -21,8 +17,6 @@ export interface ThumbnailClipRule {
   sopPath: string;
   outputFolder: string;        // vault-relative, e.g. Content Creation/Great Videos
   thumbnailFolder: string;     // vault-relative, e.g. Assets/Great Videos
-  providerId: string;
-  processingMode: 'auto' | 'manual';
 }
 
 // ── Plugin settings ───────────────────────────────────────────────────────────

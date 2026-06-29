@@ -18,19 +18,16 @@ function makeVaultOps(): jest.Mocked<VaultOps> {
 
 const thumbnailClipRule: ThumbnailClipRule = {
   sopPath: '/thumb-sop.md', outputFolder: 'Content Creation/Great Videos',
-  thumbnailFolder: 'Assets/Great Videos', providerId: 'p1', processingMode: 'manual',
+  thumbnailFolder: 'Assets/Great Videos',
 };
 const screenshotClipRule: ScreenshotClipRule = {
-  sopPath: '/ss-sop.md', outputFolder: 'Screenshots', providerId: 'p1',
-  processingMode: 'manual', framesFolder: 'Assets/images',
+  sopPath: '/ss-sop.md', outputFolder: 'Screenshots', framesFolder: 'Assets/images',
 };
 const hookClipRule: ClipRule = {
-  sopPath: '/hook-sop.md', outputFolder: 'Hooks', providerId: 'p1',
-  processingMode: 'manual', maxFrames: 5, framesFolder: 'Assets/images',
+  sopPath: '/hook-sop.md', outputFolder: 'Hooks', maxFrames: 5, framesFolder: 'Assets/images',
 };
 const keyframeClipRule: ClipRule = {
-  sopPath: '/kf-sop.md', outputFolder: 'Keyframes', providerId: 'p1',
-  processingMode: 'manual', maxFrames: 5, framesFolder: 'Assets/images',
+  sopPath: '/kf-sop.md', outputFolder: 'Keyframes', maxFrames: 5, framesFolder: 'Assets/images',
 };
 const clipRules = { thumbnail: thumbnailClipRule, screenshot: screenshotClipRule, hook: hookClipRule, keyframe: keyframeClipRule };
 
@@ -147,8 +144,7 @@ describe('routeClip — screenshot', () => {
 
 describe('routeClip — manual mode (hook)', () => {
   const manualHookRule: ClipRule = {
-    sopPath: '', outputFolder: 'Hooks', providerId: '',
-    processingMode: 'manual', maxFrames: 3, framesFolder: 'Assets/images',
+    sopPath: '', outputFolder: 'Hooks', maxFrames: 3, framesFolder: 'Assets/images',
   };
   const manualClipRules = { thumbnail: thumbnailClipRule, screenshot: screenshotClipRule, hook:manualHookRule, keyframe: keyframeClipRule };
 
@@ -190,8 +186,7 @@ describe('routeClip — manual mode (hook)', () => {
 
 describe('routeClip — manual mode (keyframe)', () => {
   const manualKeyframeRule: ClipRule = {
-    sopPath: '', outputFolder: 'Keyframes', providerId: '',
-    processingMode: 'manual', maxFrames: 5, framesFolder: 'Assets/images',
+    sopPath: '', outputFolder: 'Keyframes', maxFrames: 5, framesFolder: 'Assets/images',
   };
   const manualClipRules = { thumbnail: thumbnailClipRule, screenshot: screenshotClipRule, hook:hookClipRule, keyframe: manualKeyframeRule };
 
@@ -233,7 +228,7 @@ describe('routeClip — append to existing Great Videos note', () => {
     const vaultOps = makeVaultOps();
     (vaultOps.listMarkdownFiles as jest.Mock).mockReturnValue(['Content Creation/Great Videos/note.md']);
     (vaultOps.read as jest.Mock).mockResolvedValue(existingNote);
-    const manualHookRule = { ...hookClipRule, processingMode: 'manual' as const, sopPath: '' };
+    const manualHookRule = { ...hookClipRule, sopPath: '' };
     const payload: ClipPayload = {
       mode: 'hook',
       frames: [Buffer.from('f1').toString('base64')],
@@ -256,7 +251,7 @@ describe('routeClip — append to existing Great Videos note', () => {
     const vaultOps = makeVaultOps();
     (vaultOps.listMarkdownFiles as jest.Mock).mockReturnValue(['Content Creation/Great Videos/note.md']);
     (vaultOps.read as jest.Mock).mockResolvedValue(existingNote);
-    const manualKeyframeRule = { ...keyframeClipRule, processingMode: 'manual' as const, sopPath: '' };
+    const manualKeyframeRule = { ...keyframeClipRule, sopPath: '' };
     const payload: ClipPayload = {
       mode: 'keyframe',
       frames: [Buffer.from('f1').toString('base64')],
@@ -275,7 +270,7 @@ describe('routeClip — append to existing Great Videos note', () => {
     const vaultOps = makeVaultOps();
     (vaultOps.listMarkdownFiles as jest.Mock).mockReturnValue(['Content Creation/Great Videos/note.md']);
     (vaultOps.read as jest.Mock).mockResolvedValue(existingNote);
-    const manualHookRule = { ...hookClipRule, processingMode: 'manual' as const, sopPath: '' };
+    const manualHookRule = { ...hookClipRule, sopPath: '' };
     const payload: ClipPayload = {
       mode: 'hook',
       frames: [Buffer.from('f1').toString('base64')],
@@ -290,7 +285,7 @@ describe('routeClip — append to existing Great Videos note', () => {
   test('no existing note: creates new note in Great Videos with ## 🎬 内容 section', async () => {
     const vaultOps = makeVaultOps();
     (vaultOps.listMarkdownFiles as jest.Mock).mockReturnValue([]);
-    const manualHookRule = { ...hookClipRule, processingMode: 'manual' as const, sopPath: '' };
+    const manualHookRule = { ...hookClipRule, sopPath: '' };
     const payload: ClipPayload = {
       mode: 'hook',
       frames: [Buffer.from('f1').toString('base64')],
@@ -313,8 +308,8 @@ describe('routeClip — unified video note (manual)', () => {
   const manual = {
     thumbnail: { ...thumbnailClipRule },
     screenshot: screenshotClipRule,
-    hook: { ...hookClipRule, processingMode: 'manual' as const, sopPath: '' },
-    keyframe: { ...keyframeClipRule, processingMode: 'manual' as const, sopPath: '' },
+    hook: { ...hookClipRule, sopPath: '' },
+    keyframe: { ...keyframeClipRule, sopPath: '' },
   };
   function vaultWithStore() {
     const store: Record<string, string> = {};
