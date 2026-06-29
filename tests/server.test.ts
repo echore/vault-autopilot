@@ -25,7 +25,7 @@ describe('createServer', () => {
   afterEach((done) => { server.close(done); });
 
   test('POST /clip calls handler and returns success', async () => {
-    const payload: ClipPayload = { image_base64: 'abc', source_url: 'https://x.com', title: 'T' };
+    const payload: ClipPayload = { mode: 'screenshot', images: ['abc'], url: 'https://x.com', title: 'T' };
     const { status, body } = await request('POST', '/clip', payload);
     expect(status).toBe(200);
     expect(body).toEqual({ success: true });
@@ -34,7 +34,7 @@ describe('createServer', () => {
 
   test('POST /clip includes obsidianUrl when handler returns one', async () => {
     handler.mockResolvedValue({ obsidianUrl: 'obsidian://open?vault=V&file=Notes%2Ffoo.md' });
-    const { status, body } = await request('POST', '/clip', { image_base64: 'abc', source_url: '', title: 'T' });
+    const { status, body } = await request('POST', '/clip', { mode: 'screenshot', images: ['abc'], url: '', title: 'T' });
     expect(status).toBe(200);
     expect(body).toEqual({ success: true, obsidianUrl: 'obsidian://open?vault=V&file=Notes%2Ffoo.md' });
   });
@@ -50,7 +50,7 @@ describe('createServer', () => {
 
   test('handler error returns 500', async () => {
     handler.mockRejectedValue(new Error('disk error'));
-    const { status, body } = await request('POST', '/clip', { image_base64: 'x', source_url: '', title: '' });
+    const { status, body } = await request('POST', '/clip', { mode: 'screenshot', images: ['x'], url: '', title: '' });
     expect(status).toBe(500);
     expect(body.error).toContain('disk error');
   });

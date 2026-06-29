@@ -1,11 +1,5 @@
 import * as http from 'http';
 
-export type LegacyClipPayload = {
-  image_base64: string;
-  source_url: string;
-  title: string;
-};
-
 export type ScreenshotPayload = {
   mode: 'screenshot';
   images: string[];
@@ -57,8 +51,7 @@ export type ClipPayload =
   | ThumbnailPayload
   | ScreenshotPayload
   | HookPayload
-  | KeyframePayload
-  | LegacyClipPayload;
+  | KeyframePayload;
 
 // Returns an obsidian:// deep link to the created/updated note (optional) and
 // a notice string when a section was skipped (e.g. already exists).

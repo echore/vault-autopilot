@@ -143,32 +143,6 @@ describe('isMultiFrameProvider', () => {
   });
 });
 
-// ── legacy format ─────────────────────────────────────────────────────────────
-
-describe('routeClip — legacy format', () => {
-  test('saves image and meta.json to first enabled watchRule folder', async () => {
-    const vaultOps = makeVaultOps();
-    const payload = { image_base64: Buffer.from('frame').toString('base64'), source_url: 'https://x.com', title: 'Test' };
-    await routeClip(payload as ClipPayload, new Map(), clipRules, [enabledWatchRule], vaultOps);
-    expect(vaultOps.ensureFolder).toHaveBeenCalledWith('Inbox');
-    expect(vaultOps.createBinary).toHaveBeenCalledWith(
-      expect.stringContaining('Inbox/'),
-      expect.any(ArrayBuffer),
-    );
-    expect(vaultOps.create).toHaveBeenCalledWith(
-      expect.stringContaining('.meta.json'),
-      expect.stringContaining('"source_url":"https://x.com"'),
-    );
-  });
-
-  test('throws when no enabled watch rules exist', async () => {
-    const vaultOps = makeVaultOps();
-    const payload = { image_base64: 'AAAA', source_url: '', title: '' };
-    await expect(routeClip(payload as ClipPayload, new Map(), clipRules, [], vaultOps))
-      .rejects.toThrow('No enabled watch rules');
-  });
-});
-
 // ── screenshot ────────────────────────────────────────────────────────────────
 
 describe('routeClip — screenshot', () => {

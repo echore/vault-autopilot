@@ -1,4 +1,4 @@
-import { ClipPayload, HookPayload, KeyframePayload, LegacyClipPayload, ScreenshotPayload, ThumbnailPayload } from './server';
+import { ClipPayload, HookPayload, KeyframePayload, ScreenshotPayload, ThumbnailPayload } from './server';
 import { AIProvider, ClipRule, isMultiFrameProvider, MultiFrameRequest, PluginSettings, ScreenshotClipRule, ThumbnailClipRule, WatchRule } from './types';
 import { postProcessMarkdown, sanitize, buildVideoEmbed, extractVideoId, detectPlatform, videoKey } from './util';
 import { buildAnchor, mergeSection, coverSection, hookSection, keyframeSection, screenshotSection, VideoNoteMeta, NewSection } from './video-note';
@@ -22,10 +22,6 @@ export async function routeClip(
   watchRules: WatchRule[],
   vaultOps: VaultOps,
 ): Promise<{ notePath?: string; notice?: string }> {
-  if (isLegacy(payload)) {
-    await handleLegacyScreenshot(payload, watchRules, vaultOps);
-    return {};
-  }
   if (payload.mode === 'thumbnail') return handleThumbnail(payload, providers, clipRules.thumbnail, vaultOps);
   if (payload.mode === 'screenshot') {
     const normalized = normalizeScreenshot(payload);
@@ -36,32 +32,11 @@ export async function routeClip(
   throw new Error('Unknown clip mode');
 }
 
-function isLegacy(p: ClipPayload): p is LegacyClipPayload {
-  return 'image_base64' in p;
-}
-
 function normalizeScreenshot(payload: ScreenshotPayload & { image?: string }): ScreenshotPayload {
   if (!payload.images && payload.image) {
     return { ...payload, images: [payload.image] };
   }
   return payload;
-}
-
-async function handleLegacyScreenshot(
-  payload: LegacyClipPayload,
-  watchRules: WatchRule[],
-  vaultOps: VaultOps,
-): Promise<undefined> {
-  const rule = watchRules.find((r) => r.enabled);
-  if (!rule) throw new Error('No enabled watch rules configured');
-  const stem = `${Date.now()}-${sanitize(payload.title)}`;
-  await vaultOps.ensureFolder(rule.watchFolder);
-  await vaultOps.create(
-    `${rule.watchFolder}/${stem}.meta.json`,
-    JSON.stringify({ source_url: payload.source_url, title: payload.title }),
-  );
-  const bytes = Buffer.from(payload.image_base64, 'base64');
-  await vaultOps.createBinary(`${rule.watchFolder}/${stem}.png`, bytes.buffer as ArrayBuffer);
 }
 
 function readSopSafely(sopPath: string, vaultOps: VaultOps): string | undefined {
