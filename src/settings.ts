@@ -1,10 +1,9 @@
 import * as crypto from 'crypto';
 import { App, Notice, PluginSettingTab, Setting } from 'obsidian';
 import type VaultAutopilotPlugin from './main';
-import { PluginSettings, ProviderConfig, ScreenshotClipRule, ThumbnailClipRule, WatchRule } from './types';
+import { PluginSettings, ProviderConfig, ScreenshotClipRule, ThumbnailClipRule } from './types';
 
 export const DEFAULT_SETTINGS: PluginSettings = {
-  rules: [],
   providers: [],
   httpServer: {
     enabled: true,
@@ -83,21 +82,6 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
 
     for (const [i, prov] of this.plugin.settings.providers.entries()) {
       this.renderProvider(containerEl, prov, i);
-    }
-
-    // ── Rules ──────────────────────────────────────────────────────────────────
-    new Setting(containerEl).setName('Watch Rules').setHeading();
-    new Setting(containerEl)
-      .setName('Add rule')
-      .addButton(b => b.setButtonText('Add rule').onClick(async () => {
-        const id = crypto.randomBytes(4).toString('hex');
-        this.plugin.settings.rules.push({ id, enabled: true, watchFolder: '', sopPath: '', outputFolder: '', providerId: this.plugin.settings.providers[0]?.id || '' });
-        await this.plugin.saveSettings();
-        this.display();
-      }));
-
-    for (const [i, rule] of this.plugin.settings.rules.entries()) {
-      this.renderRule(containerEl, rule, i);
     }
 
     // ── Clip Rules ──────────────────────────────────────────────────────────────
@@ -329,20 +313,4 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
     }));
   }
 
-  private renderRule(el: HTMLElement, rule: WatchRule, i: number): void {
-    new Setting(el).setName(`Rule ${i + 1}`).setHeading();
-    new Setting(el).setName('Watch folder').setDesc('Vault-relative. e.g. Inbox/screenshots').addText(t => t.setValue(rule.watchFolder).onChange(async v => { this.plugin.settings.rules[i].watchFolder = v.trim(); await this.plugin.saveSettings(); }));
-    new Setting(el).setName('SOP / prompt path').setDesc('Absolute path to the markdown file with instructions.').addText(t => t.setValue(rule.sopPath).onChange(async v => { this.plugin.settings.rules[i].sopPath = v.trim(); await this.plugin.saveSettings(); }));
-    new Setting(el).setName('Output folder').setDesc('Vault-relative. e.g. Notes/Aesthetic').addText(t => t.setValue(rule.outputFolder).onChange(async v => { this.plugin.settings.rules[i].outputFolder = v.trim(); await this.plugin.saveSettings(); }));
-    new Setting(el).setName('Provider').addDropdown(d => {
-      this.plugin.settings.providers.forEach(p => d.addOption(p.id, p.type === 'cli' ? `CLI: ${(p as any).cliType}` : (p as any).label || p.type));
-      d.setValue(rule.providerId).onChange(async v => { this.plugin.settings.rules[i].providerId = v; await this.plugin.saveSettings(); });
-    });
-    new Setting(el).setName('Enabled').addToggle(t => t.setValue(rule.enabled).onChange(async v => { this.plugin.settings.rules[i].enabled = v; await this.plugin.saveSettings(); }));
-    new Setting(el).addButton(b => b.setButtonText('Remove rule').onClick(async () => {
-      this.plugin.settings.rules.splice(i, 1);
-      await this.plugin.saveSettings();
-      this.display();
-    }));
-  }
 }

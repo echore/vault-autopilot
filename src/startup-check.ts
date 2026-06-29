@@ -28,16 +28,6 @@ export function runStartupChecks(settings: PluginSettings): string[] {
     }
   }
 
-  // Check each rule
-  for (const rule of settings.rules) {
-    if (!rule.enabled) continue;
-    if (!rule.watchFolder) problems.push(`Rule "${rule.id}": watch folder is empty.`);
-    if (!rule.sopPath) problems.push(`Rule "${rule.id}": SOP path is empty.`);
-    else if (!fs.existsSync(rule.sopPath)) problems.push(`Rule "${rule.id}": SOP file not found at "${rule.sopPath}".`);
-    if (!rule.outputFolder) problems.push(`Rule "${rule.id}": output folder is empty.`);
-    if (!settings.providers.find(p => p.id === rule.providerId)) problems.push(`Rule "${rule.id}": assigned provider not found.`);
-  }
-
   // Show as Notice (each problem gets its own so they don't stack-truncate)
   for (const p of problems) {
     new Notice(`Vault Autopilot: ${p}`, 10000);

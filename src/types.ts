@@ -81,15 +81,6 @@ export type ProviderConfig =
 
 // ── Rules ─────────────────────────────────────────────────────────────────────
 
-export interface WatchRule {
-  id: string;
-  enabled: boolean;
-  watchFolder: string;    // vault-relative path
-  sopPath: string;        // absolute path to SOP/prompt markdown file
-  outputFolder: string;   // vault-relative path
-  providerId: string;     // must match a ProviderConfig.id
-}
-
 export interface ClipRule {
   sopPath: string;       // absolute path to SOP markdown file
   outputFolder: string;  // vault-relative path
@@ -123,7 +114,6 @@ export interface HttpServerSettings {
 }
 
 export interface PluginSettings {
-  rules: WatchRule[];
   providers: ProviderConfig[];
   httpServer: HttpServerSettings;
   clipRules: {

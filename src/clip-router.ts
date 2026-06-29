@@ -1,5 +1,5 @@
 import { ClipPayload, HookPayload, KeyframePayload, ScreenshotPayload, ThumbnailPayload } from './server';
-import { AIProvider, ClipRule, isMultiFrameProvider, MultiFrameRequest, PluginSettings, ScreenshotClipRule, ThumbnailClipRule, WatchRule } from './types';
+import { AIProvider, ClipRule, isMultiFrameProvider, MultiFrameRequest, PluginSettings, ScreenshotClipRule, ThumbnailClipRule } from './types';
 import { postProcessMarkdown, sanitize, buildVideoEmbed, extractVideoId, detectPlatform, videoKey } from './util';
 import { buildAnchor, mergeSection, coverSection, hookSection, keyframeSection, screenshotSection, VideoNoteMeta, NewSection } from './video-note';
 
@@ -19,7 +19,6 @@ export async function routeClip(
   payload: ClipPayload,
   providers: Map<string, AIProvider>,
   clipRules: PluginSettings['clipRules'],
-  watchRules: WatchRule[],
   vaultOps: VaultOps,
 ): Promise<{ notePath?: string; notice?: string }> {
   if (payload.mode === 'thumbnail') return handleThumbnail(payload, providers, clipRules.thumbnail, vaultOps);
