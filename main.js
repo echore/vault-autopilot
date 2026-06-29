@@ -6440,7 +6440,7 @@ __export(main_exports, {
 module.exports = __toCommonJS(main_exports);
 var path3 = __toESM(require("path"));
 var fs5 = __toESM(require("fs"));
-var import_obsidian3 = require("obsidian");
+var import_obsidian4 = require("obsidian");
 
 // src/settings.ts
 var crypto = __toESM(require("crypto"));
@@ -6457,7 +6457,8 @@ var DEFAULT_SETTINGS = {
     screenshot: { sopPath: "", outputFolder: "", providerId: "", processingMode: "manual", framesFolder: "Assets/images" },
     hook: { sopPath: "", outputFolder: "", providerId: "", processingMode: "manual", maxFrames: 5, framesFolder: "Assets/images" },
     keyframe: { sopPath: "", outputFolder: "", providerId: "", processingMode: "manual", maxFrames: 5, framesFolder: "Assets/images" }
-  }
+  },
+  frameSelector: { baseUrl: "https://api.z.ai/api/paas/v4/", model: "GLM-4.6V-Flash", apiKey: "" }
 };
 var VaultAutopilotSettingTab = class extends import_obsidian.PluginSettingTab {
   constructor(app, plugin) {
@@ -6479,6 +6480,23 @@ var VaultAutopilotSettingTab = class extends import_obsidian.PluginSettingTab {
         this.plugin.settings.httpServer.port = n2;
         await this.plugin.saveSettings();
       }
+    }));
+    new import_obsidian.Setting(containerEl).setName("AI \u6311\u5E27\uFF08\u53EF\u9009\uFF09").setHeading();
+    new import_obsidian.Setting(containerEl).setDesc("\u586B\u4E86 API Key \u540E\uFF0CHook/\u5173\u952E\u5E27\u4F1A\u8BA9\u89C6\u89C9\u6A21\u578B\u4ECE\u5019\u9009\u5E27\u91CC\u6311\u6700\u6709\u52A8\u6548\u7684\u51E0\u5F20\u3001\u8DF3\u8FC7\u53E3\u64AD\u8138\uFF1B\u7559\u7A7A\u5219\u7528\u542F\u53D1\u5F0F\uFF08\u53BB\u9ED1+\u5747\u5300\u53D6\uFF09\u3002");
+    new import_obsidian.Setting(containerEl).setName("API Key").setDesc("Z.ai / \u667A\u8C31 \u7B49 OpenAI \u517C\u5BB9\u5E73\u53F0\u7684 key\u3002").addText((t2) => {
+      t2.inputEl.type = "password";
+      t2.setValue(this.plugin.settings.frameSelector.apiKey).onChange(async (v2) => {
+        this.plugin.settings.frameSelector.apiKey = v2.trim();
+        await this.plugin.saveSettings();
+      });
+    });
+    new import_obsidian.Setting(containerEl).setName("Base URL").setDesc("OpenAI \u517C\u5BB9\u7AEF\u70B9\u3002Z.ai \u9ED8\u8BA4\uFF1Ahttps://api.z.ai/api/paas/v4/").addText((t2) => t2.setValue(this.plugin.settings.frameSelector.baseUrl).onChange(async (v2) => {
+      this.plugin.settings.frameSelector.baseUrl = v2.trim();
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian.Setting(containerEl).setName("Model").setDesc("\u89C6\u89C9\u6A21\u578B\u540D\uFF0C\u9ED8\u8BA4 GLM-4.6V-Flash\u3002").addText((t2) => t2.setValue(this.plugin.settings.frameSelector.model).onChange(async (v2) => {
+      this.plugin.settings.frameSelector.model = v2.trim();
+      await this.plugin.saveSettings();
     }));
     new import_obsidian.Setting(containerEl).setName("AI Providers").setHeading();
     new import_obsidian.Setting(containerEl).setName("Add provider").setDesc("Configure at least one provider before creating rules.").addDropdown(
@@ -17312,9 +17330,9 @@ function createServer2(port, onClip) {
     req.on("end", async () => {
       try {
         const payload = JSON.parse(body);
-        const obsidianUrl = await onClip(payload);
+        const { obsidianUrl, notice } = await onClip(payload);
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify(obsidianUrl ? { success: true, obsidianUrl } : { success: true }));
+        res.end(JSON.stringify({ success: true, ...obsidianUrl ? { obsidianUrl } : {}, ...notice ? { notice } : {} }));
       } catch (err) {
         res.writeHead(500, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ success: false, error: String(err) }));
@@ -17351,33 +17369,287 @@ function extractVideoId(url, platform) {
     const bv = url.match(/\/(BV[a-zA-Z0-9]+)/);
     if (bv) return bv[1];
   }
+  if (p2 === "xiaohongshu" || url.includes("xiaohongshu.com")) {
+    const m2 = url.match(/\/(?:explore|discovery\/item)\/(\w+)/);
+    if (m2) return m2[1];
+  }
   return null;
 }
-function buildVideoEmbed(url, platform, startSeconds) {
+function canonicalUrl(url) {
+  try {
+    const u2 = new URL(url);
+    return (u2.origin + u2.pathname).replace(/\/+$/, "");
+  } catch (e2) {
+    return url;
+  }
+}
+function videoKey(url, platform) {
+  var _a3;
+  return (_a3 = extractVideoId(url, platform)) != null ? _a3 : canonicalUrl(url);
+}
+function detectPlatform(url) {
+  if (url.includes("youtube.com") || url.includes("youtu.be")) return "youtube";
+  if (url.includes("bilibili.com")) return "bilibili";
+  if (url.includes("xiaohongshu.com")) return "xiaohongshu";
+  return "other";
+}
+function buildVideoEmbed(url, platform, startSeconds, endSeconds) {
   const p2 = (platform != null ? platform : "").toLowerCase();
+  const start = Math.floor(startSeconds);
   if (p2 === "youtube" || url.includes("youtube.com") || url.includes("youtu.be")) {
     const id = extractVideoId(url, platform);
-    if (id) return `<iframe width="100%" height="315" src="https://www.youtube.com/embed/${id}?start=${startSeconds}" frameborder="0" allowfullscreen></iframe>`;
+    if (id) {
+      const endParam = endSeconds != null ? `&end=${Math.floor(endSeconds)}` : "";
+      return `<iframe width="100%" height="315" src="https://www.youtube.com/embed/${id}?start=${start}${endParam}" frameborder="0" allowfullscreen></iframe>`;
+    }
   }
   if (p2 === "bilibili" || url.includes("bilibili.com")) {
     const id = extractVideoId(url, platform);
-    if (id) return `<iframe width="100%" height="315" src="https://player.bilibili.com/player.html?bvid=${id}&page=1&t=${startSeconds}" frameborder="0" allowfullscreen></iframe>`;
+    if (id) return `<iframe width="100%" height="315" src="https://player.bilibili.com/player.html?bvid=${id}&page=1&t=${start}" frameborder="0" allowfullscreen></iframe>`;
   }
   return `[\u25B6 \u8DF3\u8F6C\u539F\u89C6\u9891](${url})`;
 }
 
+// src/frame-select.ts
+var import_obsidian2 = require("obsidian");
+function parseSelection(text, count, total) {
+  var _a3;
+  const seen = /* @__PURE__ */ new Set();
+  const keep = [];
+  for (const m2 of (_a3 = text.match(/\d+/g)) != null ? _a3 : []) {
+    const n2 = Number(m2);
+    if (n2 >= 0 && n2 < total && !seen.has(n2)) {
+      seen.add(n2);
+      keep.push(n2);
+      if (keep.length >= count) break;
+    }
+  }
+  for (let i2 = 0; i2 < total && keep.length < count; i2++) {
+    if (!seen.has(i2)) {
+      seen.add(i2);
+      keep.push(i2);
+    }
+  }
+  return keep;
+}
+var PROMPTS = {
+  hook: "\u8FD9\u4E9B\u662F\u4ECE\u4E00\u4E2A\u89C6\u9891\u5F00\u5934\u622A\u7684\u9759\u6B62\u5E27\u3002\u8BF7\u6311\u51FA\u753B\u9762\u4FE1\u606F\u6700\u4E30\u5BCC\u7684\u51E0\u5F20\u2014\u2014\u4F18\u5148\u6709\u56FE\u5F62\u3001\u6587\u5B57\u3001\u56FE\u6807\u3001\u7279\u6548\u53E0\u52A0\uFF0C\u6216\u4EBA\u7269\u52A8\u4F5C\u5E45\u5EA6\u5927\u7684\u753B\u9762\uFF1B\u52A1\u5FC5\u6311\u5F7C\u6B64\u5DEE\u5F02\u5927\u7684\uFF0C\u7EDD\u4E0D\u8981\u9009\u51E0\u4E4E\u4E00\u6837\u6216\u540C\u4E00\u955C\u5934\u7684\u4E24\u5F20\uFF1B\u5C3D\u91CF\u907F\u5F00\u53EA\u6709\u4E00\u5F20\u4EBA\u8138\u3001\u6CA1\u6709\u522B\u7684\u5185\u5BB9\u7684\u5B9A\u683C\u3002",
+  keyframe: "\u8FD9\u4E9B\u662F\u4ECE\u4E00\u6BB5\u89C6\u9891\u622A\u7684\u9759\u6B62\u5E27\u3002\u8BF7\u6311\u51FA\u753B\u9762\u4FE1\u606F\u6700\u4E30\u5BCC\u7684\u51E0\u5F20\u2014\u2014\u4F18\u5148\u6709\u56FE\u5F62\u3001\u6587\u5B57\u3001\u56FE\u6807\u3001\u7279\u6548\u53E0\u52A0\uFF0C\u6216\u4EBA\u7269\u52A8\u4F5C\u5E45\u5EA6\u5927\u7684\u753B\u9762\uFF1B\u52A1\u5FC5\u6311\u5F7C\u6B64\u5DEE\u5F02\u5927\u7684\uFF0C\u7EDD\u4E0D\u8981\u9009\u51E0\u4E4E\u4E00\u6837\u6216\u540C\u4E00\u955C\u5934\u7684\u4E24\u5F20\uFF1B\u5C3D\u91CF\u907F\u5F00\u53EA\u6709\u4E00\u5F20\u4EBA\u8138\u3001\u6CA1\u6709\u522B\u7684\u5185\u5BB9\u7684\u5B9A\u683C\u3002"
+};
+async function selectFrames(frames, count, mode, cfg) {
+  var _a3, _b, _c, _d, _e2, _f;
+  const labelled = frames.flatMap((f2, i2) => [
+    { type: "text", text: `[${i2}]` },
+    { type: "image_url", image_url: { url: `data:image/jpeg;base64,${f2.toString("base64")}` } }
+  ]);
+  const prompt = `${(_a3 = PROMPTS[mode]) != null ? _a3 : PROMPTS.keyframe}
+\u6BCF\u5F20\u56FE\u524D\u9762\u90FD\u6709\u7F16\u53F7 [n]\u3002\u4ECE\u4E2D\u9009\u51FA\u6700\u597D\u7684 ${count} \u5F20\uFF0C\u53EA\u8FD4\u56DE JSON\uFF1A{"keep":[\u7F16\u53F7,...]}\uFF0C\u4E0D\u8981\u4EFB\u4F55\u5176\u5B83\u6587\u5B57\u3002`;
+  const url = cfg.baseUrl.replace(/\/+$/, "") + "/chat/completions";
+  const resp = await (0, import_obsidian2.requestUrl)({
+    url,
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${cfg.apiKey}` },
+    body: JSON.stringify({
+      model: cfg.model,
+      messages: [{ role: "user", content: [...labelled, { type: "text", text: prompt }] }],
+      max_tokens: 200
+    })
+  });
+  const text = (_f = (_e2 = (_d = (_c = (_b = resp.json) == null ? void 0 : _b.choices) == null ? void 0 : _c[0]) == null ? void 0 : _d.message) == null ? void 0 : _e2.content) != null ? _f : "";
+  return parseSelection(text, count, frames.length);
+}
+
+// src/video-note.ts
+var RANK = { "\u5C01\u9762\u6807\u9898": 0, "\u5185\u5BB9": 1, "\u52A8\u6548": 2, "\u622A\u56FE": 3 };
+var EMOJI = { "\u5C01\u9762\u6807\u9898": "\u{1F5BC}\uFE0F", "\u5185\u5BB9": "\u{1F3AC}", "\u52A8\u6548": "\u2728", "\u622A\u56FE": "\u{1F4F8}" };
+function circledNumber(i2) {
+  return i2 >= 1 && i2 <= 20 ? String.fromCodePoint(9312 + i2 - 1) : `(${i2})`;
+}
+function sopBlock(sopContent) {
+  const lines = sopContent.split("\n").map((l2) => `> ${l2}`).join("\n");
+  const checklist = ["> ", "> ---", "> **\u5B8C\u6210\u540E\u6267\u884C\uFF1A**", "> - [ ] \u5206\u6790\u5DF2\u5199\u5165\u7B14\u8BB0\u5404\u7AE0\u8282", "> - [ ] \u5220\u9664\u6B64\u6574\u4E2A\u63D0\u793A\u5757"].join("\n");
+  return `> [!TIP] \u5206\u6790\u63D0\u793A
+${lines}
+${checklist}`;
+}
+function framesBlock(frameNames) {
+  const lines = frameNames.map((n2, i2) => `> **[Image #${i2 + 1}]** ![[${n2}]]`).join("\n");
+  return `> [!NOTE] \u5206\u6790\u7528\u5E27
+${lines}
+> 
+> - [ ] \u6309 SOP \u5B8C\u6210\u5206\u6790\uFF0C\u586B\u5165\u5404\u7AE0\u8282`;
+}
+function coverSection(coverFile, sop) {
+  const parts = [`## \u5C01\u9762\u6807\u9898`, ``, `![[${coverFile}]]`, ``];
+  if (sop) parts.push(sopBlock(sop), ``);
+  return { kind: "\u5C01\u9762\u6807\u9898", startSeconds: 0, text: parts.join("\n") };
+}
+function hookSection(p2, sop) {
+  const embed = buildVideoEmbed(p2.url, p2.platform, 0);
+  const parts = [`## \u5185\u5BB9`, ``, embed, ``];
+  if (p2.aiResult) {
+    parts.push(p2.aiResult, ``);
+  } else {
+    parts.push(framesBlock(p2.frameNames), ``);
+    if (p2.transcript) parts.push(`### \u5B57\u5E55`, ``, p2.transcript, ``);
+    if (sop) parts.push(sopBlock(sop), ``);
+  }
+  return { kind: "\u5185\u5BB9", startSeconds: 0, text: parts.join("\n") };
+}
+function keyframeSection(p2, sop) {
+  const embed = buildVideoEmbed(p2.url, p2.platform, p2.start);
+  const parts = [`## \u52A8\u6548 \u2460 \xB7 ${Math.floor(p2.start)}s\u2013${Math.round(p2.end)}s`, ``, embed, ``];
+  if (p2.aiResult) {
+    parts.push(p2.aiResult, ``);
+  } else {
+    parts.push(framesBlock(p2.frameNames), ``);
+    if (sop) parts.push(sopBlock(sop), ``);
+  }
+  return { kind: "\u52A8\u6548", startSeconds: p2.start, text: parts.join("\n") };
+}
+function screenshotSection(imageNames, sop, aiResult) {
+  const imgs = imageNames.map((n2) => `![[${n2}]]`).join("\n");
+  const parts = [`## \u622A\u56FE \u2460`, ``, imgs, ``];
+  if (aiResult) parts.push(aiResult, ``);
+  else if (sop) parts.push(sopBlock(sop), ``);
+  return { kind: "\u622A\u56FE", startSeconds: 0, text: parts.join("\n") };
+}
+function buildAnchor(meta) {
+  const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  const fm = [
+    `---`,
+    `type: video`,
+    `platform: ${meta.platform}`,
+    `video_id: "${meta.videoId}"`,
+    `video_url: "${meta.videoUrl}"`,
+    `title: "${meta.title}"`,
+    ...meta.channel ? [`channel: "${meta.channel}"`] : [],
+    `dimensions: []`,
+    `analyzed_at: ${today}`,
+    `tags: []`,
+    `depth: normal`,
+    `---`
+  ].join("\n");
+  return `${fm}
+
+# ${meta.title}
+`;
+}
+function kindOf(heading) {
+  for (const k2 of ["\u5C01\u9762\u6807\u9898", "\u5185\u5BB9", "\u52A8\u6548", "\u622A\u56FE"]) {
+    if (heading.includes(k2)) return k2;
+  }
+  return null;
+}
+function emojiHeading(text, kind3) {
+  return text.replace(/^## .*$/m, (line) => {
+    const heading = line.slice(3);
+    const idx = heading.indexOf(kind3);
+    const tail = idx >= 0 ? heading.slice(idx) : kind3;
+    return `## ${EMOJI[kind3]} ${tail}`;
+  });
+}
+function stripTrailingRule(t2) {
+  return t2.replace(/\s+$/, "").replace(/\n-{3,}$/, "").replace(/\s+$/, "");
+}
+function syncOverview(head, frontmatter, dims) {
+  var _a3, _b;
+  const channel = (_a3 = frontmatter.match(/^channel:\s*"?(.*?)"?\s*$/m)) == null ? void 0 : _a3[1];
+  const platform = (_b = frontmatter.match(/^platform:\s*(.*?)\s*$/m)) == null ? void 0 : _b[1];
+  const label = [channel, platform].filter(Boolean).join(" \xB7 ") || "\u89C6\u9891";
+  const overview = `> [!abstract] ${label}
+> ${dims.map((d2) => `${EMOJI[d2]} ${d2}`).join(" \xB7 ")}`;
+  const cleaned = head.replace(/\n*> \[!abstract\][^\n]*(?:\n>[^\n]*)*/g, "");
+  if (/^# .+$/m.test(cleaned)) return cleaned.replace(/^(# .+)$/m, `$1
+
+${overview}`);
+  return `${cleaned.replace(/\s+$/, "")}
+
+${overview}`;
+}
+function parseSections(body) {
+  const lines = body.split("\n");
+  const head = [];
+  const sections = [];
+  let cur = null;
+  let curHeading = "";
+  const flush = () => {
+    var _a3;
+    if (cur) {
+      const kind3 = (_a3 = kindOf(curHeading)) != null ? _a3 : "\u52A8\u6548";
+      const m2 = curHeading.match(/(\d+)s/);
+      sections.push({ kind: kind3, startSeconds: m2 ? parseInt(m2[1], 10) : 0, text: cur.join("\n") });
+    }
+  };
+  let inFence = false;
+  for (const line of lines) {
+    if (/^\s*(```|~~~)/.test(line)) inFence = !inFence;
+    if (!inFence && line.startsWith("## ")) {
+      flush();
+      cur = [line];
+      curHeading = line.slice(3).trim();
+    } else if (cur) {
+      cur.push(line);
+    } else {
+      head.push(line);
+    }
+  }
+  flush();
+  return { head: head.join("\n"), sections };
+}
+var DIMENSION_ORDER = ["\u5C01\u9762\u6807\u9898", "\u5185\u5BB9", "\u52A8\u6548", "\u622A\u56FE"];
+function addDimension(frontmatter, dim) {
+  return frontmatter.replace(/^(dimensions:\s*\[)([^\]]*)(\])/m, (_2, open, inner, close) => {
+    const dims = inner.split(",").map((d2) => d2.trim()).filter(Boolean);
+    if (!dims.includes(dim)) dims.push(dim);
+    dims.sort((a2, b2) => DIMENSION_ORDER.indexOf(a2) - DIMENSION_ORDER.indexOf(b2));
+    return `${open}${dims.join(", ")}${close}`;
+  });
+}
+function renumber(sections) {
+  const counters = {};
+  return sections.map((s2) => {
+    var _a3;
+    if (s2.kind !== "\u52A8\u6548" && s2.kind !== "\u622A\u56FE") return s2;
+    counters[s2.kind] = ((_a3 = counters[s2.kind]) != null ? _a3 : 0) + 1;
+    const text = s2.text.replace(new RegExp(`^(## .*?${s2.kind} )\\S+( \xB7.*)?$`, "m"), `$1${circledNumber(counters[s2.kind])}$2`);
+    return { ...s2, text };
+  });
+}
+function mergeSection(existing, section) {
+  const fmMatch = existing.match(/^---\n[\s\S]*?\n---/);
+  const frontmatter = fmMatch ? fmMatch[0] : "";
+  const body = fmMatch ? existing.slice(frontmatter.length) : existing;
+  const { head, sections } = parseSections(body);
+  if (section.kind !== "\u52A8\u6548" && section.kind !== "\u622A\u56FE" && sections.some((s2) => s2.kind === section.kind)) {
+    return { content: existing, skipped: true };
+  }
+  const incoming = { kind: section.kind, startSeconds: section.startSeconds, text: section.text };
+  const all = [...sections, incoming].sort(
+    (a2, b2) => RANK[a2.kind] - RANK[b2.kind] || a2.startSeconds - b2.startSeconds
+  );
+  const ordered = renumber(all);
+  const newFrontmatter = addDimension(frontmatter, section.kind);
+  const dims = DIMENSION_ORDER.filter((k2) => ordered.some((s2) => s2.kind === k2));
+  const newHead = syncOverview(head, newFrontmatter, dims).replace(/\s+$/, "");
+  const renderedSections = ordered.map((s2) => stripTrailingRule(emojiHeading(s2.text, s2.kind))).join("\n\n---\n\n");
+  const newBody = [newHead, "", renderedSections, ""].join("\n");
+  return { content: `${newFrontmatter}${newBody}`, skipped: false };
+}
+
 // src/clip-router.ts
-async function routeClip(payload, providers, clipRules, watchRules, vaultOps) {
+async function routeClip(payload, providers, clipRules, watchRules, vaultOps, frameSelector) {
   if (isLegacy(payload)) {
-    return handleLegacyScreenshot(payload, watchRules, vaultOps);
+    await handleLegacyScreenshot(payload, watchRules, vaultOps);
+    return {};
   }
   if (payload.mode === "thumbnail") return handleThumbnail(payload, providers, clipRules.thumbnail, vaultOps);
   if (payload.mode === "screenshot") {
     const normalized = normalizeScreenshot(payload);
-    return handleScreenshot(normalized, providers, clipRules.screenshot, vaultOps);
+    return handleScreenshot(normalized, providers, clipRules.screenshot, vaultOps, clipRules.thumbnail.outputFolder, clipRules.thumbnail.thumbnailFolder);
   }
-  if (payload.mode === "hook") return handleMultiFrame(payload, providers, clipRules.hook, vaultOps, clipRules.thumbnail.outputFolder);
-  if (payload.mode === "keyframe") return handleMultiFrame(payload, providers, clipRules.keyframe, vaultOps, clipRules.thumbnail.outputFolder);
+  if (payload.mode === "hook") return handleMultiFrame(payload, providers, clipRules.hook, vaultOps, clipRules.thumbnail.outputFolder, clipRules.thumbnail.thumbnailFolder, frameSelector);
+  if (payload.mode === "keyframe") return handleMultiFrame(payload, providers, clipRules.keyframe, vaultOps, clipRules.thumbnail.outputFolder, clipRules.thumbnail.thumbnailFolder, frameSelector);
   throw new Error("Unknown clip mode");
 }
 function isLegacy(p2) {
@@ -17401,19 +17673,6 @@ async function handleLegacyScreenshot(payload, watchRules, vaultOps) {
   const bytes = Buffer.from(payload.image_base64, "base64");
   await vaultOps.createBinary(`${rule.watchFolder}/${stem}.png`, bytes.buffer);
 }
-function sopBlock(sopContent) {
-  const lines = sopContent.split("\n").map((l2) => `> ${l2}`).join("\n");
-  const checklist = [
-    `> `,
-    `> ---`,
-    `> **\u5B8C\u6210\u540E\u6267\u884C\uFF1A**`,
-    `> - [ ] \u5206\u6790\u5DF2\u5199\u5165\u7B14\u8BB0\u5404\u7AE0\u8282`,
-    `> - [ ] \u5220\u9664\u6B64\u6574\u4E2A\u63D0\u793A\u5757`
-  ].join("\n");
-  return `> [!TIP] \u5206\u6790\u63D0\u793A
-${lines}
-${checklist}`;
-}
 function readSopSafely(sopPath, vaultOps) {
   if (!sopPath) return void 0;
   try {
@@ -17422,76 +17681,39 @@ function readSopSafely(sopPath, vaultOps) {
     return void 0;
   }
 }
-function thumbnailNoteStem(payload) {
-  const titleSlug = payload.title.slice(0, 40).trim();
-  return `${payload.channel} - ${titleSlug}`;
+async function upsertVideoNote(meta, section, vaultOps, folder) {
+  await vaultOps.ensureFolder(folder);
+  const existing = meta.videoId ? await findNoteByVideoId(meta.videoId, folder, vaultOps) : null;
+  if (existing) {
+    const { content: content2, skipped } = mergeSection(existing.content, section);
+    if (skipped) return { notePath: existing.path, notice: `\u300C${section.kind}\u300D\u5DF2\u5B58\u5728\uFF0C\u672A\u8986\u76D6\u3002\u60F3\u91CD\u505A\u8BF7\u5148\u5220\u6389\u8BE5\u5C0F\u8282\u518D\u70B9\u3002` };
+    await vaultOps.modify(existing.path, content2);
+    return { notePath: existing.path };
+  }
+  const { content } = mergeSection(buildAnchor(meta), section);
+  let stem = (meta.channel ? `${sanitize(meta.channel)} - ${sanitize(meta.title)}` : sanitize(meta.title)) || "video";
+  if (vaultOps.listMarkdownFiles(folder).includes(`${folder}/${stem}.md`)) {
+    stem = `${stem} \xB7 ${fileFingerprint(meta.videoId)}`;
+  }
+  const notePath = `${folder}/${stem}.md`;
+  await vaultOps.create(notePath, content);
+  return { notePath };
 }
-function buildThumbnailNote(payload, thumbnailFile, sopContent, coverAnalysis) {
-  const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-  const frontmatter = [
-    `---`,
-    `type: video`,
-    `platform: ${payload.platform}`,
-    `channel: "${payload.channel}"`,
-    ...payload.channel_handle ? [`channel_handle: "${payload.channel_handle}"`] : [],
-    `video_id: "${payload.video_id}"`,
-    `video_url: "${payload.video_url}"`,
-    `title: "${payload.title}"`,
-    ...payload.views ? [`views: "${payload.views}"`] : [],
-    `analyzed_at: ${today}`,
-    `tags: []`,
-    `dimensions: [\u5C01\u9762\u6807\u9898]`,
-    `depth: normal`,
-    `---`
-  ].join("\n");
-  const bodyParts = [
-    ``,
-    `# ${payload.title}`,
-    ``,
-    `<iframe width="100%" height="315" src="https://www.youtube.com/embed/${payload.video_id}" frameborder="0" allowfullscreen></iframe>`,
-    ``,
-    `![[${thumbnailFile}]]`,
-    ``
-  ];
-  if (sopContent) bodyParts.push(sopBlock(sopContent), ``);
-  bodyParts.push(`## \u5C01\u9762\u6807\u9898`, ``, coverAnalysis != null ? coverAnalysis : ``);
-  return frontmatter + bodyParts.join("\n");
+function fileFingerprint(videoId) {
+  if (/^[A-Za-z0-9_-]{1,24}$/.test(videoId)) return videoId;
+  let h2 = 0;
+  for (let i2 = 0; i2 < videoId.length; i2++) h2 = h2 * 31 + videoId.charCodeAt(i2) | 0;
+  return (h2 >>> 0).toString(36);
 }
-async function handleThumbnail(payload, providers, rule, vaultOps) {
-  if (!rule.outputFolder || !rule.thumbnailFolder) {
-    throw new Error("Thumbnail output folder or thumbnail folder is not configured. Go to Settings \u2192 Clip Rules \u2192 Thumbnail.");
+async function ensureCover(videoId, coverUrl, vaultOps, assetFolder) {
+  if (!coverUrl || !/^[A-Za-z0-9_-]{1,24}$/.test(videoId)) return;
+  const path4 = `${assetFolder}/${videoId}.webp`;
+  if (vaultOps.fileExists(path4)) return;
+  try {
+    await vaultOps.ensureFolder(assetFolder);
+    await vaultOps.createBinary(path4, await vaultOps.downloadUrl(coverUrl));
+  } catch (_2) {
   }
-  await vaultOps.ensureFolder(rule.thumbnailFolder);
-  await vaultOps.ensureFolder(rule.outputFolder);
-  const thumbnailFile = `${payload.video_id}.webp`;
-  const thumbnailPath = `${rule.thumbnailFolder}/${thumbnailFile}`;
-  const imgData = await vaultOps.downloadUrl(payload.thumbnail_url);
-  await vaultOps.createBinary(thumbnailPath, imgData);
-  const stem = thumbnailNoteStem(payload);
-  const notePath = `${rule.outputFolder}/${stem}.md`;
-  if (rule.processingMode === "manual") {
-    const sopContent2 = readSopSafely(rule.sopPath, vaultOps);
-    await vaultOps.create(notePath, buildThumbnailNote(payload, thumbnailFile, sopContent2));
-    return notePath;
-  }
-  if (!rule.sopPath || !rule.providerId) {
-    throw new Error("Thumbnail clip rule is not fully configured (sopPath / providerId missing)");
-  }
-  const provider = providers.get(rule.providerId);
-  if (!provider) throw new Error(`Provider "${rule.providerId}" not found`);
-  if (!isMultiFrameProvider(provider)) {
-    throw new Error(
-      `Provider "${provider.name}" does not support image analysis. Use an API provider (Anthropic, OpenAI-compatible, or Gemini).`
-    );
-  }
-  const sopContent = vaultOps.readFileSync(rule.sopPath);
-  const result = await provider.analyzeMultiFrame({
-    frames: [Buffer.from(imgData)],
-    sopContent,
-    meta: { video_title: payload.title, channel: payload.channel, url: payload.video_url }
-  });
-  await vaultOps.create(notePath, buildThumbnailNote(payload, thumbnailFile, postProcessMarkdown(result)));
-  return notePath;
 }
 function buildScreenshotTemplate(payload, imageNames, sopContent) {
   const imageLines = imageNames.map((n2) => `> ![[${n2}]]`).join("\n");
@@ -17504,11 +17726,17 @@ function buildScreenshotTemplate(payload, imageNames, sopContent) {
     imageLines,
     ``
   ];
-  if (sopContent) parts.push(sopBlock(sopContent), ``);
+  if (sopContent) {
+    const lines = sopContent.split("\n").map((l2) => `> ${l2}`).join("\n");
+    const checklist = [`> `, `> ---`, `> **\u5B8C\u6210\u540E\u6267\u884C\uFF1A**`, `> - [ ] \u5206\u6790\u5DF2\u5199\u5165\u7B14\u8BB0\u5404\u7AE0\u8282`, `> - [ ] \u5220\u9664\u6B64\u6574\u4E2A\u63D0\u793A\u5757`].join("\n");
+    parts.push(`> [!TIP] \u5206\u6790\u63D0\u793A
+${lines}
+${checklist}`, ``);
+  }
   parts.push(`---`, ``, `## \u7B14\u8BB0`, ``);
   return parts.join("\n");
 }
-async function handleScreenshot(payload, providers, rule, vaultOps) {
+async function handleScreenshot(payload, providers, rule, vaultOps, searchFolder, assetFolder) {
   if (!rule.outputFolder) {
     throw new Error("Screenshot output folder is not configured. Go to Settings \u2192 Clip Rules \u2192 Screenshot \u2192 Output folder.");
   }
@@ -17524,11 +17752,20 @@ async function handleScreenshot(payload, providers, rule, vaultOps) {
     await vaultOps.createBinary(`${framesDir}/${name}`, bytes.buffer);
     imageNames.push(name);
   }
+  const key = videoKey(payload.url);
+  const existing = await findNoteByVideoId(key, searchFolder, vaultOps);
+  const intoVideoNote = !!existing || extractVideoId(payload.url, void 0) != null;
+  const meta = { platform: detectPlatform(payload.url), videoId: key, videoUrl: payload.url, title: payload.title };
   if (rule.processingMode === "manual") {
     const sopContent2 = readSopSafely(rule.sopPath, vaultOps);
+    if (intoVideoNote) {
+      const r2 = await upsertVideoNote(meta, screenshotSection(imageNames, sopContent2), vaultOps, searchFolder);
+      await ensureCover(meta.videoId, payload.cover_url, vaultOps, assetFolder);
+      return r2;
+    }
     const template = buildScreenshotTemplate(payload, imageNames, sopContent2);
     await vaultOps.create(notePath, template);
-    return notePath;
+    return { notePath };
   }
   if (!rule.sopPath || !rule.outputFolder || !rule.providerId) {
     throw new Error("Screenshot clip rule is not configured");
@@ -17548,88 +17785,18 @@ async function handleScreenshot(payload, providers, rule, vaultOps) {
     meta: { url: payload.url }
   });
   const markdown = postProcessMarkdown(result);
+  if (intoVideoNote) {
+    const r2 = await upsertVideoNote(meta, screenshotSection(imageNames, void 0, markdown), vaultOps, searchFolder);
+    await ensureCover(meta.videoId, payload.cover_url, vaultOps, assetFolder);
+    return r2;
+  }
   await vaultOps.create(notePath, markdown);
-  return notePath;
+  return { notePath };
 }
 function sampleFrames(frames, max) {
   if (frames.length <= max) return frames;
   const step = frames.length / max;
   return Array.from({ length: max }, (_2, i2) => frames[Math.floor(i2 * step)]);
-}
-function buildManualTemplate(payload, frameNames, sopContent) {
-  const startSeconds = payload.mode === "keyframe" ? payload.time_range.start : 0;
-  const platform = payload.mode === "hook" ? payload.platform : void 0;
-  const channel = payload.mode === "hook" ? payload.channel : void 0;
-  const embed = buildVideoEmbed(payload.url, platform, startSeconds);
-  const frameLines = frameNames.map((n2, i2) => `> **[Image #${i2 + 1}]** ![[${n2}]]`).join("\n");
-  const frameChecklist = [`> `, `> - [ ] \u6309 SOP \u5B8C\u6210\u5206\u6790\uFF0C\u586B\u5165\u5404\u7AE0\u8282`].join("\n");
-  if (payload.mode === "hook") {
-    const transcriptSection = payload.transcript ? `
-## \u5B57\u5E55
-
-${payload.transcript}
-` : "";
-    const durationSuffix = payload.time_range ? ` [${payload.time_range.start}s\u2013${payload.time_range.end}s]` : "";
-    const durationLabel = payload.time_range ? ` | ${payload.time_range.end}s Hook` : "";
-    const parts = [
-      `# Hook \u2014 ${payload.video_title}${durationSuffix}`,
-      ``,
-      embed,
-      ``,
-      `\u6765\u6E90\uFF1A${platform != null ? platform : ""} | ${channel != null ? channel : ""} | ${payload.url} | ${payload.captured_at}${durationLabel}`,
-      ``,
-      `> [!NOTE] \u5206\u6790\u7528\u5E27`,
-      frameLines,
-      frameChecklist,
-      ``
-    ];
-    if (sopContent) parts.push(sopBlock(sopContent), ``);
-    parts.push(`---`, ``);
-    if (transcriptSection) parts.push(transcriptSection);
-    parts.push(
-      `## Hook \u7C7B\u578B`,
-      ``,
-      `## \u5177\u4F53\u624B\u6CD5`,
-      ``,
-      `## \u4E3A\u4EC0\u4E48\u6709\u6548`,
-      ``,
-      `## \u5982\u4F55\u590D\u5236`,
-      ``,
-      `## \u6211\u7684\u60F3\u6CD5`,
-      ``
-    );
-    return parts.join("\n");
-  } else {
-    const { start, end } = payload.time_range;
-    const parts = [
-      `# \u5173\u952E\u5E27 \u2014 ${payload.video_title} [${start}s\u2013${end}s]`,
-      ``,
-      embed,
-      ``,
-      `\u6765\u6E90\uFF1A${payload.url} | ${payload.captured_at} | ${start}s\u2013${end}s`,
-      ``,
-      `> [!NOTE] \u5206\u6790\u7528\u5E27`,
-      frameLines,
-      frameChecklist,
-      ``
-    ];
-    if (sopContent) parts.push(sopBlock(sopContent), ``);
-    parts.push(
-      `---`,
-      ``,
-      `## \u6280\u6CD5\u7C7B\u578B`,
-      ``,
-      `## \u6280\u672F\u5B9E\u73B0`,
-      ``,
-      `## \u89C6\u89C9\u76EE\u7684`,
-      ``,
-      `## \u5982\u4F55\u590D\u5236`,
-      ``,
-      `## \u6211\u7684\u60F3\u6CD5`,
-      ``
-    );
-    return parts.join("\n");
-  }
 }
 async function findNoteByVideoId(videoId, folder, vaultOps) {
   const files = vaultOps.listMarkdownFiles(folder);
@@ -17639,39 +17806,67 @@ async function findNoteByVideoId(videoId, folder, vaultOps) {
   }
   return null;
 }
-function addDimension(content, dimension) {
-  return content.replace(
-    /^(dimensions:\s*\[)([^\]]*)(\])/m,
-    (_2, open, inner, close) => {
-      const dims = inner.split(",").map((d2) => d2.trim()).filter(Boolean);
-      if (!dims.includes(dimension)) dims.push(dimension);
-      return `${open}${dims.join(", ")}${close}`;
-    }
-  );
-}
-function buildAppendSection(payload, frameNames, sopContent, aiResult) {
-  const header = payload.mode === "hook" ? `## \u5185\u5BB9` : `## \u52A8\u6548`;
-  if (aiResult) return `
-${header}
-
-${aiResult}
-`;
-  const frameLines = frameNames.map((n2, i2) => `> **[Image #${i2 + 1}]** ![[${n2}]]`).join("\n");
-  const frameChecklist = [`> `, `> - [ ] \u6309 SOP \u5B8C\u6210\u5206\u6790\uFF0C\u586B\u5165\u5404\u7AE0\u8282`].join("\n");
-  const parts = [``, header, ``, `> [!NOTE] \u5206\u6790\u7528\u5E27`, frameLines, frameChecklist, ``];
-  if (sopContent) parts.push(sopBlock(sopContent), ``);
-  if (payload.mode === "hook" && payload.transcript) {
-    parts.push(`## \u5B57\u5E55`, ``, payload.transcript, ``);
+async function handleThumbnail(payload, providers, rule, vaultOps) {
+  if (!rule.outputFolder || !rule.thumbnailFolder) {
+    throw new Error("Thumbnail output folder or thumbnail folder is not configured. Go to Settings \u2192 Clip Rules \u2192 Thumbnail.");
   }
-  return parts.join("\n");
+  await vaultOps.ensureFolder(rule.thumbnailFolder);
+  const thumbnailFile = `${payload.video_id}.webp`;
+  const thumbnailPath = `${rule.thumbnailFolder}/${thumbnailFile}`;
+  const imgData = await vaultOps.downloadUrl(payload.thumbnail_url);
+  await vaultOps.createBinary(thumbnailPath, imgData);
+  const sopContent = rule.processingMode === "manual" ? readSopSafely(rule.sopPath, vaultOps) : void 0;
+  let aiResult;
+  if (rule.processingMode !== "manual") {
+    if (!rule.sopPath || !rule.providerId) throw new Error("Thumbnail clip rule is not fully configured (sopPath / providerId missing)");
+    const provider = providers.get(rule.providerId);
+    if (!provider) throw new Error(`Provider "${rule.providerId}" not found`);
+    if (!isMultiFrameProvider(provider)) throw new Error(`Provider "${provider.name}" does not support image analysis. Use an API provider.`);
+    const sop = vaultOps.readFileSync(rule.sopPath);
+    aiResult = postProcessMarkdown(await provider.analyzeMultiFrame({ frames: [Buffer.from(imgData)], sopContent: sop, meta: { video_title: payload.title, channel: payload.channel, url: payload.video_url } }));
+  }
+  const section = coverSection(thumbnailFile, aiResult != null ? aiResult : sopContent);
+  const meta = {
+    platform: payload.platform,
+    videoId: videoKey(payload.video_url, payload.platform),
+    videoUrl: payload.video_url,
+    title: payload.title,
+    channel: payload.channel
+  };
+  return upsertVideoNote(meta, section, vaultOps, rule.outputFolder);
 }
-async function handleMultiFrame(payload, providers, rule, vaultOps, searchFolder) {
-  var _a3;
-  const max = (_a3 = rule.maxFrames) != null ? _a3 : 5;
-  const sampled = sampleFrames(payload.frames, max);
+function withNotice(result, extra) {
+  const notice = [extra, result.notice].filter(Boolean).join(" \xB7 ") || void 0;
+  return { ...result, notice };
+}
+async function handleMultiFrame(payload, providers, rule, vaultOps, searchFolder, assetFolder, frameSelector) {
+  var _a3, _b, _c, _d, _e2, _f;
+  const count = payload.frames_select && payload.frames_select > 0 ? payload.frames_select : (_a3 = rule.maxFrames) != null ? _a3 : 5;
+  let sampled;
+  let aiNotice;
+  if (count >= payload.frames.length) {
+    sampled = payload.frames;
+  } else if (frameSelector == null ? void 0 : frameSelector.apiKey) {
+    try {
+      const idx = await selectFrames(payload.frames.map((f2) => Buffer.from(f2, "base64")), count, payload.mode, frameSelector);
+      sampled = idx.map((i2) => payload.frames[i2]);
+    } catch (e2) {
+      sampled = sampleFrames(payload.frames, count);
+      aiNotice = `\u26A0\uFE0F AI \u6311\u5E27\u5931\u8D25\uFF08${String((_b = e2 == null ? void 0 : e2.message) != null ? _b : e2).slice(0, 50)}\uFF09\uFF0C\u672C\u6B21\u6539\u7528\u5747\u5300\u53D6\u5E27`;
+    }
+  } else {
+    sampled = sampleFrames(payload.frames, count);
+  }
   const stem = `${payload.mode}-${sanitize(payload.video_title)}-${Date.now()}`;
-  const videoId = extractVideoId(payload.url, payload.mode === "hook" ? payload.platform : void 0);
-  const existing = videoId && searchFolder ? await findNoteByVideoId(videoId, searchFolder, vaultOps) : null;
+  const platform = detectPlatform(payload.url);
+  const videoId = videoKey(payload.url, platform);
+  const meta = {
+    platform,
+    videoId,
+    videoUrl: payload.url,
+    title: payload.video_title,
+    channel: payload.mode === "hook" ? payload.channel : void 0
+  };
   if (rule.processingMode === "manual") {
     const framesDir = rule.framesFolder || rule.outputFolder;
     await vaultOps.ensureFolder(framesDir);
@@ -17683,17 +17878,21 @@ async function handleMultiFrame(payload, providers, rule, vaultOps, searchFolder
       frameNames.push(name);
     }
     const sopContent2 = readSopSafely(rule.sopPath, vaultOps);
-    if (existing) {
-      const dimension = payload.mode === "hook" ? "\u5185\u5BB9" : "\u52A8\u6548";
-      const updated = addDimension(existing.content, dimension) + buildAppendSection(payload, frameNames, sopContent2);
-      await vaultOps.modify(existing.path, updated);
-      return existing.path;
+    let section2;
+    if (payload.mode === "hook") {
+      section2 = hookSection(
+        { url: payload.url, platform, endSeconds: (_d = (_c = payload.time_range) == null ? void 0 : _c.end) != null ? _d : 15, frameNames, transcript: payload.transcript, aiResult: void 0 },
+        sopContent2
+      );
+    } else {
+      section2 = keyframeSection(
+        { url: payload.url, platform, start: payload.time_range.start, end: payload.time_range.end, frameNames, aiResult: void 0 },
+        sopContent2
+      );
     }
-    await vaultOps.ensureFolder(rule.outputFolder);
-    const template = buildManualTemplate(payload, frameNames, sopContent2);
-    const notePath2 = `${rule.outputFolder}/${stem}.md`;
-    await vaultOps.create(notePath2, template);
-    return notePath2;
+    const result2 = await upsertVideoNote(meta, section2, vaultOps, searchFolder);
+    await ensureCover(meta.videoId, payload.cover_url, vaultOps, assetFolder);
+    return withNotice(result2, aiNotice);
   }
   if (!rule.sopPath || !rule.outputFolder || !rule.providerId) {
     throw new Error(`Clip rule for "${payload.mode}" is not configured`);
@@ -17702,35 +17901,38 @@ async function handleMultiFrame(payload, providers, rule, vaultOps, searchFolder
   if (!provider) throw new Error(`Provider "${rule.providerId}" not found`);
   if (!isMultiFrameProvider(provider)) {
     throw new Error(
-      `Provider "${provider.name}" does not support multi-frame analysis. Use an API provider (Anthropic, OpenAI-compatible, or Gemini).`
+      `Provider "${payload.mode === "hook" ? "hook" : rule.providerId}" does not support multi-frame analysis. Use an API provider (Anthropic, OpenAI-compatible, or Gemini).`
     );
   }
   const frames = sampled.map((f2) => Buffer.from(f2, "base64"));
   const sopContent = vaultOps.readFileSync(rule.sopPath);
-  const meta = {
+  const metaReq = {
     video_title: payload.video_title,
     url: payload.url,
     captured_at: payload.captured_at,
     ...payload.mode === "hook" ? { channel: payload.channel, platform: payload.platform } : { time_range: payload.time_range }
   };
   const transcript = payload.mode === "hook" ? payload.transcript : void 0;
-  const result = await provider.analyzeMultiFrame({ frames, transcript, sopContent, meta });
+  const result = await provider.analyzeMultiFrame({ frames, transcript, sopContent, meta: metaReq });
   const aiResult = postProcessMarkdown(result);
-  if (existing) {
-    const dimension = payload.mode === "hook" ? "\u5185\u5BB9" : "\u52A8\u6548";
-    const updated = addDimension(existing.content, dimension) + buildAppendSection(payload, [], void 0, aiResult);
-    await vaultOps.modify(existing.path, updated);
-    return existing.path;
+  let section;
+  if (payload.mode === "hook") {
+    section = hookSection(
+      { url: payload.url, platform: payload.platform, endSeconds: (_f = (_e2 = payload.time_range) == null ? void 0 : _e2.end) != null ? _f : 15, frameNames: [], transcript: payload.transcript, aiResult },
+      sopContent
+    );
+  } else {
+    section = keyframeSection(
+      { url: payload.url, platform: "youtube", start: payload.time_range.start, end: payload.time_range.end, frameNames: [], aiResult },
+      sopContent
+    );
   }
-  await vaultOps.ensureFolder(rule.outputFolder);
-  const notePath = `${rule.outputFolder}/${stem}.md`;
-  await vaultOps.create(notePath, aiResult);
-  return notePath;
+  return upsertVideoNote(meta, section, vaultOps, searchFolder);
 }
 
 // src/startup-check.ts
 var fs4 = __toESM(require("fs"));
-var import_obsidian2 = require("obsidian");
+var import_obsidian3 = require("obsidian");
 function runStartupChecks(settings) {
   const problems = [];
   for (const prov of settings.providers) {
@@ -17757,13 +17959,13 @@ function runStartupChecks(settings) {
     if (!settings.providers.find((p2) => p2.id === rule.providerId)) problems.push(`Rule "${rule.id}": assigned provider not found.`);
   }
   for (const p2 of problems) {
-    new import_obsidian2.Notice(`Vault Autopilot: ${p2}`, 1e4);
+    new import_obsidian3.Notice(`Vault Autopilot: ${p2}`, 1e4);
   }
   return problems;
 }
 
 // src/main.ts
-var VaultAutopilotPlugin = class extends import_obsidian3.Plugin {
+var VaultAutopilotPlugin = class extends import_obsidian4.Plugin {
   constructor() {
     super(...arguments);
     this.settings = DEFAULT_SETTINGS;
@@ -17786,7 +17988,7 @@ var VaultAutopilotPlugin = class extends import_obsidian3.Plugin {
     this.server = null;
   }
   async loadSettings() {
-    var _a3, _b, _c, _d, _e2, _f, _g, _h, _i, _j, _k;
+    var _a3, _b, _c, _d, _e2, _f, _g, _h, _i, _j, _k, _l;
     const loaded = await this.loadData();
     this.settings = {
       ...DEFAULT_SETTINGS,
@@ -17799,7 +18001,8 @@ var VaultAutopilotPlugin = class extends import_obsidian3.Plugin {
         keyframe: { ...DEFAULT_SETTINGS.clipRules.keyframe, ...(_i = (_h = loaded == null ? void 0 : loaded.clipRules) == null ? void 0 : _h.keyframe) != null ? _i : {} }
       },
       rules: (_j = loaded == null ? void 0 : loaded.rules) != null ? _j : DEFAULT_SETTINGS.rules,
-      providers: (_k = loaded == null ? void 0 : loaded.providers) != null ? _k : DEFAULT_SETTINGS.providers
+      providers: (_k = loaded == null ? void 0 : loaded.providers) != null ? _k : DEFAULT_SETTINGS.providers,
+      frameSelector: { ...DEFAULT_SETTINGS.frameSelector, ...(_l = loaded == null ? void 0 : loaded.frameSelector) != null ? _l : {} }
     };
   }
   async saveSettings() {
@@ -17831,13 +18034,13 @@ var VaultAutopilotPlugin = class extends import_obsidian3.Plugin {
   registerVaultWatcher() {
     this.registerEvent(
       this.app.vault.on("create", (file) => {
-        if (!(file instanceof import_obsidian3.TFile)) return;
+        if (!(file instanceof import_obsidian4.TFile)) return;
         if (!isSupportedFileType(file.name)) return;
         const rule = this.findMatchingRule(file.path);
         if (!rule) return;
         this.handleNewFile(file, rule).catch((err) => {
           const msg = `Failed to process "${file.name}": ${err.message}`;
-          new import_obsidian3.Notice(`Vault Autopilot: ${msg}`, 1e4);
+          new import_obsidian4.Notice(`Vault Autopilot: ${msg}`, 1e4);
           this.appendError(msg);
         });
       })
@@ -17863,7 +18066,7 @@ var VaultAutopilotPlugin = class extends import_obsidian3.Plugin {
   async readMeta(filePath) {
     const metaPath = filePath.replace(/\.[^.]+$/, ".meta.json");
     const metaFile = this.app.vault.getAbstractFileByPath(metaPath);
-    if (!(metaFile instanceof import_obsidian3.TFile)) return {};
+    if (!(metaFile instanceof import_obsidian4.TFile)) return {};
     try {
       return JSON.parse(await this.app.vault.read(metaFile));
     } catch (e2) {
@@ -17885,42 +18088,44 @@ var VaultAutopilotPlugin = class extends import_obsidian3.Plugin {
     const vaultOps = {
       ensureFolder: (p2) => this.ensureFolder(p2),
       createBinary: async (p2, data) => {
-        await this.app.vault.createBinary(p2, data);
+        const existing = this.app.vault.getAbstractFileByPath(p2);
+        if (existing instanceof import_obsidian4.TFile) await this.app.vault.modifyBinary(existing, data);
+        else await this.app.vault.createBinary(p2, data);
       },
       create: async (p2, content) => {
         await this.app.vault.create(p2, content);
       },
       readFileSync: (p2) => fs5.readFileSync(p2, "utf8"),
       downloadUrl: async (url) => {
-        const resp = await (0, import_obsidian3.requestUrl)({ url, method: "GET" });
+        const resp = await (0, import_obsidian4.requestUrl)({ url, method: "GET" });
         return resp.arrayBuffer;
       },
+      fileExists: (p2) => this.app.vault.getAbstractFileByPath(p2) != null,
       listMarkdownFiles: (folderPath) => {
         return this.app.vault.getFiles().filter((f2) => f2.path.startsWith(folderPath + "/") && f2.extension === "md").map((f2) => f2.path);
       },
       read: async (filePath) => {
         const file = this.app.vault.getAbstractFileByPath(filePath);
-        if (!(file instanceof import_obsidian3.TFile)) throw new Error(`File not found: ${filePath}`);
+        if (!(file instanceof import_obsidian4.TFile)) throw new Error(`File not found: ${filePath}`);
         return this.app.vault.read(file);
       },
       modify: async (filePath, content) => {
         const file = this.app.vault.getAbstractFileByPath(filePath);
-        if (!(file instanceof import_obsidian3.TFile)) throw new Error(`File not found: ${filePath}`);
+        if (!(file instanceof import_obsidian4.TFile)) throw new Error(`File not found: ${filePath}`);
         await this.app.vault.modify(file, content);
       }
     };
     this.server = createServer2(
       port,
       async (payload) => {
-        const notePath = await routeClip(payload, this.providers, this.settings.clipRules, this.settings.rules, vaultOps);
-        if (!notePath) return void 0;
-        const vault = encodeURIComponent(this.app.vault.getName());
-        return `obsidian://open?vault=${vault}&file=${encodeURIComponent(notePath)}`;
+        const { notePath, notice } = await routeClip(payload, this.providers, this.settings.clipRules, this.settings.rules, vaultOps, this.settings.frameSelector);
+        const obsidianUrl = notePath ? `obsidian://open?vault=${encodeURIComponent(this.app.vault.getName())}&file=${encodeURIComponent(notePath)}` : void 0;
+        return { obsidianUrl, notice };
       }
     );
     this.server.on("error", (err) => {
       if (err.code === "EADDRINUSE") {
-        new import_obsidian3.Notice(`Vault Autopilot: Port ${port} is already in use. Close the other process or change the port in settings.`, 1e4);
+        new import_obsidian4.Notice(`Vault Autopilot: Port ${port} is already in use. Close the other process or change the port in settings.`, 1e4);
       }
     });
   }
@@ -17930,7 +18135,7 @@ var VaultAutopilotPlugin = class extends import_obsidian3.Plugin {
     const line = `- ${timestamp}: ${message}
 `;
     const existing = this.app.vault.getAbstractFileByPath(logPath);
-    if (existing instanceof import_obsidian3.TFile) {
+    if (existing instanceof import_obsidian4.TFile) {
       const content = await this.app.vault.read(existing);
       await this.app.vault.modify(existing, content + line);
     } else {
