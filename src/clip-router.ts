@@ -1,7 +1,6 @@
 import { ClipPayload, HookPayload, KeyframePayload, LegacyClipPayload, ScreenshotPayload, ThumbnailPayload } from './server';
-import { AIProvider, ClipRule, isMultiFrameProvider, MultiFrameRequest, PluginSettings, ScreenshotClipRule, ThumbnailClipRule, WatchRule, FrameSelectorSettings } from './types';
+import { AIProvider, ClipRule, isMultiFrameProvider, MultiFrameRequest, PluginSettings, ScreenshotClipRule, ThumbnailClipRule, WatchRule } from './types';
 import { postProcessMarkdown, sanitize, buildVideoEmbed, extractVideoId, detectPlatform, videoKey } from './util';
-import { selectFrames } from './frame-select';
 import { buildAnchor, mergeSection, coverSection, hookSection, keyframeSection, screenshotSection, VideoNoteMeta, NewSection } from './video-note';
 
 export interface VaultOps {
@@ -22,7 +21,6 @@ export async function routeClip(
   clipRules: PluginSettings['clipRules'],
   watchRules: WatchRule[],
   vaultOps: VaultOps,
-  frameSelector?: FrameSelectorSettings,
 ): Promise<{ notePath?: string; notice?: string }> {
   if (isLegacy(payload)) {
     await handleLegacyScreenshot(payload, watchRules, vaultOps);
@@ -33,8 +31,8 @@ export async function routeClip(
     const normalized = normalizeScreenshot(payload);
     return handleScreenshot(normalized, providers, clipRules.screenshot, vaultOps, clipRules.thumbnail.outputFolder, clipRules.thumbnail.thumbnailFolder);
   }
-  if (payload.mode === 'hook') return handleMultiFrame(payload, providers, clipRules.hook, vaultOps, clipRules.thumbnail.outputFolder, clipRules.thumbnail.thumbnailFolder, frameSelector);
-  if (payload.mode === 'keyframe') return handleMultiFrame(payload, providers, clipRules.keyframe, vaultOps, clipRules.thumbnail.outputFolder, clipRules.thumbnail.thumbnailFolder, frameSelector);
+  if (payload.mode === 'hook') return handleMultiFrame(payload, providers, clipRules.hook, vaultOps, clipRules.thumbnail.outputFolder, clipRules.thumbnail.thumbnailFolder);
+  if (payload.mode === 'keyframe') return handleMultiFrame(payload, providers, clipRules.keyframe, vaultOps, clipRules.thumbnail.outputFolder, clipRules.thumbnail.thumbnailFolder);
   throw new Error('Unknown clip mode');
 }
 
@@ -274,13 +272,6 @@ async function handleThumbnail(
   return upsertVideoNote(meta, section, vaultOps, rule.outputFolder);
 }
 
-// Combine a frame-selection notice (e.g. AI-fallback warning) with whatever
-// notice upsert produced (e.g. "section already exists").
-function withNotice(result: { notePath: string; notice?: string }, extra?: string): { notePath: string; notice?: string } {
-  const notice = [extra, result.notice].filter(Boolean).join(' · ') || undefined;
-  return { ...result, notice };
-}
-
 async function handleMultiFrame(
   payload: HookPayload | KeyframePayload,
   providers: Map<string, AIProvider>,
@@ -288,26 +279,12 @@ async function handleMultiFrame(
   vaultOps: VaultOps,
   searchFolder: string,
   assetFolder: string,
-  frameSelector?: FrameSelectorSettings,
 ): Promise<{ notePath: string; notice?: string }> {
   // ── Pick which frames to keep from the candidates the extension sent ──────────
+  // The extension already curates frames; save them as-is, or sample uniformly
+  // down to `count` when it sent more than we want to keep.
   const count = (payload.frames_select && payload.frames_select > 0) ? payload.frames_select : (rule.maxFrames ?? 5);
-  let sampled: string[];
-  let aiNotice: string | undefined;
-  if (count >= payload.frames.length) {
-    sampled = payload.frames; // already curated upstream (e.g. user picked) — save all as-is
-  } else if (frameSelector?.apiKey) {
-    try {
-      const idx = await selectFrames(payload.frames.map((f) => Buffer.from(f, 'base64')), count, payload.mode, frameSelector);
-      sampled = idx.map((i) => payload.frames[i]);
-    } catch (e) {
-      // Surface the fallback so the user knows AI selection didn't actually run.
-      sampled = sampleFrames(payload.frames, count);
-      aiNotice = `⚠️ AI 挑帧失败（${String((e as { message?: string })?.message ?? e).slice(0, 50)}），本次改用均匀取帧`;
-    }
-  } else {
-    sampled = sampleFrames(payload.frames, count);
-  }
+  const sampled = count >= payload.frames.length ? payload.frames : sampleFrames(payload.frames, count);
   const stem = `${payload.mode}-${sanitize(payload.video_title)}-${Date.now()}`;
 
   const platform = detectPlatform(payload.url);
@@ -345,7 +322,7 @@ async function handleMultiFrame(
     }
     const result = await upsertVideoNote(meta, section, vaultOps, searchFolder);
     await ensureCover(meta.videoId, payload.cover_url, vaultOps, assetFolder);
-    return withNotice(result, aiNotice);
+    return result;
   }
 
   if (!rule.sopPath || !rule.outputFolder || !rule.providerId) {

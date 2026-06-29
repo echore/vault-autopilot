@@ -16,7 +16,6 @@ export const DEFAULT_SETTINGS: PluginSettings = {
     hook: { sopPath: '', outputFolder: '', providerId: '', processingMode: 'manual', maxFrames: 5, framesFolder: 'Assets/images' },
     keyframe: { sopPath: '', outputFolder: '', providerId: '', processingMode: 'manual', maxFrames: 5, framesFolder: 'Assets/images' },
   },
-  frameSelector: { baseUrl: 'https://api.z.ai/api/paas/v4/', model: 'GLM-4.6V-Flash', apiKey: '' },
 };
 
 export class VaultAutopilotSettingTab extends PluginSettingTab {
@@ -46,29 +45,6 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
       .addText(t => t.setValue(String(this.plugin.settings.httpServer.port)).onChange(async v => {
         const n = parseInt(v, 10);
         if (n > 1024 && n < 65536) { this.plugin.settings.httpServer.port = n; await this.plugin.saveSettings(); }
-      }));
-
-    // ── AI Frame Selection ───────────────────────────────────────────────────────
-    new Setting(containerEl).setName('AI 挑帧（可选）').setHeading();
-    new Setting(containerEl)
-      .setDesc('填了 API Key 后，Hook/关键帧会让视觉模型从候选帧里挑最有动效的几张、跳过口播脸；留空则用启发式（去黑+均匀取）。');
-    new Setting(containerEl)
-      .setName('API Key')
-      .setDesc('Z.ai / 智谱 等 OpenAI 兼容平台的 key。')
-      .addText(t => { t.inputEl.type = 'password'; t.setValue(this.plugin.settings.frameSelector.apiKey).onChange(async v => {
-        this.plugin.settings.frameSelector.apiKey = v.trim(); await this.plugin.saveSettings();
-      }); });
-    new Setting(containerEl)
-      .setName('Base URL')
-      .setDesc('OpenAI 兼容端点。Z.ai 默认：https://api.z.ai/api/paas/v4/')
-      .addText(t => t.setValue(this.plugin.settings.frameSelector.baseUrl).onChange(async v => {
-        this.plugin.settings.frameSelector.baseUrl = v.trim(); await this.plugin.saveSettings();
-      }));
-    new Setting(containerEl)
-      .setName('Model')
-      .setDesc('视觉模型名，默认 GLM-4.6V-Flash。')
-      .addText(t => t.setValue(this.plugin.settings.frameSelector.model).onChange(async v => {
-        this.plugin.settings.frameSelector.model = v.trim(); await this.plugin.saveSettings();
       }));
 
     // ── Providers ──────────────────────────────────────────────────────────────

@@ -50,7 +50,6 @@ export default class VaultAutopilotPlugin extends Plugin {
       },
       rules: loaded?.rules ?? DEFAULT_SETTINGS.rules,
       providers: loaded?.providers ?? DEFAULT_SETTINGS.providers,
-      frameSelector: { ...DEFAULT_SETTINGS.frameSelector, ...(loaded?.frameSelector ?? {}) },
     };
   }
 
@@ -181,7 +180,7 @@ export default class VaultAutopilotPlugin extends Plugin {
     this.server = createServer(
       port,
       async (payload) => {
-        const { notePath, notice } = await routeClip(payload, this.providers, this.settings.clipRules, this.settings.rules, vaultOps, this.settings.frameSelector);
+        const { notePath, notice } = await routeClip(payload, this.providers, this.settings.clipRules, this.settings.rules, vaultOps);
         const obsidianUrl = notePath
           ? `obsidian://open?vault=${encodeURIComponent(this.app.vault.getName())}&file=${encodeURIComponent(notePath)}`
           : undefined;

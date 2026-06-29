@@ -122,12 +122,6 @@ export interface HttpServerSettings {
   port: number;
 }
 
-export interface FrameSelectorSettings {
-  baseUrl: string;
-  model: string;
-  apiKey: string;
-}
-
 export interface PluginSettings {
   rules: WatchRule[];
   providers: ProviderConfig[];
@@ -138,5 +132,4 @@ export interface PluginSettings {
     hook: ClipRule;
     keyframe: ClipRule;
   };
-  frameSelector: FrameSelectorSettings;
 }
