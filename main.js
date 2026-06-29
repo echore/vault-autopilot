@@ -43,10 +43,10 @@ var DEFAULT_SETTINGS = {
     port: 27183
   },
   clipRules: {
-    thumbnail: { sopPath: "", outputFolder: "Content Creation/Great Videos", thumbnailFolder: "Assets/Great Videos", providerId: "", processingMode: "manual" },
-    screenshot: { sopPath: "", outputFolder: "", providerId: "", processingMode: "manual", framesFolder: "Assets/images" },
-    hook: { sopPath: "", outputFolder: "", providerId: "", processingMode: "manual", maxFrames: 5, framesFolder: "Assets/images" },
-    keyframe: { sopPath: "", outputFolder: "", providerId: "", processingMode: "manual", maxFrames: 5, framesFolder: "Assets/images" }
+    thumbnail: { sopPath: "", outputFolder: "Content Creation/Great Videos", thumbnailFolder: "Assets/Great Videos" },
+    screenshot: { sopPath: "", outputFolder: "", framesFolder: "Assets/images" },
+    hook: { sopPath: "", outputFolder: "", maxFrames: 5, framesFolder: "Assets/images" },
+    keyframe: { sopPath: "", outputFolder: "", maxFrames: 5, framesFolder: "Assets/images" }
   }
 };
 var VaultAutopilotSettingTab = class extends import_obsidian.PluginSettingTab {
