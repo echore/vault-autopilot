@@ -1,19 +1,6 @@
 import { routeClip, VaultOps } from '../src/clip-router';
-import { AIProvider, ClipRule, ScreenshotClipRule, ThumbnailClipRule, isMultiFrameProvider } from '../src/types';
+import { ClipRule, ScreenshotClipRule, ThumbnailClipRule } from '../src/types';
 import { ClipPayload } from '../src/server';
-
-function makeMultiFrameProvider(id = 'p1') {
-  return {
-    id,
-    name: 'Mock API Provider',
-    analyze: jest.fn(),
-    analyzeMultiFrame: jest.fn().mockResolvedValue('# Analysis\nContent'),
-  };
-}
-
-function makeSingleProvider(id = 'p2') {
-  return { id, name: 'Mock CLI', analyze: jest.fn() };
-}
 
 function makeVaultOps(): jest.Mocked<VaultOps> {
   return {
@@ -39,15 +26,13 @@ const screenshotClipRule: ScreenshotClipRule = {
 };
 const hookClipRule: ClipRule = {
   sopPath: '/hook-sop.md', outputFolder: 'Hooks', providerId: 'p1',
-  processingMode: 'auto', maxFrames: 5, framesFolder: 'Assets/images',
+  processingMode: 'manual', maxFrames: 5, framesFolder: 'Assets/images',
 };
 const keyframeClipRule: ClipRule = {
   sopPath: '/kf-sop.md', outputFolder: 'Keyframes', providerId: 'p1',
-  processingMode: 'auto', maxFrames: 5, framesFolder: 'Assets/images',
+  processingMode: 'manual', maxFrames: 5, framesFolder: 'Assets/images',
 };
 const clipRules = { thumbnail: thumbnailClipRule, screenshot: screenshotClipRule, hook: hookClipRule, keyframe: keyframeClipRule };
-
-// ── isMultiFrameProvider ──────────────────────────────────────────────────────
 
 // ── thumbnail ─────────────────────────────────────────────────────────────────
 
@@ -67,7 +52,7 @@ describe('routeClip — thumbnail', () => {
 
   test('manual: downloads thumbnail and creates note with correct frontmatter', async () => {
     const vaultOps = makeVaultOps();
-    await routeClip(payload, new Map(), clipRules, vaultOps);
+    await routeClip(payload, clipRules, vaultOps);
     expect(vaultOps.downloadUrl).toHaveBeenCalledWith(payload.thumbnail_url);
     expect(vaultOps.createBinary).toHaveBeenCalledWith(
       'Assets/Great Videos/abc123.webp',
@@ -86,23 +71,8 @@ describe('routeClip — thumbnail', () => {
   test('note filename omits the author segment when channel is empty', async () => {
     const vaultOps = makeVaultOps();
     const noChannel = { ...payload, channel: '' } as ClipPayload;
-    const result = await routeClip(noChannel, new Map(), clipRules, vaultOps);
+    const result = await routeClip(noChannel, clipRules, vaultOps);
     expect(result.notePath).toBe('Content Creation/Great Videos/How to Get Rich on Easy Mode.md');
-  });
-
-  test('auto: calls analyzeMultiFrame with thumbnail buffer and writes AI result', async () => {
-    const provider = makeMultiFrameProvider('p1');
-    const providers = new Map<string, AIProvider>([['p1', provider as any]]);
-    const vaultOps = makeVaultOps();
-    const autoRule: ThumbnailClipRule = { ...thumbnailClipRule, processingMode: 'auto' };
-    await routeClip(payload, providers, { ...clipRules, thumbnail: autoRule }, vaultOps);
-    expect(provider.analyzeMultiFrame).toHaveBeenCalledWith(expect.objectContaining({
-      sopContent: '# SOP\nAnalyze this.',
-      meta: expect.objectContaining({ video_title: 'How to Get Rich on Easy Mode' }),
-    }));
-    const [, noteContent] = (vaultOps.create as jest.Mock).mock.calls[0];
-    expect(noteContent).toContain('## 🖼️ 封面标题');
-    expect(noteContent).toContain('# Analysis');
   });
 
   test('non-YT/Bili platform: no youtube embed, no channel/views in frontmatter, image in cover', async () => {
@@ -119,21 +89,12 @@ describe('routeClip — thumbnail', () => {
       views: null,
       captured_at: '2026-06-27T00:00:00Z',
     };
-    await routeClip(generic, new Map(), clipRules, vaultOps);
+    await routeClip(generic, clipRules, vaultOps);
     const [, noteContent] = (vaultOps.create as jest.Mock).mock.calls[0];
     expect(noteContent).not.toContain('youtube.com/embed');
     expect(noteContent).not.toContain('channel: "');
     expect(noteContent).toContain('![[twitter-com-i-status-123.webp]]');
     expect(noteContent).toContain('## 🖼️ 封面标题');
-  });
-});
-
-describe('isMultiFrameProvider', () => {
-  test('returns true when analyzeMultiFrame method is present', () => {
-    expect(isMultiFrameProvider(makeMultiFrameProvider())).toBe(true);
-  });
-  test('returns false when analyzeMultiFrame is absent', () => {
-    expect(isMultiFrameProvider(makeSingleProvider())).toBe(false);
   });
 });
 
@@ -148,7 +109,7 @@ describe('routeClip — screenshot', () => {
       url: 'https://x.com',
       title: 'My Screenshot',
     };
-    const result = await routeClip(payload, new Map(), clipRules, vaultOps);
+    const result = await routeClip(payload, clipRules, vaultOps);
     expect(result.notePath).toMatch(/^Screenshots\/screenshot-.+\.md$/);
     expect(vaultOps.createBinary).toHaveBeenCalledTimes(2);
     expect(vaultOps.createBinary).toHaveBeenCalledWith(
@@ -165,32 +126,6 @@ describe('routeClip — screenshot', () => {
     );
   });
 
-  test('auto: saves images then calls analyzeMultiFrame', async () => {
-    const provider = makeMultiFrameProvider('p1');
-    const providers = new Map<string, AIProvider>([['p1', provider as any]]);
-    const vaultOps = makeVaultOps();
-    const autoRule: ScreenshotClipRule = { ...screenshotClipRule, processingMode: 'auto' };
-    const payload: ClipPayload = {
-      mode: 'screenshot',
-      images: [Buffer.from('pixels').toString('base64')],
-      url: 'https://x.com',
-      title: 'Auto Shot',
-    };
-    await routeClip(payload, providers, { ...clipRules, screenshot: autoRule }, vaultOps);
-    expect(vaultOps.createBinary).toHaveBeenCalledWith(
-      expect.stringContaining('Assets/images/'),
-      expect.any(ArrayBuffer),
-    );
-    expect(provider.analyzeMultiFrame).toHaveBeenCalledWith(expect.objectContaining({
-      frames: [Buffer.from('pixels')],
-      sopContent: '# SOP\nAnalyze this.',
-    }));
-    expect(vaultOps.create).toHaveBeenCalledWith(
-      expect.stringMatching(/Screenshots\/screenshot-.+\.md/),
-      expect.any(String),
-    );
-  });
-
   test('backward compat: old image field is normalized to images array', async () => {
     const vaultOps = makeVaultOps();
     const payload = {
@@ -199,118 +134,11 @@ describe('routeClip — screenshot', () => {
       url: 'https://x.com',
       title: 'Old Format',
     } as unknown as ClipPayload;
-    await routeClip(payload, new Map(), clipRules, vaultOps);
+    await routeClip(payload, clipRules, vaultOps);
     expect(vaultOps.createBinary).toHaveBeenCalledTimes(1);
     expect(vaultOps.create).toHaveBeenCalledWith(
       expect.stringMatching(/Screenshots\/screenshot-.+\.md/),
       expect.stringContaining('# Screenshot — Old Format'),
-    );
-  });
-});
-
-// ── hook ──────────────────────────────────────────────────────────────────────
-
-describe('routeClip — hook', () => {
-  test('calls analyzeMultiFrame with decoded frames and transcript, creates note in Great Videos', async () => {
-    const provider = makeMultiFrameProvider('p1');
-    const providers = new Map<string, AIProvider>([['p1', provider as any]]);
-    const vaultOps = makeVaultOps();
-    const payload: ClipPayload = {
-      mode: 'hook',
-      frames: [Buffer.from('frame1').toString('base64'), Buffer.from('frame2').toString('base64')],
-      transcript: 'Hello world',
-      video_title: 'My Hook',
-      url: 'https://yt.com',
-      captured_at: '2026-05-30T18:00:00Z',
-    };
-    const result = await routeClip(payload, providers, clipRules, vaultOps);
-    expect(provider.analyzeMultiFrame).toHaveBeenCalledWith(expect.objectContaining({
-      frames: [Buffer.from('frame1'), Buffer.from('frame2')],
-      transcript: 'Hello world',
-      sopContent: '# SOP\nAnalyze this.',
-    }));
-    // Hook now lands in the Great Videos (thumbnail outputFolder) as a merged note
-    expect(result.notePath).toMatch(/Content Creation\/Great Videos\/.+\.md/);
-    expect(vaultOps.create).toHaveBeenCalledWith(
-      expect.stringMatching(/Content Creation\/Great Videos\/.+\.md/),
-      expect.stringContaining('## 🎬 内容'),
-    );
-  });
-
-  test('throws when hook clip rule has no sopPath configured', async () => {
-    const vaultOps = makeVaultOps();
-    const emptyRules = { thumbnail: thumbnailClipRule, screenshot: screenshotClipRule, hook:{ sopPath: '', outputFolder: 'Hooks', providerId: 'p1', processingMode: 'auto' as const, maxFrames: 5, framesFolder: 'Assets/images' }, keyframe: keyframeClipRule };
-    const payload: ClipPayload = {
-      mode: 'hook', frames: [Buffer.from('f').toString('base64')],
-      video_title: 'V', url: 'https://yt.com', captured_at: '2026-05-30T18:00:00Z',
-    };
-    await expect(routeClip(payload, new Map(), emptyRules, vaultOps))
-      .rejects.toThrow('not configured');
-  });
-
-  test('throws when provider id is not found in providers map', async () => {
-    const vaultOps = makeVaultOps();
-    const payload: ClipPayload = {
-      mode: 'hook', frames: [Buffer.from('f').toString('base64')],
-      video_title: 'V', url: 'https://yt.com', captured_at: '2026-05-30T18:00:00Z',
-    };
-    // clipRules.hook.providerId is 'p1' but the map is empty
-    await expect(routeClip(payload, new Map(), clipRules, vaultOps))
-      .rejects.toThrow('not found');
-  });
-
-  test('throws when provider does not support multi-frame', async () => {
-    const singleProvider = makeSingleProvider('p1');
-    const providers = new Map<string, AIProvider>([['p1', singleProvider]]);
-    const vaultOps = makeVaultOps();
-    const payload: ClipPayload = {
-      mode: 'hook', frames: [Buffer.from('f').toString('base64')],
-      video_title: 'V', url: 'https://yt.com', captured_at: '2026-05-30T18:00:00Z',
-    };
-    await expect(routeClip(payload, providers, clipRules, vaultOps))
-      .rejects.toThrow('does not support multi-frame');
-  });
-
-  test('21 raw frames are sampled down to maxFrames before AI call', async () => {
-    const provider = makeMultiFrameProvider('p1');
-    const providers = new Map<string, AIProvider>([['p1', provider as any]]);
-    const vaultOps = makeVaultOps();
-    const frames = Array(21).fill(Buffer.from('f').toString('base64'));
-    const payload: ClipPayload = {
-      mode: 'hook', frames, video_title: 'V',
-      url: 'https://yt.com', captured_at: '2026-05-30T18:00:00Z',
-    };
-    await routeClip(payload, providers, clipRules, vaultOps);
-    const { frames: sentFrames } = (provider.analyzeMultiFrame as jest.Mock).mock.calls[0][0];
-    expect(sentFrames.length).toBeLessThanOrEqual(hookClipRule.maxFrames);
-  });
-});
-
-// ── keyframe ──────────────────────────────────────────────────────────────────
-
-describe('routeClip — keyframe', () => {
-  test('calls analyzeMultiFrame without transcript and with time_range in meta, creates note in Great Videos', async () => {
-    const provider = makeMultiFrameProvider('p1');
-    const providers = new Map<string, AIProvider>([['p1', provider as any]]);
-    const vaultOps = makeVaultOps();
-    const payload: ClipPayload = {
-      mode: 'keyframe',
-      frames: [Buffer.from('f1').toString('base64')],
-      video_title: 'My Video',
-      url: 'https://yt.com',
-      time_range: { start: 0, end: 15 },
-      captured_at: '2026-05-30T18:00:00Z',
-    };
-    const result = await routeClip(payload, providers, { thumbnail: thumbnailClipRule, screenshot: screenshotClipRule, hook:hookClipRule, keyframe: keyframeClipRule }, vaultOps);
-    expect(provider.analyzeMultiFrame).toHaveBeenCalledWith(expect.objectContaining({
-      transcript: undefined,
-      meta: expect.objectContaining({ time_range: { start: 0, end: 15 } }),
-    }));
-    // Keyframe now lands in the Great Videos (thumbnail outputFolder) as a merged note
-    expect(result.notePath).toMatch(/Content Creation\/Great Videos\/.+\.md/);
-    expect(vaultOps.create).toHaveBeenCalledWith(
-      expect.stringMatching(/Content Creation\/Great Videos\/.+\.md/),
-      expect.stringContaining('## ✨ 动效'),
     );
   });
 });
@@ -331,7 +159,7 @@ describe('routeClip — manual mode (hook)', () => {
       mode: 'hook', frames, video_title: 'Test Hook',
       url: 'https://youtube.com/watch?v=abc', captured_at: '2026-05-30T18:00:00Z',
     };
-    await routeClip(payload, new Map(), manualClipRules, vaultOps);
+    await routeClip(payload, manualClipRules, vaultOps);
     expect(vaultOps.createBinary).toHaveBeenCalledTimes(3);
     expect(vaultOps.createBinary).toHaveBeenCalledWith(
       expect.stringMatching(/Assets\/images\/hook-.+-f01\.png/),
@@ -347,7 +175,7 @@ describe('routeClip — manual mode (hook)', () => {
       video_title: 'My Hook', transcript: 'Hello world',
       url: 'https://youtube.com/watch?v=abc', captured_at: '2026-05-30T18:00:00Z',
     };
-    await routeClip(payload, new Map(), manualClipRules, vaultOps);
+    await routeClip(payload, manualClipRules, vaultOps);
     const [notePath, noteContent] = (vaultOps.create as jest.Mock).mock.calls[0];
     // Hook now goes into the Great Videos (thumbnail outputFolder) as a merged note
     expect(notePath).toMatch(/Content Creation\/Great Videos\/.+\.md/);
@@ -357,19 +185,6 @@ describe('routeClip — manual mode (hook)', () => {
     expect(noteContent).toContain('[Image #1]');
     expect(noteContent).toContain('![[');
     expect(noteContent).toContain('Hello world');
-  });
-
-  test('does not call analyzeMultiFrame in manual mode', async () => {
-    const provider = makeMultiFrameProvider('p1');
-    const providers = new Map<string, AIProvider>([['p1', provider as any]]);
-    const vaultOps = makeVaultOps();
-    const payload: ClipPayload = {
-      mode: 'hook',
-      frames: [Buffer.from('f').toString('base64')],
-      video_title: 'V', url: 'https://yt.com', captured_at: '2026-05-30T18:00:00Z',
-    };
-    await routeClip(payload, providers, manualClipRules, vaultOps);
-    expect(provider.analyzeMultiFrame).not.toHaveBeenCalled();
   });
 });
 
@@ -388,7 +203,7 @@ describe('routeClip — manual mode (keyframe)', () => {
       video_title: 'My Video', url: 'https://youtube.com/watch?v=xyz',
       time_range: { start: 30, end: 45 }, captured_at: '2026-05-30T18:00:00Z',
     };
-    await routeClip(payload, new Map(), manualClipRules, vaultOps);
+    await routeClip(payload, manualClipRules, vaultOps);
     const [notePath, noteContent] = (vaultOps.create as jest.Mock).mock.calls[0];
     // Keyframe now goes into Great Videos as a merged note
     expect(notePath).toMatch(/Content Creation\/Great Videos\/.+\.md/);
@@ -426,7 +241,7 @@ describe('routeClip — append to existing Great Videos note', () => {
       url: 'https://www.youtube.com/watch?v=abc123',
       captured_at: '2026-05-31T00:00:00Z',
     };
-    await routeClip(payload, new Map(), { ...clipRules, hook: manualHookRule }, vaultOps);
+    await routeClip(payload, { ...clipRules, hook: manualHookRule }, vaultOps);
     expect(vaultOps.modify).toHaveBeenCalledWith(
       'Content Creation/Great Videos/note.md',
       expect.stringContaining('## 🎬 内容'),
@@ -450,7 +265,7 @@ describe('routeClip — append to existing Great Videos note', () => {
       time_range: { start: 10, end: 20 },
       captured_at: '2026-05-31T00:00:00Z',
     };
-    await routeClip(payload, new Map(), { ...clipRules, keyframe: manualKeyframeRule }, vaultOps);
+    await routeClip(payload, { ...clipRules, keyframe: manualKeyframeRule }, vaultOps);
     const [, modifiedContent] = (vaultOps.modify as jest.Mock).mock.calls[0];
     expect(modifiedContent).toContain('## ✨ 动效');
     expect(modifiedContent).toContain('dimensions: [封面标题, 动效]');
@@ -468,7 +283,7 @@ describe('routeClip — append to existing Great Videos note', () => {
       url: 'https://www.youtube.com/watch?v=abc123',
       captured_at: '2026-05-31T00:00:00Z',
     };
-    const result = await routeClip(payload, new Map(), { ...clipRules, hook: manualHookRule }, vaultOps);
+    const result = await routeClip(payload, { ...clipRules, hook: manualHookRule }, vaultOps);
     expect(result.notePath).toBe('Content Creation/Great Videos/note.md');
   });
 
@@ -483,7 +298,7 @@ describe('routeClip — append to existing Great Videos note', () => {
       url: 'https://www.youtube.com/watch?v=newvid',
       captured_at: '2026-05-31T00:00:00Z',
     };
-    await routeClip(payload, new Map(), { ...clipRules, hook: manualHookRule }, vaultOps);
+    await routeClip(payload, { ...clipRules, hook: manualHookRule }, vaultOps);
     expect(vaultOps.modify).not.toHaveBeenCalled();
     expect(vaultOps.create).toHaveBeenCalledWith(
       expect.stringContaining('Content Creation/Great Videos/'),
@@ -515,8 +330,8 @@ describe('routeClip — unified video note (manual)', () => {
 
   test('hook then keyframe land in ONE note ordered 内容 before 动效', async () => {
     const { v, store } = vaultWithStore();
-    await routeClip(hookPayload, new Map(), manual, v);
-    await routeClip(kfPayload(45, 52), new Map(), manual, v);
+    await routeClip(hookPayload, manual, v);
+    await routeClip(kfPayload(45, 52), manual, v);
     const paths = Object.keys(store);
     expect(paths.length).toBe(1);
     const note = store[paths[0]];
@@ -526,8 +341,8 @@ describe('routeClip — unified video note (manual)', () => {
 
   test('re-capturing hook returns a notice and does not duplicate', async () => {
     const { v, store } = vaultWithStore();
-    await routeClip(hookPayload, new Map(), manual, v);
-    const r = await routeClip(hookPayload, new Map(), manual, v);
+    await routeClip(hookPayload, manual, v);
+    const r = await routeClip(hookPayload, manual, v);
     expect(r.notice).toContain('已存在');
     const note = store[Object.keys(store)[0]];
     expect((note.match(/## 🎬 内容/g) || []).length).toBe(1);
@@ -536,8 +351,8 @@ describe('routeClip — unified video note (manual)', () => {
   test('Xiaohongshu hook + keyframe merge into ONE note (link fallback embed)', async () => {
     const { v, store } = vaultWithStore();
     const url = 'https://www.xiaohongshu.com/explore/xhs123abc';
-    await routeClip({ mode: 'hook', frames: ['Zg=='], video_title: 'XHS', url, captured_at: '2026-06-28T00:00:00Z' }, new Map(), manual, v);
-    await routeClip({ mode: 'keyframe', frames: ['Zg=='], video_title: 'XHS', url, time_range: { start: 5, end: 9 }, captured_at: '2026-06-28T00:00:00Z' }, new Map(), manual, v);
+    await routeClip({ mode: 'hook', frames: ['Zg=='], video_title: 'XHS', url, captured_at: '2026-06-28T00:00:00Z' }, manual, v);
+    await routeClip({ mode: 'keyframe', frames: ['Zg=='], video_title: 'XHS', url, time_range: { start: 5, end: 9 }, captured_at: '2026-06-28T00:00:00Z' }, manual, v);
     expect(Object.keys(store).length).toBe(1);
     const note = store[Object.keys(store)[0]];
     expect(note).toContain('platform: xiaohongshu');
@@ -549,8 +364,8 @@ describe('routeClip — unified video note (manual)', () => {
 
   test('any platform merges by URL: Twitter hook + keyframe → one note', async () => {
     const { v, store } = vaultWithStore();
-    await routeClip({ mode: 'hook', frames: ['Zg=='], video_title: 'Tweet', url: 'https://x.com/u/status/123?s=20', captured_at: '2026-06-28T00:00:00Z' }, new Map(), manual, v);
-    await routeClip({ mode: 'keyframe', frames: ['Zg=='], video_title: 'Tweet', url: 'https://x.com/u/status/123', time_range: { start: 5, end: 9 }, captured_at: '2026-06-28T00:00:00Z' }, new Map(), manual, v);
+    await routeClip({ mode: 'hook', frames: ['Zg=='], video_title: 'Tweet', url: 'https://x.com/u/status/123?s=20', captured_at: '2026-06-28T00:00:00Z' }, manual, v);
+    await routeClip({ mode: 'keyframe', frames: ['Zg=='], video_title: 'Tweet', url: 'https://x.com/u/status/123', time_range: { start: 5, end: 9 }, captured_at: '2026-06-28T00:00:00Z' }, manual, v);
     expect(Object.keys(store).length).toBe(1);
     const note = store[Object.keys(store)[0]];
     expect(note).toContain('video_id: "https://x.com/u/status/123"');
@@ -559,45 +374,45 @@ describe('routeClip — unified video note (manual)', () => {
 
   test('hook with cover_url saves the gallery cover at <video_id>.webp', async () => {
     const { v } = vaultWithStore();
-    await routeClip({ mode: 'hook', frames: ['Zg=='], video_title: 'Bee', url: 'https://www.youtube.com/watch?v=abc123', cover_url: 'https://img.youtube.com/vi/abc123/maxresdefault.jpg', captured_at: '2026-06-28T00:00:00Z' } as ClipPayload, new Map(), manual, v);
+    await routeClip({ mode: 'hook', frames: ['Zg=='], video_title: 'Bee', url: 'https://www.youtube.com/watch?v=abc123', cover_url: 'https://img.youtube.com/vi/abc123/maxresdefault.jpg', captured_at: '2026-06-28T00:00:00Z' } as ClipPayload, manual, v);
     expect(v.createBinary).toHaveBeenCalledWith('Assets/Great Videos/abc123.webp', expect.any(ArrayBuffer));
   });
 
   test('cover is not re-downloaded when it already exists', async () => {
     const { v } = vaultWithStore();
     (v.fileExists as jest.Mock).mockReturnValue(true);
-    await routeClip({ mode: 'hook', frames: ['Zg=='], video_title: 'Bee', url: 'https://www.youtube.com/watch?v=abc123', cover_url: 'https://x/cover.jpg', captured_at: '2026-06-28T00:00:00Z' } as ClipPayload, new Map(), manual, v);
+    await routeClip({ mode: 'hook', frames: ['Zg=='], video_title: 'Bee', url: 'https://www.youtube.com/watch?v=abc123', cover_url: 'https://x/cover.jpg', captured_at: '2026-06-28T00:00:00Z' } as ClipPayload, manual, v);
     expect(v.createBinary).not.toHaveBeenCalledWith('Assets/Great Videos/abc123.webp', expect.anything());
   });
 
   test('screenshot folds into the existing video note; otherwise standalone', async () => {
     const { v, store } = vaultWithStore();
     const url = 'https://www.youtube.com/watch?v=abc123';
-    await routeClip(hookPayload, new Map(), manual, v); // creates the video note
-    await routeClip({ mode: 'screenshot', images: ['Zg=='], url, title: 'Bee' }, new Map(), manual, v);
+    await routeClip(hookPayload, manual, v); // creates the video note
+    await routeClip({ mode: 'screenshot', images: ['Zg=='], url, title: 'Bee' }, manual, v);
     expect(Object.keys(store).length).toBe(1); // merged, not a new note
     const note = store[Object.keys(store)[0]];
     expect(note).toContain('## 📸 截图');
     expect(note).toContain('dimensions: [内容, 截图]');
 
     // a screenshot on an un-studied plain webpage stays standalone
-    await routeClip({ mode: 'screenshot', images: ['Zg=='], url: 'https://example.com/random', title: 'Rand' }, new Map(), manual, v);
+    await routeClip({ mode: 'screenshot', images: ['Zg=='], url: 'https://example.com/random', title: 'Rand' }, manual, v);
     expect(Object.keys(store).length).toBe(2);
   });
 
   test('two different videos with the same author+title get distinct filenames', async () => {
     const { v, store } = vaultWithStore();
     const base = { mode: 'hook' as const, frames: ['Zg=='], video_title: 'Same Title', channel: 'Ch', captured_at: '2026-06-28T00:00:00Z' };
-    await routeClip({ ...base, url: 'https://www.youtube.com/watch?v=vid1' } as ClipPayload, new Map(), manual, v);
-    await routeClip({ ...base, url: 'https://www.youtube.com/watch?v=vid2' } as ClipPayload, new Map(), manual, v);
+    await routeClip({ ...base, url: 'https://www.youtube.com/watch?v=vid1' } as ClipPayload, manual, v);
+    await routeClip({ ...base, url: 'https://www.youtube.com/watch?v=vid2' } as ClipPayload, manual, v);
     expect(Object.keys(store).length).toBe(2); // no overwrite / no crash
   });
 
   test('screenshot FIRST on a video page anchors the note (any order)', async () => {
     const { v, store } = vaultWithStore();
     const url = 'https://www.youtube.com/watch?v=zzz999';
-    await routeClip({ mode: 'screenshot', images: ['Zg=='], url, title: 'Vid - YouTube' }, new Map(), manual, v);
-    await routeClip({ mode: 'hook', frames: ['Zg=='], video_title: 'Vid', url, captured_at: '2026-06-28T00:00:00Z' }, new Map(), manual, v);
+    await routeClip({ mode: 'screenshot', images: ['Zg=='], url, title: 'Vid - YouTube' }, manual, v);
+    await routeClip({ mode: 'hook', frames: ['Zg=='], video_title: 'Vid', url, captured_at: '2026-06-28T00:00:00Z' }, manual, v);
     expect(Object.keys(store).length).toBe(1); // screenshot anchored it, hook merged in
     const note = store[Object.keys(store)[0]];
     expect(note).toContain('## 📸 截图');

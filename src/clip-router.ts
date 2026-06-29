@@ -1,6 +1,6 @@
 import { ClipPayload, HookPayload, KeyframePayload, ScreenshotPayload, ThumbnailPayload } from './server';
-import { AIProvider, ClipRule, isMultiFrameProvider, MultiFrameRequest, PluginSettings, ScreenshotClipRule, ThumbnailClipRule } from './types';
-import { postProcessMarkdown, sanitize, buildVideoEmbed, extractVideoId, detectPlatform, videoKey } from './util';
+import { ClipRule, PluginSettings, ScreenshotClipRule, ThumbnailClipRule } from './types';
+import { sanitize, buildVideoEmbed, extractVideoId, detectPlatform, videoKey } from './util';
 import { buildAnchor, mergeSection, coverSection, hookSection, keyframeSection, screenshotSection, VideoNoteMeta, NewSection } from './video-note';
 
 export interface VaultOps {
@@ -17,17 +17,16 @@ export interface VaultOps {
 
 export async function routeClip(
   payload: ClipPayload,
-  providers: Map<string, AIProvider>,
   clipRules: PluginSettings['clipRules'],
   vaultOps: VaultOps,
 ): Promise<{ notePath?: string; notice?: string }> {
-  if (payload.mode === 'thumbnail') return handleThumbnail(payload, providers, clipRules.thumbnail, vaultOps);
+  if (payload.mode === 'thumbnail') return handleThumbnail(payload, clipRules.thumbnail, vaultOps);
   if (payload.mode === 'screenshot') {
     const normalized = normalizeScreenshot(payload);
-    return handleScreenshot(normalized, providers, clipRules.screenshot, vaultOps, clipRules.thumbnail.outputFolder, clipRules.thumbnail.thumbnailFolder);
+    return handleScreenshot(normalized, clipRules.screenshot, vaultOps, clipRules.thumbnail.outputFolder, clipRules.thumbnail.thumbnailFolder);
   }
-  if (payload.mode === 'hook') return handleMultiFrame(payload, providers, clipRules.hook, vaultOps, clipRules.thumbnail.outputFolder, clipRules.thumbnail.thumbnailFolder);
-  if (payload.mode === 'keyframe') return handleMultiFrame(payload, providers, clipRules.keyframe, vaultOps, clipRules.thumbnail.outputFolder, clipRules.thumbnail.thumbnailFolder);
+  if (payload.mode === 'hook') return handleMultiFrame(payload, clipRules.hook, vaultOps, clipRules.thumbnail.outputFolder, clipRules.thumbnail.thumbnailFolder);
+  if (payload.mode === 'keyframe') return handleMultiFrame(payload, clipRules.keyframe, vaultOps, clipRules.thumbnail.outputFolder, clipRules.thumbnail.thumbnailFolder);
   throw new Error('Unknown clip mode');
 }
 
@@ -115,7 +114,6 @@ function buildScreenshotTemplate(payload: ScreenshotPayload, imageNames: string[
 
 async function handleScreenshot(
   payload: ScreenshotPayload,
-  providers: Map<string, AIProvider>,
   rule: ScreenshotClipRule,
   vaultOps: VaultOps,
   searchFolder: string,
@@ -146,43 +144,14 @@ async function handleScreenshot(
   const intoVideoNote = !!existing || extractVideoId(payload.url, undefined) != null;
   const meta: VideoNoteMeta = { platform: detectPlatform(payload.url), videoId: key, videoUrl: payload.url, title: payload.title };
 
-  if (rule.processingMode === 'manual') {
-    const sopContent = readSopSafely(rule.sopPath, vaultOps);
-    if (intoVideoNote) {
-      const r = await upsertVideoNote(meta, screenshotSection(imageNames, sopContent), vaultOps, searchFolder);
-      await ensureCover(meta.videoId, payload.cover_url, vaultOps, assetFolder);
-      return r;
-    }
-    const template = buildScreenshotTemplate(payload, imageNames, sopContent);
-    await vaultOps.create(notePath, template);
-    return { notePath };
-  }
-
-  if (!rule.sopPath || !rule.outputFolder || !rule.providerId) {
-    throw new Error('Screenshot clip rule is not configured');
-  }
-  const provider = providers.get(rule.providerId);
-  if (!provider) throw new Error(`Provider "${rule.providerId}" not found`);
-  if (!isMultiFrameProvider(provider)) {
-    throw new Error(
-      `Provider "${provider.name}" does not support multi-frame analysis. ` +
-      `Use an API provider (Anthropic, OpenAI-compatible, or Gemini).`,
-    );
-  }
-  const frames = payload.images.map((img) => Buffer.from(img, 'base64'));
-  const sopContent = vaultOps.readFileSync(rule.sopPath);
-  const result = await provider.analyzeMultiFrame({
-    frames,
-    sopContent,
-    meta: { url: payload.url },
-  });
-  const markdown = postProcessMarkdown(result);
+  const sopContent = readSopSafely(rule.sopPath, vaultOps);
   if (intoVideoNote) {
-    const r = await upsertVideoNote(meta, screenshotSection(imageNames, undefined, markdown), vaultOps, searchFolder);
+    const r = await upsertVideoNote(meta, screenshotSection(imageNames, sopContent), vaultOps, searchFolder);
     await ensureCover(meta.videoId, payload.cover_url, vaultOps, assetFolder);
     return r;
   }
-  await vaultOps.create(notePath, markdown);
+  const template = buildScreenshotTemplate(payload, imageNames, sopContent);
+  await vaultOps.create(notePath, template);
   return { notePath };
 }
 
@@ -207,7 +176,6 @@ async function findNoteByVideoId(
 
 async function handleThumbnail(
   payload: ThumbnailPayload,
-  providers: Map<string, AIProvider>,
   rule: ThumbnailClipRule,
   vaultOps: VaultOps,
 ): Promise<{ notePath: string; notice?: string }> {
@@ -223,19 +191,8 @@ async function handleThumbnail(
   const imgData = await vaultOps.downloadUrl(payload.thumbnail_url);
   await vaultOps.createBinary(thumbnailPath, imgData);
 
-  const sopContent = rule.processingMode === 'manual'
-    ? readSopSafely(rule.sopPath, vaultOps)
-    : undefined;
-  let aiResult: string | undefined;
-  if (rule.processingMode !== 'manual') {
-    if (!rule.sopPath || !rule.providerId) throw new Error('Thumbnail clip rule is not fully configured (sopPath / providerId missing)');
-    const provider = providers.get(rule.providerId);
-    if (!provider) throw new Error(`Provider "${rule.providerId}" not found`);
-    if (!isMultiFrameProvider(provider)) throw new Error(`Provider "${provider.name}" does not support image analysis. Use an API provider.`);
-    const sop = vaultOps.readFileSync(rule.sopPath);
-    aiResult = postProcessMarkdown(await provider.analyzeMultiFrame({ frames: [Buffer.from(imgData)], sopContent: sop, meta: { video_title: payload.title, channel: payload.channel, url: payload.video_url } }));
-  }
-  const section = coverSection(thumbnailFile, aiResult ?? sopContent);
+  const sopContent = readSopSafely(rule.sopPath, vaultOps);
+  const section = coverSection(thumbnailFile, sopContent);
   const meta: VideoNoteMeta = {
     platform: payload.platform,
     videoId: videoKey(payload.video_url, payload.platform),
@@ -248,7 +205,6 @@ async function handleThumbnail(
 
 async function handleMultiFrame(
   payload: HookPayload | KeyframePayload,
-  providers: Map<string, AIProvider>,
   rule: ClipRule,
   vaultOps: VaultOps,
   searchFolder: string,
@@ -271,70 +227,29 @@ async function handleMultiFrame(
     channel: payload.mode === 'hook' ? payload.channel : undefined,
   };
 
-  if (rule.processingMode === 'manual') {
-    const framesDir = rule.framesFolder || rule.outputFolder;
-    await vaultOps.ensureFolder(framesDir);
-    const frameNames: string[] = [];
-    for (let i = 0; i < sampled.length; i++) {
-      const name = `${stem}-f${String(i + 1).padStart(2, '0')}.png`;
-      const bytes = Buffer.from(sampled[i], 'base64');
-      await vaultOps.createBinary(`${framesDir}/${name}`, bytes.buffer as ArrayBuffer);
-      frameNames.push(name);
-    }
-    const sopContent = readSopSafely(rule.sopPath, vaultOps);
-    let section: NewSection;
-    if (payload.mode === 'hook') {
-      section = hookSection(
-        { url: payload.url, platform, endSeconds: payload.time_range?.end ?? 15, frameNames, transcript: payload.transcript, aiResult: undefined },
-        sopContent,
-      );
-    } else {
-      section = keyframeSection(
-        { url: payload.url, platform, start: payload.time_range.start, end: payload.time_range.end, frameNames, aiResult: undefined },
-        sopContent,
-      );
-    }
-    const result = await upsertVideoNote(meta, section, vaultOps, searchFolder);
-    await ensureCover(meta.videoId, payload.cover_url, vaultOps, assetFolder);
-    return result;
+  const framesDir = rule.framesFolder || rule.outputFolder;
+  await vaultOps.ensureFolder(framesDir);
+  const frameNames: string[] = [];
+  for (let i = 0; i < sampled.length; i++) {
+    const name = `${stem}-f${String(i + 1).padStart(2, '0')}.png`;
+    const bytes = Buffer.from(sampled[i], 'base64');
+    await vaultOps.createBinary(`${framesDir}/${name}`, bytes.buffer as ArrayBuffer);
+    frameNames.push(name);
   }
-
-  if (!rule.sopPath || !rule.outputFolder || !rule.providerId) {
-    throw new Error(`Clip rule for "${payload.mode}" is not configured`);
-  }
-  const provider = providers.get(rule.providerId);
-  if (!provider) throw new Error(`Provider "${rule.providerId}" not found`);
-  if (!isMultiFrameProvider(provider)) {
-    throw new Error(
-      `Provider "${payload.mode === 'hook' ? 'hook' : rule.providerId}" does not support multi-frame analysis. ` +
-      `Use an API provider (Anthropic, OpenAI-compatible, or Gemini).`,
-    );
-  }
-  const frames = sampled.map((f) => Buffer.from(f, 'base64'));
-  const sopContent = vaultOps.readFileSync(rule.sopPath);
-  const metaReq: MultiFrameRequest['meta'] = {
-    video_title: payload.video_title,
-    url: payload.url,
-    captured_at: payload.captured_at,
-    ...(payload.mode === 'hook'
-      ? { channel: payload.channel, platform: payload.platform }
-      : { time_range: payload.time_range }),
-  };
-  const transcript = payload.mode === 'hook' ? payload.transcript : undefined;
-  const result = await provider.analyzeMultiFrame({ frames, transcript, sopContent, meta: metaReq });
-  const aiResult = postProcessMarkdown(result);
-
+  const sopContent = readSopSafely(rule.sopPath, vaultOps);
   let section: NewSection;
   if (payload.mode === 'hook') {
     section = hookSection(
-      { url: payload.url, platform: payload.platform, endSeconds: payload.time_range?.end ?? 15, frameNames: [], transcript: payload.transcript, aiResult },
+      { url: payload.url, platform, endSeconds: payload.time_range?.end ?? 15, frameNames, transcript: payload.transcript, aiResult: undefined },
       sopContent,
     );
   } else {
     section = keyframeSection(
-      { url: payload.url, platform: 'youtube', start: payload.time_range.start, end: payload.time_range.end, frameNames: [], aiResult },
+      { url: payload.url, platform, start: payload.time_range.start, end: payload.time_range.end, frameNames, aiResult: undefined },
       sopContent,
     );
   }
-  return upsertVideoNote(meta, section, vaultOps, searchFolder);
+  const result = await upsertVideoNote(meta, section, vaultOps, searchFolder);
+  await ensureCover(meta.videoId, payload.cover_url, vaultOps, assetFolder);
+  return result;
 }

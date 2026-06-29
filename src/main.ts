@@ -2,26 +2,17 @@ import * as http from 'http';
 import * as fs from 'fs';
 import { Notice, Plugin, TFile, requestUrl } from 'obsidian';
 import { DEFAULT_SETTINGS, VaultAutopilotSettingTab } from './settings';
-import { PluginSettings, AIProvider, ProviderConfig } from './types';
-import { createCLIProvider } from './providers/cli-base';
-import { createOpenAICompatProvider } from './providers/openai-compat';
-import { createAnthropicProvider } from './providers/anthropic';
-import { createGeminiAPIProvider } from './providers/gemini-api';
-import { detectBinaryPath } from './path-detector';
+import { PluginSettings } from './types';
 import { createServer, ClipPayload } from './server';
 import { routeClip, VaultOps } from './clip-router';
-import { runStartupChecks } from './startup-check';
 
 export default class VaultAutopilotPlugin extends Plugin {
   settings: PluginSettings = DEFAULT_SETTINGS;
   private server: http.Server | null = null;
-  private providers = new Map<string, AIProvider>();
 
   async onload(): Promise<void> {
     await this.loadSettings();
     this.addSettingTab(new VaultAutopilotSettingTab(this.app, this));
-    this.rebuildProviders();
-    runStartupChecks(this.settings);
     if (this.settings.httpServer.enabled) this.startServer();
   }
 
@@ -42,37 +33,17 @@ export default class VaultAutopilotPlugin extends Plugin {
         hook: { ...DEFAULT_SETTINGS.clipRules.hook, ...(loaded?.clipRules?.hook ?? {}) },
         keyframe: { ...DEFAULT_SETTINGS.clipRules.keyframe, ...(loaded?.clipRules?.keyframe ?? {}) },
       },
-      providers: loaded?.providers ?? DEFAULT_SETTINGS.providers,
     };
   }
 
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
-    this.rebuildProviders();
   }
 
   restartServer(): void {
     this.server?.close();
     this.server = null;
     if (this.settings.httpServer.enabled) this.startServer();
-  }
-
-  private rebuildProviders(): void {
-    this.providers.clear();
-    for (const config of this.settings.providers) {
-      this.providers.set(config.id, this.buildProvider(config));
-    }
-  }
-
-  private buildProvider(config: ProviderConfig): AIProvider {
-    if (config.type === 'cli') {
-      const resolvedBin = detectBinaryPath(config.cliType, config.bin);
-      return createCLIProvider({ ...config, bin: resolvedBin });
-    }
-    if (config.type === 'openai-compat') return createOpenAICompatProvider(config);
-    if (config.type === 'anthropic') return createAnthropicProvider(config);
-    if (config.type === 'gemini-api') return createGeminiAPIProvider(config);
-    throw new Error(`Unknown provider type: ${(config as any).type}`);
   }
 
   private async ensureFolder(folderPath: string): Promise<void> {
@@ -122,7 +93,7 @@ export default class VaultAutopilotPlugin extends Plugin {
     this.server = createServer(
       port,
       async (payload) => {
-        const { notePath, notice } = await routeClip(payload, this.providers, this.settings.clipRules, vaultOps);
+        const { notePath, notice } = await routeClip(payload, this.settings.clipRules, vaultOps);
         const obsidianUrl = notePath
           ? `obsidian://open?vault=${encodeURIComponent(this.app.vault.getName())}&file=${encodeURIComponent(notePath)}`
           : undefined;

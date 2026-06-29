@@ -1,10 +1,8 @@
-import * as crypto from 'crypto';
-import { App, Notice, PluginSettingTab, Setting } from 'obsidian';
+import { App, PluginSettingTab, Setting } from 'obsidian';
 import type VaultAutopilotPlugin from './main';
-import { PluginSettings, ProviderConfig, ScreenshotClipRule, ThumbnailClipRule } from './types';
+import { PluginSettings, ScreenshotClipRule, ThumbnailClipRule } from './types';
 
 export const DEFAULT_SETTINGS: PluginSettings = {
-  providers: [],
   httpServer: {
     enabled: true,
     port: 27183,
@@ -46,44 +44,6 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
         if (n > 1024 && n < 65536) { this.plugin.settings.httpServer.port = n; await this.plugin.saveSettings(); }
       }));
 
-    // ── Providers ──────────────────────────────────────────────────────────────
-    new Setting(containerEl).setName('AI Providers').setHeading();
-    new Setting(containerEl)
-      .setName('Add provider')
-      .setDesc('Configure at least one provider before creating rules.')
-      .addDropdown(d => d
-        .addOption('cli-claude', 'CLI: claude (Claude Code subscription)')
-        .addOption('cli-gemini', 'CLI: gemini (Google account, free)')
-        .addOption('cli-codex', 'CLI: codex (ChatGPT Plus subscription)')
-        .addOption('openai-compat', 'API: OpenAI-compatible (OpenRouter / OpenAI / Grok / DeepSeek / Ollama)')
-        .addOption('anthropic', 'API: Anthropic (Claude API)')
-        .addOption('gemini-api', 'API: Google Gemini API')
-      )
-      .addButton(b => b.setButtonText('Add').onClick(async () => {
-        const sel = containerEl.querySelector('select') as HTMLSelectElement;
-        if (!sel) return;
-        const type = sel.value;
-        const id = crypto.randomBytes(4).toString('hex');
-        let newProvider: ProviderConfig;
-        if (type === 'openai-compat') {
-          newProvider = { id, type: 'openai-compat', label: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', apiKey: '', model: '' };
-        } else if (type === 'anthropic') {
-          newProvider = { id, type: 'anthropic', apiKey: '', model: 'claude-sonnet-4-6' };
-        } else if (type === 'gemini-api') {
-          newProvider = { id, type: 'gemini-api', apiKey: '', model: 'gemini-1.5-flash' };
-        } else {
-          const cliType = type.replace('cli-', '') as 'claude' | 'gemini' | 'codex';
-          newProvider = { id, type: 'cli', cliType, bin: '' };
-        }
-        this.plugin.settings.providers.push(newProvider);
-        await this.plugin.saveSettings();
-        this.display();
-      }));
-
-    for (const [i, prov] of this.plugin.settings.providers.entries()) {
-      this.renderProvider(containerEl, prov, i);
-    }
-
     // ── Clip Rules ──────────────────────────────────────────────────────────────
     new Setting(containerEl).setName('Clip Rules').setHeading();
 
@@ -97,18 +57,6 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
       const label = mode === 'hook' ? 'Hook Analysis' : 'Keyframe Analysis';
       new Setting(containerEl).setName(label).setHeading();
       new Setting(containerEl)
-        .setName('Processing mode')
-        .setDesc('Auto: vault-autopilot calls AI and writes the note. Manual: saves frames + template, you trigger analysis in Obsidian.')
-        .addDropdown(d => d
-          .addOption('manual', 'Manual (save frames + template)')
-          .addOption('auto', 'Auto (call AI provider)')
-          .setValue(this.plugin.settings.clipRules[mode].processingMode)
-          .onChange(async v => {
-            this.plugin.settings.clipRules[mode].processingMode = v as 'auto' | 'manual';
-            await this.plugin.saveSettings();
-            this.display();
-          }));
-      new Setting(containerEl)
         .setName('Max frames to save')
         .setDesc('How many frames to sample and save (1–20). Default: 5.')
         .addText(t => t
@@ -120,17 +68,15 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
               await this.plugin.saveSettings();
             }
           }));
-      if (this.plugin.settings.clipRules[mode].processingMode === 'manual') {
-        new Setting(containerEl)
-          .setName('Frames folder')
-          .setDesc('Vault-relative path where frame images are saved. Default: Assets/images')
-          .addText(t => t
-            .setValue(this.plugin.settings.clipRules[mode].framesFolder)
-            .onChange(async v => {
-              this.plugin.settings.clipRules[mode].framesFolder = v.trim();
-              await this.plugin.saveSettings();
-            }));
-      }
+      new Setting(containerEl)
+        .setName('Frames folder')
+        .setDesc('Vault-relative path where frame images are saved. Default: Assets/images')
+        .addText(t => t
+          .setValue(this.plugin.settings.clipRules[mode].framesFolder)
+          .onChange(async v => {
+            this.plugin.settings.clipRules[mode].framesFolder = v.trim();
+            await this.plugin.saveSettings();
+          }));
       new Setting(containerEl)
         .setName('SOP / prompt path')
         .setDesc('Absolute path to the markdown SOP file.')
@@ -149,38 +95,11 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
             this.plugin.settings.clipRules[mode].outputFolder = v.trim();
             await this.plugin.saveSettings();
           }));
-      if (this.plugin.settings.clipRules[mode].processingMode === 'auto') {
-        new Setting(containerEl)
-          .setName('Provider')
-          .setDesc('Must be an API provider (Anthropic, OpenAI-compatible, or Gemini).')
-          .addDropdown(d => {
-            this.plugin.settings.providers.forEach(p =>
-              d.addOption(p.id, p.type === 'cli' ? `CLI: ${(p as any).cliType}` : (p as any).label || p.type)
-            );
-            d.setValue(this.plugin.settings.clipRules[mode].providerId)
-              .onChange(async v => {
-                this.plugin.settings.clipRules[mode].providerId = v;
-                await this.plugin.saveSettings();
-              });
-          });
-      }
     }
   }
 
   private renderThumbnailClipRule(el: HTMLElement): void {
     const rule: ThumbnailClipRule = this.plugin.settings.clipRules.thumbnail;
-    new Setting(el)
-      .setName('Processing mode')
-      .setDesc('Auto: downloads thumbnail + calls AI to analyze cover. Manual: downloads thumbnail + generates note template.')
-      .addDropdown(d => d
-        .addOption('manual', 'Manual (download + template)')
-        .addOption('auto', 'Auto (download + call AI provider)')
-        .setValue(rule.processingMode)
-        .onChange(async v => {
-          this.plugin.settings.clipRules.thumbnail.processingMode = v as 'auto' | 'manual';
-          await this.plugin.saveSettings();
-          this.display();
-        }));
     new Setting(el)
       .setName('Output folder')
       .setDesc('Vault-relative path for generated notes. Default: Content Creation/Great Videos')
@@ -208,37 +127,10 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
           this.plugin.settings.clipRules.thumbnail.sopPath = v.trim();
           await this.plugin.saveSettings();
         }));
-    if (rule.processingMode === 'auto') {
-      new Setting(el)
-        .setName('Provider')
-        .setDesc('Must be an API provider (Anthropic, OpenAI-compatible, or Gemini).')
-        .addDropdown(d => {
-          this.plugin.settings.providers.forEach(p =>
-            d.addOption(p.id, p.type === 'cli' ? `CLI: ${(p as any).cliType}` : (p as any).label || p.type)
-          );
-          d.setValue(rule.providerId)
-            .onChange(async v => {
-              this.plugin.settings.clipRules.thumbnail.providerId = v;
-              await this.plugin.saveSettings();
-            });
-        });
-    }
   }
 
   private renderScreenshotClipRule(el: HTMLElement): void {
     const rule: ScreenshotClipRule = this.plugin.settings.clipRules.screenshot;
-    new Setting(el)
-      .setName('Processing mode')
-      .setDesc('Auto: vault-autopilot calls AI and writes the note. Manual: saves images + template, you trigger analysis in Obsidian.')
-      .addDropdown(d => d
-        .addOption('manual', 'Manual (save images + template)')
-        .addOption('auto', 'Auto (call AI provider)')
-        .setValue(rule.processingMode)
-        .onChange(async v => {
-          this.plugin.settings.clipRules.screenshot.processingMode = v as 'auto' | 'manual';
-          await this.plugin.saveSettings();
-          this.display();
-        }));
     new Setting(el)
       .setName('Frames folder')
       .setDesc('Vault-relative path where screenshot images are saved. Default: Assets/images')
@@ -266,51 +158,5 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
           this.plugin.settings.clipRules.screenshot.outputFolder = v.trim();
           await this.plugin.saveSettings();
         }));
-    if (rule.processingMode === 'auto') {
-      new Setting(el)
-        .setName('Provider')
-        .setDesc('Must be an API provider (Anthropic, OpenAI-compatible, or Gemini).')
-        .addDropdown(d => {
-          this.plugin.settings.providers.forEach(p =>
-            d.addOption(p.id, p.type === 'cli' ? `CLI: ${(p as any).cliType}` : (p as any).label || p.type)
-          );
-          d.setValue(rule.providerId)
-            .onChange(async v => {
-              this.plugin.settings.clipRules.screenshot.providerId = v;
-              await this.plugin.saveSettings();
-            });
-        });
-    }
   }
-
-  private renderProvider(el: HTMLElement, prov: ProviderConfig, i: number): void {
-    const label = prov.type === 'cli' ? `CLI: ${prov.cliType}` : prov.type === 'openai-compat' ? `API: ${prov.label}` : `API: ${prov.type}`;
-    new Setting(el).setName(label).setHeading();
-
-    if (prov.type === 'cli') {
-      new Setting(el)
-        .setName('Binary path')
-        .setDesc(`Leave empty to auto-detect. Example: /usr/local/bin/${prov.cliType}`)
-        .addText(t => t.setValue(prov.bin).onChange(async v => {
-          (this.plugin.settings.providers[i] as any).bin = v.trim();
-          await this.plugin.saveSettings();
-        }));
-    }
-    if (prov.type === 'openai-compat') {
-      new Setting(el).setName('Label').addText(t => t.setValue(prov.label).onChange(async v => { (this.plugin.settings.providers[i] as any).label = v; await this.plugin.saveSettings(); }));
-      new Setting(el).setName('Base URL').setDesc('e.g. https://openrouter.ai/api/v1').addText(t => t.setValue(prov.baseUrl).onChange(async v => { (this.plugin.settings.providers[i] as any).baseUrl = v.trim(); await this.plugin.saveSettings(); }));
-      new Setting(el).setName('API Key').addText(t => t.setValue(prov.apiKey).onChange(async v => { (this.plugin.settings.providers[i] as any).apiKey = v.trim(); await this.plugin.saveSettings(); }));
-      new Setting(el).setName('Model').setDesc('Must support vision for image analysis. e.g. gpt-4o, openai/gpt-4o').addText(t => t.setValue(prov.model).onChange(async v => { (this.plugin.settings.providers[i] as any).model = v.trim(); await this.plugin.saveSettings(); }));
-    }
-    if (prov.type === 'anthropic' || prov.type === 'gemini-api') {
-      new Setting(el).setName('API Key').addText(t => t.setValue(prov.apiKey).onChange(async v => { (this.plugin.settings.providers[i] as any).apiKey = v.trim(); await this.plugin.saveSettings(); }));
-      new Setting(el).setName('Model').addText(t => t.setValue(prov.model).onChange(async v => { (this.plugin.settings.providers[i] as any).model = v.trim(); await this.plugin.saveSettings(); }));
-    }
-    new Setting(el).addButton(b => b.setButtonText('Remove provider').onClick(async () => {
-      this.plugin.settings.providers.splice(i, 1);
-      await this.plugin.saveSettings();
-      this.display();
-    }));
-  }
-
 }
