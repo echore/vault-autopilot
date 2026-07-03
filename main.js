@@ -234,7 +234,7 @@ function buildVideoEmbed(url, platform, startSeconds, endSeconds) {
   }
   if (p === "bilibili" || url.includes("bilibili.com")) {
     const id = extractVideoId(url, platform);
-    if (id) return `<iframe width="100%" height="315" src="https://player.bilibili.com/player.html?bvid=${id}&page=1&t=${start}" frameborder="0" allowfullscreen></iframe>`;
+    if (id) return `<iframe width="100%" height="315" src="https://player.bilibili.com/player.html?bvid=${id}&page=1&t=${start}&autoplay=0&danmaku=0" frameborder="0" allowfullscreen></iframe>`;
   }
   return `[\u25B6 \u8DF3\u8F6C\u539F\u89C6\u9891](${url})`;
 }

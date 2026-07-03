@@ -64,7 +64,9 @@ export function buildVideoEmbed(url: string, platform: string | undefined, start
   }
   if (p === 'bilibili' || url.includes('bilibili.com')) {
     const id = extractVideoId(url, platform);
-    if (id) return `<iframe width="100%" height="315" src="https://player.bilibili.com/player.html?bvid=${id}&page=1&t=${start}" frameborder="0" allowfullscreen></iframe>`;
+    // Bilibili's embed player autoplays by default — with several 动效 embeds in one
+    // note they all start at once. autoplay=0 stops that; danmaku=0 keeps replays clean.
+    if (id) return `<iframe width="100%" height="315" src="https://player.bilibili.com/player.html?bvid=${id}&page=1&t=${start}&autoplay=0&danmaku=0" frameborder="0" allowfullscreen></iframe>`;
   }
   return `[▶ 跳转原视频](${url})`;
 }
