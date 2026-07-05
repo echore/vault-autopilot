@@ -135,4 +135,4 @@ Bilibili embed URL 代码已写，但从未真实测试。
 
 ### Chrome 扩展（已完成部分）
 - Hook 模式基础 payload 结构（frames / video_title / url / platform / channel）
-- POST 到 `http://127.0.0.1:27183/clip`
+- POST 到 `http://127.0.0.1:17183/clip`

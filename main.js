@@ -500,7 +500,7 @@ ${checklist}`, ``);
 }
 async function handleScreenshot(payload, rule, vaultOps, searchFolder, assetFolder) {
   if (!rule.outputFolder) {
-    throw new Error("Screenshot output folder is not configured. Go to Settings \u2192 Clip Rules \u2192 Screenshot \u2192 Output folder.");
+    throw new Error("\u622A\u56FE\u6587\u4EF6\u5939\u672A\u914D\u7F6E\uFF1A\u8BF7\u5728 \u8BBE\u7F6E \u2192 Vault Autopilot \u2192 \u5B58\u50A8\u4F4D\u7F6E \u2192 \u622A\u56FE\u6587\u4EF6\u5939 \u586B\u5199\u3002");
   }
   const stem = `screenshot-${sanitize(payload.title)}-${Date.now()}`;
   const notePath = `${rule.outputFolder}/${stem}.md`;
@@ -543,7 +543,7 @@ async function findNoteByVideoId(videoId, folder, vaultOps) {
 }
 async function handleThumbnail(payload, rule, vaultOps) {
   if (!rule.outputFolder || !rule.thumbnailFolder) {
-    throw new Error("Thumbnail output folder or thumbnail folder is not configured. Go to Settings \u2192 Clip Rules \u2192 Thumbnail.");
+    throw new Error("\u89C6\u9891\u7B14\u8BB0\u6587\u4EF6\u5939\u6216\u5C01\u9762\u56FE\u7247\u6587\u4EF6\u5939\u672A\u914D\u7F6E\uFF1A\u8BF7\u5728 \u8BBE\u7F6E \u2192 Vault Autopilot \u2192 \u5B58\u50A8\u4F4D\u7F6E \u586B\u5199\u3002");
   }
   await vaultOps.ensureFolder(rule.thumbnailFolder);
   const thumbnailFile = `${payload.video_id}.webp`;

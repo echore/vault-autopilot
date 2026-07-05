@@ -120,7 +120,7 @@ async function handleScreenshot(
   assetFolder: string,
 ): Promise<{ notePath: string }> {
   if (!rule.outputFolder) {
-    throw new Error('Screenshot output folder is not configured. Go to Settings → Clip Rules → Screenshot → Output folder.');
+    throw new Error('截图文件夹未配置：请在 设置 → Vault Autopilot → 存储位置 → 截图文件夹 填写。');
   }
   const stem = `screenshot-${sanitize(payload.title)}-${Date.now()}`;
   const notePath = `${rule.outputFolder}/${stem}.md`;
@@ -180,7 +180,7 @@ async function handleThumbnail(
   vaultOps: VaultOps,
 ): Promise<{ notePath: string; notice?: string }> {
   if (!rule.outputFolder || !rule.thumbnailFolder) {
-    throw new Error('Thumbnail output folder or thumbnail folder is not configured. Go to Settings → Clip Rules → Thumbnail.');
+    throw new Error('视频笔记文件夹或封面图片文件夹未配置：请在 设置 → Vault Autopilot → 存储位置 填写。');
   }
   await vaultOps.ensureFolder(rule.thumbnailFolder);
 
