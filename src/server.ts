@@ -57,16 +57,22 @@ export type ClipPayload =
 // a notice string when a section was skipped (e.g. already exists).
 export type ClipHandler = (payload: ClipPayload) => Promise<{ obsidianUrl?: string; notice?: string }>;
 
-export function createServer(port: number, onClip: ClipHandler): http.Server {
+export function createServer(port: number, onClip: ClipHandler, version = ''): http.Server {
   const server = http.createServer((req, res) => {
     const origin = req.headers['origin'] || '';
     if (origin.startsWith('chrome-extension://')) {
       res.setHeader('Access-Control-Allow-Origin', origin);
-      res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     }
 
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+
+    if (req.method === 'GET' && req.url === '/ping') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ app: 'vault-autopilot', version }));
+      return;
+    }
 
     if (req.method !== 'POST' || req.url !== '/clip') {
       res.writeHead(404, { 'Content-Type': 'application/json' });

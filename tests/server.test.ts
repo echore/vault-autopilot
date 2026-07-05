@@ -1,7 +1,7 @@
 import * as http from 'http';
 import { createServer, ClipPayload } from '../src/server';
 
-const PORT = 27191;
+const PORT = 17999;
 
 async function request(method: string, urlPath: string, body?: unknown): Promise<{ status: number; body: any }> {
   const headers: Record<string, string> = {};
@@ -18,7 +18,7 @@ describe('createServer', () => {
 
   beforeEach((done) => {
     handler = jest.fn().mockResolvedValue({});
-    server = createServer(PORT, handler);
+    server = createServer(PORT, handler, '0.1.0');
     server.on('listening', done);
   });
 
@@ -93,5 +93,19 @@ describe('createServer', () => {
     const { status } = await request('POST', '/clip', payload);
     expect(status).toBe(200);
     expect(handler).toHaveBeenCalledWith(payload);
+  });
+
+  test('GET /ping returns app identity and version', async () => {
+    const { status, body } = await request('GET', '/ping');
+    expect(status).toBe(200);
+    expect(body).toEqual({ app: 'vault-autopilot', version: '0.1.0' });
+  });
+
+  test('GET /ping sets CORS header for extension origin', async () => {
+    const res = await fetch(`http://127.0.0.1:${PORT}/ping`, {
+      headers: { 'Origin': 'chrome-extension://test' },
+    });
+    expect(res.headers.get('access-control-allow-origin')).toBe('chrome-extension://test');
+    expect(res.headers.get('access-control-allow-methods')).toContain('GET');
   });
 });

@@ -99,6 +99,7 @@ export default class VaultAutopilotPlugin extends Plugin {
           : undefined;
         return { obsidianUrl, notice };
       },
+      this.manifest.version,
     );
     this.server.on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'EADDRINUSE') {
