@@ -13,6 +13,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
     hook: { sopPath: '', outputFolder: '', maxFrames: 5, framesFolder: 'Clips/Videos/frames' },
     keyframe: { sopPath: '', outputFolder: '', maxFrames: 5, framesFolder: 'Clips/Videos/frames' },
   },
+  firstSaveNoticed: { thumbnail: false, screenshot: false, hook: false, keyframe: false },
 };
 
 // 27183 was the original default; it collides with scrcpy's port range

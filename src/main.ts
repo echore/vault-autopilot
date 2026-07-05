@@ -2,7 +2,7 @@ import * as http from 'http';
 import * as fs from 'fs';
 import { Notice, Plugin, TFile, requestUrl } from 'obsidian';
 import { DEFAULT_SETTINGS, VaultAutopilotSettingTab, normalizePort, emptyToDefault } from './settings';
-import { PluginSettings } from './types';
+import { PluginSettings, ClipMode } from './types';
 import { createServer, ClipPayload } from './server';
 import { routeClip, VaultOps } from './clip-router';
 
@@ -37,6 +37,7 @@ export default class VaultAutopilotPlugin extends Plugin {
         hook: emptyToDefault(loaded?.clipRules?.hook, DEFAULT_SETTINGS.clipRules.hook),
         keyframe: emptyToDefault(loaded?.clipRules?.keyframe, DEFAULT_SETTINGS.clipRules.keyframe),
       },
+      firstSaveNoticed: { ...DEFAULT_SETTINGS.firstSaveNoticed, ...(loaded?.firstSaveNoticed ?? {}) },
     };
   }
 
@@ -59,6 +60,16 @@ export default class VaultAutopilotPlugin extends Plugin {
         await this.app.vault.createFolder(current);
       }
     }
+  }
+
+  // First successful save per mode: tell the user where it landed and that the
+  // location is changeable — they can't design folders before seeing output.
+  private async maybeFirstSaveNotice(mode: ClipMode, notePath: string): Promise<void> {
+    if (this.settings.firstSaveNoticed[mode]) return;
+    this.settings.firstSaveNoticed[mode] = true;
+    await this.saveSettings();
+    const folder = notePath.includes('/') ? notePath.split('/').slice(0, -1).join('/') : '/';
+    new Notice(`已存到 ${folder}\n想换位置？设置 → Vault Autopilot → 存储位置`, 8000);
   }
 
   private startServer(): void {
@@ -98,6 +109,7 @@ export default class VaultAutopilotPlugin extends Plugin {
       port,
       async (payload) => {
         const { notePath, notice } = await routeClip(payload, this.settings.clipRules, vaultOps);
+        if (notePath) await this.maybeFirstSaveNotice(payload.mode, notePath);
         const obsidianUrl = notePath
           ? `obsidian://open?vault=${encodeURIComponent(this.app.vault.getName())}&file=${encodeURIComponent(notePath)}`
           : undefined;
@@ -107,7 +119,7 @@ export default class VaultAutopilotPlugin extends Plugin {
     );
     this.server.on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'EADDRINUSE') {
-        new Notice(`Vault Autopilot: Port ${port} is already in use. Close the other process or change the port in settings.`, 10000);
+        new Notice(`Vault Autopilot：端口 ${port} 被占用。请关闭占用它的程序；或在插件设置和扩展设置两处改成同一个新端口。`, 10000);
       }
     });
   }

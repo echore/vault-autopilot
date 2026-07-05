@@ -42,3 +42,11 @@ describe('emptyToDefault', () => {
     expect(emptyToDefault(undefined, def)).toEqual(def);
   });
 });
+
+describe('first-save notice flags', () => {
+  test('first-save notice flags default to all-false', () => {
+    expect(DEFAULT_SETTINGS.firstSaveNoticed).toEqual({
+      thumbnail: false, screenshot: false, hook: false, keyframe: false,
+    });
+  });
+});

@@ -26,6 +26,8 @@ export interface HttpServerSettings {
   port: number;
 }
 
+export type ClipMode = 'thumbnail' | 'screenshot' | 'hook' | 'keyframe';
+
 export interface PluginSettings {
   httpServer: HttpServerSettings;
   clipRules: {
@@ -34,4 +36,6 @@ export interface PluginSettings {
     hook: ClipRule;
     keyframe: ClipRule;
   };
+  // One-time "saved to X — change it in settings" notice, tracked per mode.
+  firstSaveNoticed: Record<ClipMode, boolean>;
 }
