@@ -67,9 +67,14 @@ export default class VaultAutopilotPlugin extends Plugin {
   private async maybeFirstSaveNotice(mode: ClipMode, notePath: string): Promise<void> {
     if (this.settings.firstSaveNoticed[mode]) return;
     this.settings.firstSaveNoticed[mode] = true;
-    await this.saveSettings();
     const folder = notePath.includes('/') ? notePath.split('/').slice(0, -1).join('/') : '/';
     new Notice(`已存到 ${folder}\n想换位置？设置 → Vault Autopilot → 存储位置`, 8000);
+    try {
+      await this.saveSettings();
+    } catch {
+      // Transient disk error must not fail the clip response; acceptable consequence
+      // is a repeat notice after reload when the flag reverts.
+    }
   }
 
   private startServer(): void {

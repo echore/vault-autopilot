@@ -40,15 +40,28 @@ var import_obsidian = require("obsidian");
 var DEFAULT_SETTINGS = {
   httpServer: {
     enabled: true,
-    port: 27183
+    port: 17183
   },
   clipRules: {
-    thumbnail: { sopPath: "", outputFolder: "Content Creation/Great Videos", thumbnailFolder: "Assets/Great Videos" },
-    screenshot: { sopPath: "", outputFolder: "", framesFolder: "Assets/images" },
-    hook: { sopPath: "", outputFolder: "", maxFrames: 5, framesFolder: "Assets/images" },
-    keyframe: { sopPath: "", outputFolder: "", maxFrames: 5, framesFolder: "Assets/images" }
-  }
+    thumbnail: { sopPath: "", outputFolder: "Clips/Videos", thumbnailFolder: "Clips/Videos/covers" },
+    screenshot: { sopPath: "", outputFolder: "Clips/Screenshots", framesFolder: "Clips/Screenshots/frames" },
+    hook: { sopPath: "", outputFolder: "", maxFrames: 5, framesFolder: "Clips/Videos/frames" },
+    keyframe: { sopPath: "", outputFolder: "", maxFrames: 5, framesFolder: "Clips/Videos/frames" }
+  },
+  firstSaveNoticed: { thumbnail: false, screenshot: false, hook: false, keyframe: false }
 };
+var LEGACY_DEFAULT_PORT = 27183;
+function normalizePort(loaded) {
+  if (loaded === void 0 || loaded === LEGACY_DEFAULT_PORT) return DEFAULT_SETTINGS.httpServer.port;
+  return loaded;
+}
+function emptyToDefault(loaded, defaults) {
+  const merged = { ...defaults, ...loaded != null ? loaded : {} };
+  for (const key of Object.keys(defaults)) {
+    if (key !== "sopPath" && merged[key] === "" && defaults[key] !== "") merged[key] = defaults[key];
+  }
+  return merged;
+}
 var VaultAutopilotSettingTab = class extends import_obsidian.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
@@ -57,93 +70,81 @@ var VaultAutopilotSettingTab = class extends import_obsidian.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    new import_obsidian.Setting(containerEl).setName("HTTP Server").setHeading();
-    new import_obsidian.Setting(containerEl).setName("Enable HTTP server").setDesc("Allows Chrome extension and other tools to drop files via POST /clip").addToggle((t) => t.setValue(this.plugin.settings.httpServer.enabled).onChange(async (v) => {
+    new import_obsidian.Setting(containerEl).setName("\u5B58\u50A8\u4F4D\u7F6E").setHeading();
+    new import_obsidian.Setting(containerEl).setName("\u89C6\u9891\u7B14\u8BB0\u6587\u4EF6\u5939").setDesc("\u4E00\u4E2A\u89C6\u9891\u4E00\u6761\u7B14\u8BB0\uFF1A\u5C01\u9762\u3001Hook\u3001\u5173\u952E\u5E27\u90FD\u5199\u8FDB\u540C\u4E00\u6761\u3002\u9ED8\u8BA4 Clips/Videos").addText((t) => t.setValue(this.plugin.settings.clipRules.thumbnail.outputFolder).onChange(async (v) => {
+      this.plugin.settings.clipRules.thumbnail.outputFolder = v.trim();
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian.Setting(containerEl).setName("\u5C01\u9762\u56FE\u7247\u6587\u4EF6\u5939").setDesc("\u89C6\u9891\u5C01\u9762\u56FE\uFF08<\u89C6\u9891ID>.webp\uFF09\u3002\u9ED8\u8BA4 Clips/Videos/covers").addText((t) => t.setValue(this.plugin.settings.clipRules.thumbnail.thumbnailFolder).onChange(async (v) => {
+      this.plugin.settings.clipRules.thumbnail.thumbnailFolder = v.trim();
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian.Setting(containerEl).setName("\u5E27\u56FE\u7247\u6587\u4EF6\u5939").setDesc("Hook / \u5173\u952E\u5E27\u62BD\u51FA\u7684\u5E27\u56FE\u3002\u9ED8\u8BA4 Clips/Videos/frames").addText((t) => t.setValue(this.plugin.settings.clipRules.hook.framesFolder).onChange(async (v) => {
+      const folder = v.trim();
+      this.plugin.settings.clipRules.hook.framesFolder = folder;
+      this.plugin.settings.clipRules.keyframe.framesFolder = folder;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian.Setting(containerEl).setName("\u622A\u56FE\u6587\u4EF6\u5939").setDesc("\u666E\u901A\u7F51\u9875\u622A\u56FE\u72EC\u7ACB\u6210\u7B14\u8BB0\uFF0C\u5B58\u5728\u8FD9\u91CC\uFF1B\u56FE\u7247\u81EA\u52A8\u653E\u5165\u5176 frames/ \u5B50\u6587\u4EF6\u5939\u3002\u9ED8\u8BA4 Clips/Screenshots").addText((t) => t.setValue(this.plugin.settings.clipRules.screenshot.outputFolder).onChange(async (v) => {
+      const folder = v.trim();
+      this.plugin.settings.clipRules.screenshot.outputFolder = folder;
+      this.plugin.settings.clipRules.screenshot.framesFolder = folder ? `${folder}/frames` : "";
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian.Setting(containerEl).setName("\u9AD8\u7EA7").setHeading();
+    new import_obsidian.Setting(containerEl).setName("\u542F\u7528 HTTP \u670D\u52A1").setDesc("\u63A5\u6536 Chrome \u6269\u5C55\u901A\u8FC7 POST /clip \u53D1\u6765\u7684\u5185\u5BB9").addToggle((t) => t.setValue(this.plugin.settings.httpServer.enabled).onChange(async (v) => {
       this.plugin.settings.httpServer.enabled = v;
       await this.plugin.saveSettings();
       this.plugin.restartServer();
     }));
-    new import_obsidian.Setting(containerEl).setName("Port").setDesc("Default: 27183. Restart Obsidian after changing.").addText((t) => t.setValue(String(this.plugin.settings.httpServer.port)).onChange(async (v) => {
+    new import_obsidian.Setting(containerEl).setName("\u7AEF\u53E3").setDesc("\u9ED8\u8BA4 17183\u3002\u4EC5\u5F53\u7AEF\u53E3\u88AB\u5360\u7528\u65F6\u624D\u9700\u8981\u6539\uFF1B\u6539\u5B8C\u5FC5\u987B\u5728\u6269\u5C55\u7684\u5F15\u5BFC\u9875\uFF08\u9AD8\u7EA7 \u2192 \u7AEF\u53E3\uFF09\u6539\u6210\u540C\u4E00\u4E2A\u503C\uFF0C\u5426\u5219\u4E24\u8FB9\u4F1A\u65AD\u5F00\u3002\u6539\u540E\u91CD\u542F Obsidian\u3002").addText((t) => t.setValue(String(this.plugin.settings.httpServer.port)).onChange(async (v) => {
       const n = parseInt(v, 10);
       if (n > 1024 && n < 65536) {
         this.plugin.settings.httpServer.port = n;
         await this.plugin.saveSettings();
       }
     }));
-    new import_obsidian.Setting(containerEl).setName("Clip Rules").setHeading();
-    new import_obsidian.Setting(containerEl).setName("Thumbnail / Great Videos").setHeading();
-    this.renderThumbnailClipRule(containerEl);
-    new import_obsidian.Setting(containerEl).setName("Screenshot").setHeading();
-    this.renderScreenshotClipRule(containerEl);
-    for (const mode of ["hook", "keyframe"]) {
-      const label = mode === "hook" ? "Hook Analysis" : "Keyframe Analysis";
-      new import_obsidian.Setting(containerEl).setName(label).setHeading();
-      new import_obsidian.Setting(containerEl).setName("Max frames to save").setDesc("How many frames to sample and save (1\u201320). Default: 5.").addText((t) => t.setValue(String(this.plugin.settings.clipRules[mode].maxFrames)).onChange(async (v) => {
-        const n = parseInt(v, 10);
-        if (n >= 1 && n <= 20) {
-          this.plugin.settings.clipRules[mode].maxFrames = n;
-          await this.plugin.saveSettings();
-        }
-      }));
-      new import_obsidian.Setting(containerEl).setName("Frames folder").setDesc("Vault-relative path where frame images are saved. Default: Assets/images").addText((t) => t.setValue(this.plugin.settings.clipRules[mode].framesFolder).onChange(async (v) => {
-        this.plugin.settings.clipRules[mode].framesFolder = v.trim();
+    new import_obsidian.Setting(containerEl).setName("\u62BD\u5E27\u6570\u91CF\u4E0A\u9650").setDesc("Hook / \u5173\u952E\u5E27\u6A21\u5F0F\u6700\u591A\u4FDD\u5B58\u51E0\u5E27\uFF081\u201320\uFF09\u3002\u9ED8\u8BA4 5\u3002").addText((t) => t.setValue(String(this.plugin.settings.clipRules.hook.maxFrames)).onChange(async (v) => {
+      const n = parseInt(v, 10);
+      if (n >= 1 && n <= 20) {
+        this.plugin.settings.clipRules.hook.maxFrames = n;
+        this.plugin.settings.clipRules.keyframe.maxFrames = n;
         await this.plugin.saveSettings();
-      }));
-      new import_obsidian.Setting(containerEl).setName("SOP / prompt path").setDesc("Absolute path to the markdown SOP file.").addText((t) => t.setValue(this.plugin.settings.clipRules[mode].sopPath).onChange(async (v) => {
+      }
+    }));
+    const sopModes = [
+      ["thumbnail", "\u5C01\u9762 SOP \u8DEF\u5F84"],
+      ["screenshot", "\u622A\u56FE SOP \u8DEF\u5F84"],
+      ["hook", "Hook SOP \u8DEF\u5F84"],
+      ["keyframe", "\u5173\u952E\u5E27 SOP \u8DEF\u5F84"]
+    ];
+    for (const [mode, label] of sopModes) {
+      new import_obsidian.Setting(containerEl).setName(label).setDesc("\u7559\u7A7A = \u7EAF\u7D20\u6750\u6A21\u5F0F\uFF08\u4E0D\u9644\u5E26\u5206\u6790\u63D0\u793A\uFF09\u3002\u586B vault \u5185 markdown \u6587\u4EF6\u7684\u7EDD\u5BF9\u8DEF\u5F84\u3002").addText((t) => t.setValue(this.plugin.settings.clipRules[mode].sopPath).onChange(async (v) => {
         this.plugin.settings.clipRules[mode].sopPath = v.trim();
         await this.plugin.saveSettings();
       }));
-      new import_obsidian.Setting(containerEl).setName("Output folder").setDesc("Vault-relative path. e.g. Notes/Hooks").addText((t) => t.setValue(this.plugin.settings.clipRules[mode].outputFolder).onChange(async (v) => {
-        this.plugin.settings.clipRules[mode].outputFolder = v.trim();
-        await this.plugin.saveSettings();
-      }));
     }
-  }
-  renderThumbnailClipRule(el) {
-    const rule = this.plugin.settings.clipRules.thumbnail;
-    new import_obsidian.Setting(el).setName("Output folder").setDesc("Vault-relative path for generated notes. Default: Content Creation/Great Videos").addText((t) => t.setValue(rule.outputFolder).onChange(async (v) => {
-      this.plugin.settings.clipRules.thumbnail.outputFolder = v.trim();
-      await this.plugin.saveSettings();
-    }));
-    new import_obsidian.Setting(el).setName("Thumbnail folder").setDesc("Vault-relative path for downloaded thumbnail images. Default: Assets/Great Videos").addText((t) => t.setValue(rule.thumbnailFolder).onChange(async (v) => {
-      this.plugin.settings.clipRules.thumbnail.thumbnailFolder = v.trim();
-      await this.plugin.saveSettings();
-    }));
-    new import_obsidian.Setting(el).setName("SOP / prompt path").setDesc("Absolute path to the markdown SOP file.").addText((t) => t.setValue(rule.sopPath).onChange(async (v) => {
-      this.plugin.settings.clipRules.thumbnail.sopPath = v.trim();
-      await this.plugin.saveSettings();
-    }));
-  }
-  renderScreenshotClipRule(el) {
-    const rule = this.plugin.settings.clipRules.screenshot;
-    new import_obsidian.Setting(el).setName("Frames folder").setDesc("Vault-relative path where screenshot images are saved. Default: Assets/images").addText((t) => t.setValue(rule.framesFolder).onChange(async (v) => {
-      this.plugin.settings.clipRules.screenshot.framesFolder = v.trim();
-      await this.plugin.saveSettings();
-    }));
-    new import_obsidian.Setting(el).setName("SOP / prompt path").setDesc("Absolute path to the markdown SOP file.").addText((t) => t.setValue(rule.sopPath).onChange(async (v) => {
-      this.plugin.settings.clipRules.screenshot.sopPath = v.trim();
-      await this.plugin.saveSettings();
-    }));
-    new import_obsidian.Setting(el).setName("Output folder").setDesc("Vault-relative path. e.g. Notes/Screenshots").addText((t) => t.setValue(rule.outputFolder).onChange(async (v) => {
-      this.plugin.settings.clipRules.screenshot.outputFolder = v.trim();
-      await this.plugin.saveSettings();
-    }));
   }
 };
 
 // src/server.ts
 var http = __toESM(require("http"));
-function createServer2(port, onClip) {
+function createServer2(port, onClip, version = "") {
   const server = http.createServer((req, res) => {
     const origin = req.headers["origin"] || "";
     if (origin.startsWith("chrome-extension://")) {
       res.setHeader("Access-Control-Allow-Origin", origin);
-      res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
       res.setHeader("Access-Control-Allow-Headers", "Content-Type");
     }
     if (req.method === "OPTIONS") {
       res.writeHead(204);
       res.end();
+      return;
+    }
+    if (req.method === "GET" && req.url === "/ping") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ app: "vault-autopilot", version }));
       return;
     }
     if (req.method !== "POST" || req.url !== "/clip") {
@@ -619,18 +620,23 @@ var VaultAutopilotPlugin = class extends import_obsidian2.Plugin {
     this.server = null;
   }
   async loadSettings() {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
+    var _a, _b, _c, _d, _e, _f, _g;
     const loaded = await this.loadData();
     this.settings = {
       ...DEFAULT_SETTINGS,
       ...loaded,
-      httpServer: { ...DEFAULT_SETTINGS.httpServer, ...(_a = loaded == null ? void 0 : loaded.httpServer) != null ? _a : {} },
+      httpServer: {
+        ...DEFAULT_SETTINGS.httpServer,
+        ...(_a = loaded == null ? void 0 : loaded.httpServer) != null ? _a : {},
+        port: normalizePort((_b = loaded == null ? void 0 : loaded.httpServer) == null ? void 0 : _b.port)
+      },
       clipRules: {
-        thumbnail: { ...DEFAULT_SETTINGS.clipRules.thumbnail, ...(_c = (_b = loaded == null ? void 0 : loaded.clipRules) == null ? void 0 : _b.thumbnail) != null ? _c : {} },
-        screenshot: { ...DEFAULT_SETTINGS.clipRules.screenshot, ...(_e = (_d = loaded == null ? void 0 : loaded.clipRules) == null ? void 0 : _d.screenshot) != null ? _e : {} },
-        hook: { ...DEFAULT_SETTINGS.clipRules.hook, ...(_g = (_f = loaded == null ? void 0 : loaded.clipRules) == null ? void 0 : _f.hook) != null ? _g : {} },
-        keyframe: { ...DEFAULT_SETTINGS.clipRules.keyframe, ...(_i = (_h = loaded == null ? void 0 : loaded.clipRules) == null ? void 0 : _h.keyframe) != null ? _i : {} }
-      }
+        thumbnail: emptyToDefault((_c = loaded == null ? void 0 : loaded.clipRules) == null ? void 0 : _c.thumbnail, DEFAULT_SETTINGS.clipRules.thumbnail),
+        screenshot: emptyToDefault((_d = loaded == null ? void 0 : loaded.clipRules) == null ? void 0 : _d.screenshot, DEFAULT_SETTINGS.clipRules.screenshot),
+        hook: emptyToDefault((_e = loaded == null ? void 0 : loaded.clipRules) == null ? void 0 : _e.hook, DEFAULT_SETTINGS.clipRules.hook),
+        keyframe: emptyToDefault((_f = loaded == null ? void 0 : loaded.clipRules) == null ? void 0 : _f.keyframe, DEFAULT_SETTINGS.clipRules.keyframe)
+      },
+      firstSaveNoticed: { ...DEFAULT_SETTINGS.firstSaveNoticed, ...(_g = loaded == null ? void 0 : loaded.firstSaveNoticed) != null ? _g : {} }
     };
   }
   async saveSettings() {
@@ -650,6 +656,19 @@ var VaultAutopilotPlugin = class extends import_obsidian2.Plugin {
       if (!this.app.vault.getAbstractFileByPath(current)) {
         await this.app.vault.createFolder(current);
       }
+    }
+  }
+  // First successful save per mode: tell the user where it landed and that the
+  // location is changeable — they can't design folders before seeing output.
+  async maybeFirstSaveNotice(mode, notePath) {
+    if (this.settings.firstSaveNoticed[mode]) return;
+    this.settings.firstSaveNoticed[mode] = true;
+    const folder = notePath.includes("/") ? notePath.split("/").slice(0, -1).join("/") : "/";
+    new import_obsidian2.Notice(`\u5DF2\u5B58\u5230 ${folder}
+\u60F3\u6362\u4F4D\u7F6E\uFF1F\u8BBE\u7F6E \u2192 Vault Autopilot \u2192 \u5B58\u50A8\u4F4D\u7F6E`, 8e3);
+    try {
+      await this.saveSettings();
+    } catch (e) {
     }
   }
   startServer() {
@@ -688,13 +707,15 @@ var VaultAutopilotPlugin = class extends import_obsidian2.Plugin {
       port,
       async (payload) => {
         const { notePath, notice } = await routeClip(payload, this.settings.clipRules, vaultOps);
+        if (notePath) await this.maybeFirstSaveNotice(payload.mode, notePath);
         const obsidianUrl = notePath ? `obsidian://open?vault=${encodeURIComponent(this.app.vault.getName())}&file=${encodeURIComponent(notePath)}` : void 0;
         return { obsidianUrl, notice };
-      }
+      },
+      this.manifest.version
     );
     this.server.on("error", (err) => {
       if (err.code === "EADDRINUSE") {
-        new import_obsidian2.Notice(`Vault Autopilot: Port ${port} is already in use. Close the other process or change the port in settings.`, 1e4);
+        new import_obsidian2.Notice(`Vault Autopilot\uFF1A\u7AEF\u53E3 ${port} \u88AB\u5360\u7528\u3002\u8BF7\u5173\u95ED\u5360\u7528\u5B83\u7684\u7A0B\u5E8F\uFF1B\u6216\u5728\u63D2\u4EF6\u8BBE\u7F6E\u548C\u6269\u5C55\u8BBE\u7F6E\u4E24\u5904\u6539\u6210\u540C\u4E00\u4E2A\u65B0\u7AEF\u53E3\u3002`, 1e4);
       }
     });
   }
