@@ -5,7 +5,7 @@ import { PluginSettings, ScreenshotClipRule, ThumbnailClipRule } from './types';
 export const DEFAULT_SETTINGS: PluginSettings = {
   httpServer: {
     enabled: true,
-    port: 27183,
+    port: 17183,
   },
   clipRules: {
     thumbnail: { sopPath: '', outputFolder: 'Content Creation/Great Videos', thumbnailFolder: 'Assets/Great Videos' },
@@ -14,6 +14,15 @@ export const DEFAULT_SETTINGS: PluginSettings = {
     keyframe: { sopPath: '', outputFolder: '', maxFrames: 5, framesFolder: 'Assets/images' },
   },
 };
+
+// 27183 was the original default; it collides with scrcpy's port range
+// (27183–27199), so existing installs on the old default migrate silently.
+const LEGACY_DEFAULT_PORT = 27183;
+
+export function normalizePort(loaded: number | undefined): number {
+  if (loaded === undefined || loaded === LEGACY_DEFAULT_PORT) return DEFAULT_SETTINGS.httpServer.port;
+  return loaded;
+}
 
 export class VaultAutopilotSettingTab extends PluginSettingTab {
   constructor(app: App, private plugin: VaultAutopilotPlugin) {
@@ -38,7 +47,7 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Port')
-      .setDesc('Default: 27183. Restart Obsidian after changing.')
+      .setDesc('Default: 17183. Restart Obsidian after changing.')
       .addText(t => t.setValue(String(this.plugin.settings.httpServer.port)).onChange(async v => {
         const n = parseInt(v, 10);
         if (n > 1024 && n < 65536) { this.plugin.settings.httpServer.port = n; await this.plugin.saveSettings(); }

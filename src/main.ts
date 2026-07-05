@@ -1,7 +1,7 @@
 import * as http from 'http';
 import * as fs from 'fs';
 import { Notice, Plugin, TFile, requestUrl } from 'obsidian';
-import { DEFAULT_SETTINGS, VaultAutopilotSettingTab } from './settings';
+import { DEFAULT_SETTINGS, VaultAutopilotSettingTab, normalizePort } from './settings';
 import { PluginSettings } from './types';
 import { createServer, ClipPayload } from './server';
 import { routeClip, VaultOps } from './clip-router';
@@ -26,7 +26,11 @@ export default class VaultAutopilotPlugin extends Plugin {
     this.settings = {
       ...DEFAULT_SETTINGS,
       ...loaded,
-      httpServer: { ...DEFAULT_SETTINGS.httpServer, ...(loaded?.httpServer ?? {}) },
+      httpServer: {
+        ...DEFAULT_SETTINGS.httpServer,
+        ...(loaded?.httpServer ?? {}),
+        port: normalizePort(loaded?.httpServer?.port),
+      },
       clipRules: {
         thumbnail: { ...DEFAULT_SETTINGS.clipRules.thumbnail, ...(loaded?.clipRules?.thumbnail ?? {}) },
         screenshot: { ...DEFAULT_SETTINGS.clipRules.screenshot, ...(loaded?.clipRules?.screenshot ?? {}) },
