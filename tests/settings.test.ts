@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, normalizePort } from '../src/settings';
+import { DEFAULT_SETTINGS, normalizePort, emptyToDefault } from '../src/settings';
 
 describe('port migration', () => {
   test('default port is 17183', () => {
@@ -12,5 +12,33 @@ describe('port migration', () => {
   });
   test('missing port falls back to default', () => {
     expect(normalizePort(undefined)).toBe(17183);
+  });
+});
+
+describe('zero-config folder defaults', () => {
+  test('all four modes have non-empty folder defaults under Clips/', () => {
+    const { thumbnail, screenshot, hook, keyframe } = DEFAULT_SETTINGS.clipRules;
+    expect(thumbnail.outputFolder).toBe('Clips/Videos');
+    expect(thumbnail.thumbnailFolder).toBe('Clips/Videos/covers');
+    expect(screenshot.outputFolder).toBe('Clips/Screenshots');
+    expect(screenshot.framesFolder).toBe('Clips/Screenshots/frames');
+    expect(hook.framesFolder).toBe('Clips/Videos/frames');
+    expect(keyframe.framesFolder).toBe('Clips/Videos/frames');
+  });
+});
+
+describe('emptyToDefault', () => {
+  const def = { sopPath: '', outputFolder: 'Clips/Screenshots', framesFolder: 'Clips/Screenshots/frames' };
+  test('empty string folder falls back to default', () => {
+    expect(emptyToDefault({ outputFolder: '', framesFolder: '' }, def).outputFolder).toBe('Clips/Screenshots');
+  });
+  test('user value wins over default', () => {
+    expect(emptyToDefault({ outputFolder: 'My/Notes' }, def).outputFolder).toBe('My/Notes');
+  });
+  test('sopPath may stay empty (material-only mode)', () => {
+    expect(emptyToDefault({ sopPath: '' }, def).sopPath).toBe('');
+  });
+  test('undefined loaded returns defaults', () => {
+    expect(emptyToDefault(undefined, def)).toEqual(def);
   });
 });

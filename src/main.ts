@@ -1,7 +1,7 @@
 import * as http from 'http';
 import * as fs from 'fs';
 import { Notice, Plugin, TFile, requestUrl } from 'obsidian';
-import { DEFAULT_SETTINGS, VaultAutopilotSettingTab, normalizePort } from './settings';
+import { DEFAULT_SETTINGS, VaultAutopilotSettingTab, normalizePort, emptyToDefault } from './settings';
 import { PluginSettings } from './types';
 import { createServer, ClipPayload } from './server';
 import { routeClip, VaultOps } from './clip-router';
@@ -32,10 +32,10 @@ export default class VaultAutopilotPlugin extends Plugin {
         port: normalizePort(loaded?.httpServer?.port),
       },
       clipRules: {
-        thumbnail: { ...DEFAULT_SETTINGS.clipRules.thumbnail, ...(loaded?.clipRules?.thumbnail ?? {}) },
-        screenshot: { ...DEFAULT_SETTINGS.clipRules.screenshot, ...(loaded?.clipRules?.screenshot ?? {}) },
-        hook: { ...DEFAULT_SETTINGS.clipRules.hook, ...(loaded?.clipRules?.hook ?? {}) },
-        keyframe: { ...DEFAULT_SETTINGS.clipRules.keyframe, ...(loaded?.clipRules?.keyframe ?? {}) },
+        thumbnail: emptyToDefault(loaded?.clipRules?.thumbnail, DEFAULT_SETTINGS.clipRules.thumbnail),
+        screenshot: emptyToDefault(loaded?.clipRules?.screenshot, DEFAULT_SETTINGS.clipRules.screenshot),
+        hook: emptyToDefault(loaded?.clipRules?.hook, DEFAULT_SETTINGS.clipRules.hook),
+        keyframe: emptyToDefault(loaded?.clipRules?.keyframe, DEFAULT_SETTINGS.clipRules.keyframe),
       },
     };
   }

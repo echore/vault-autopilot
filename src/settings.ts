@@ -8,10 +8,10 @@ export const DEFAULT_SETTINGS: PluginSettings = {
     port: 17183,
   },
   clipRules: {
-    thumbnail: { sopPath: '', outputFolder: 'Content Creation/Great Videos', thumbnailFolder: 'Assets/Great Videos' },
-    screenshot: { sopPath: '', outputFolder: '', framesFolder: 'Assets/images' },
-    hook: { sopPath: '', outputFolder: '', maxFrames: 5, framesFolder: 'Assets/images' },
-    keyframe: { sopPath: '', outputFolder: '', maxFrames: 5, framesFolder: 'Assets/images' },
+    thumbnail: { sopPath: '', outputFolder: 'Clips/Videos', thumbnailFolder: 'Clips/Videos/covers' },
+    screenshot: { sopPath: '', outputFolder: 'Clips/Screenshots', framesFolder: 'Clips/Screenshots/frames' },
+    hook: { sopPath: '', outputFolder: '', maxFrames: 5, framesFolder: 'Clips/Videos/frames' },
+    keyframe: { sopPath: '', outputFolder: '', maxFrames: 5, framesFolder: 'Clips/Videos/frames' },
   },
 };
 
@@ -22,6 +22,17 @@ const LEGACY_DEFAULT_PORT = 27183;
 export function normalizePort(loaded: number | undefined): number {
   if (loaded === undefined || loaded === LEGACY_DEFAULT_PORT) return DEFAULT_SETTINGS.httpServer.port;
   return loaded;
+}
+
+// Folder fields left empty ('') mean "never configured" — fall back to the
+// default so every mode works out of the box. sopPath is the one exception:
+// empty is a valid state (material-only mode, no analysis prompt).
+export function emptyToDefault<T extends Record<string, unknown>>(loaded: Partial<T> | undefined, defaults: T): T {
+  const merged = { ...defaults, ...(loaded ?? {}) } as T;
+  for (const key of Object.keys(defaults) as (keyof T)[]) {
+    if (key !== 'sopPath' && merged[key] === '' && defaults[key] !== '') merged[key] = defaults[key];
+  }
+  return merged;
 }
 
 export class VaultAutopilotSettingTab extends PluginSettingTab {
