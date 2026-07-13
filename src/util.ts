@@ -20,18 +20,53 @@ export function extractVideoId(url: string, platform: string | undefined): strin
     const bv = url.match(/\/(BV[a-zA-Z0-9]+)/);
     if (bv) return bv[1];
   }
+  if (p === 'xiaohongshu' || url.includes('xiaohongshu.com')) {
+    const m = url.match(/\/(?:explore|discovery\/item)\/(\w+)/);
+    if (m) return m[1];
+  }
   return null;
 }
 
-export function buildVideoEmbed(url: string, platform: string | undefined, startSeconds: number): string {
+function canonicalUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    return (u.origin + u.pathname).replace(/\/+$/, '');
+  } catch {
+    return url;
+  }
+}
+
+// Key used to merge captures of the same thing into one note. Platform ids
+// (YouTube/Bilibili/Xiaohongshu) collapse a video's many URL variants; for any
+// other platform the page URL (minus query/hash) is a stable enough key.
+export function videoKey(url: string, platform?: string): string {
+  return extractVideoId(url, platform) ?? canonicalUrl(url);
+}
+
+export function detectPlatform(url: string): string {
+  if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
+  if (url.includes('bilibili.com')) return 'bilibili';
+  if (url.includes('xiaohongshu.com')) return 'xiaohongshu';
+  return 'other';
+}
+
+export function buildVideoEmbed(url: string, platform: string | undefined, startSeconds: number, endSeconds?: number): string {
   const p = (platform ?? '').toLowerCase();
+  // Players only accept integer seconds — a float (from video.currentTime) is
+  // silently ignored and playback falls back to 0.
+  const start = Math.floor(startSeconds);
   if (p === 'youtube' || url.includes('youtube.com') || url.includes('youtu.be')) {
     const id = extractVideoId(url, platform);
-    if (id) return `<iframe width="100%" height="315" src="https://www.youtube.com/embed/${id}?start=${startSeconds}" frameborder="0" allowfullscreen></iframe>`;
+    if (id) {
+      const endParam = endSeconds != null ? `&end=${Math.floor(endSeconds)}` : '';
+      return `<iframe width="100%" height="315" src="https://www.youtube.com/embed/${id}?start=${start}${endParam}" frameborder="0" allowfullscreen></iframe>`;
+    }
   }
   if (p === 'bilibili' || url.includes('bilibili.com')) {
     const id = extractVideoId(url, platform);
-    if (id) return `<iframe width="100%" height="315" src="https://player.bilibili.com/player.html?bvid=${id}&page=1&t=${startSeconds}" frameborder="0" allowfullscreen></iframe>`;
+    // Bilibili's embed player autoplays by default — with several 动效 embeds in one
+    // note they all start at once. autoplay=0 stops that; danmaku=0 keeps replays clean.
+    if (id) return `<iframe width="100%" height="315" src="https://player.bilibili.com/player.html?bvid=${id}&page=1&t=${start}&autoplay=0&danmaku=0" frameborder="0" allowfullscreen></iframe>`;
   }
   return `[▶ 跳转原视频](${url})`;
 }

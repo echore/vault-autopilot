@@ -3,7 +3,7 @@
   "name": "Vault Autopilot",
   "version": "0.1.0",
   "minAppVersion": "1.4.0",
-  "description": "Watch folders for new files, run AI analysis via any provider, write structured notes.",
+  "description": "Receive screenshots and video frames from the Obsidian Visual Clipper Chrome extension over a local port and write structured notes into your vault.",
   "author": "liyachen",
   "isDesktopOnly": true
 }

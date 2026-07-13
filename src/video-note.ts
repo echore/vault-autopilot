@@ -1,0 +1,213 @@
+import { buildVideoEmbed, sanitize } from './util';
+
+export type SectionKind = '封面标题' | '内容' | '动效' | '截图';
+const RANK: Record<SectionKind, number> = { '封面标题': 0, '内容': 1, '动效': 2, '截图': 3 };
+const EMOJI: Record<SectionKind, string> = { '封面标题': '🖼️', '内容': '🎬', '动效': '✨', '截图': '📸' };
+
+export interface VideoNoteMeta {
+  platform: string;
+  videoId: string;
+  videoUrl: string;
+  title: string;
+  channel?: string | null;
+}
+
+export interface NewSection {
+  kind: SectionKind;
+  startSeconds: number;
+  text: string; // full "## heading\n...body" block; 动效 heading uses ① placeholder
+}
+
+export function circledNumber(i: number): string {
+  return i >= 1 && i <= 20 ? String.fromCodePoint(0x2460 + i - 1) : `(${i})`;
+}
+
+export function sopBlock(sopContent: string): string {
+  const lines = sopContent.split('\n').map((l) => `> ${l}`).join('\n');
+  const checklist = ['> ', '> ---', '> **完成后执行：**', '> - [ ] 分析已写入笔记各章节', '> - [ ] 删除此整个提示块'].join('\n');
+  return `> [!TIP] 分析提示\n${lines}\n${checklist}`;
+}
+
+function framesBlock(frameNames: string[]): string {
+  const lines = frameNames.map((n, i) => `> **[Image #${i + 1}]** ![[${n}]]`).join('\n');
+  return `> [!NOTE] 分析用帧\n${lines}\n> \n> - [ ] 按 SOP 完成分析，填入各章节`;
+}
+
+export function coverSection(coverFile: string, sop?: string): NewSection {
+  const parts = [`## 封面标题`, ``, `![[${coverFile}]]`, ``];
+  if (sop) parts.push(sopBlock(sop), ``);
+  return { kind: '封面标题', startSeconds: 0, text: parts.join('\n') };
+}
+
+export function hookSection(
+  p: { url: string; platform?: string; endSeconds: number; frameNames: string[]; transcript?: string; aiResult?: string },
+  sop?: string,
+): NewSection {
+  // Hook is always at the very front — embed the whole video from the start
+  // (no end cap; the captured cut-off point doesn't matter for a hook).
+  const embed = buildVideoEmbed(p.url, p.platform, 0);
+  const parts = [`## 内容`, ``, embed, ``];
+  if (p.aiResult) {
+    parts.push(p.aiResult, ``);
+  } else {
+    parts.push(framesBlock(p.frameNames), ``);
+    if (p.transcript) parts.push(`### 字幕`, ``, p.transcript, ``);
+    if (sop) parts.push(sopBlock(sop), ``);
+  }
+  return { kind: '内容', startSeconds: 0, text: parts.join('\n') };
+}
+
+export function keyframeSection(
+  p: { url: string; platform?: string; start: number; end: number; frameNames: string[]; aiResult?: string },
+  sop?: string,
+): NewSection {
+  // Cue the player to the START of this segment (no end cap).
+  const embed = buildVideoEmbed(p.url, p.platform, p.start);
+  // Integer seconds in the heading: clean display + parseable for re-sorting.
+  const parts = [`## 动效 ① · ${Math.floor(p.start)}s–${Math.round(p.end)}s`, ``, embed, ``];
+  if (p.aiResult) {
+    parts.push(p.aiResult, ``);
+  } else {
+    parts.push(framesBlock(p.frameNames), ``);
+    if (sop) parts.push(sopBlock(sop), ``);
+  }
+  return { kind: '动效', startSeconds: p.start, text: parts.join('\n') };
+}
+
+export function screenshotSection(imageNames: string[], sop?: string, aiResult?: string): NewSection {
+  const imgs = imageNames.map((n) => `![[${n}]]`).join('\n');
+  const parts = [`## 截图 ①`, ``, imgs, ``];
+  if (aiResult) parts.push(aiResult, ``);
+  else if (sop) parts.push(sopBlock(sop), ``);
+  return { kind: '截图', startSeconds: 0, text: parts.join('\n') };
+}
+
+export function buildAnchor(meta: VideoNoteMeta): string {
+  const today = new Date().toISOString().slice(0, 10);
+  const fm = [
+    `---`, `type: video`, `platform: ${meta.platform}`,
+    `video_id: "${meta.videoId}"`, `video_url: "${meta.videoUrl}"`,
+    `title: "${meta.title}"`,
+    ...(meta.channel ? [`channel: "${meta.channel}"`] : []),
+    `dimensions: []`, `analyzed_at: ${today}`, `tags: []`, `depth: normal`, `---`,
+  ].join('\n');
+  return `${fm}\n\n# ${meta.title}\n`;
+}
+
+interface ParsedSection { kind: SectionKind; startSeconds: number; text: string; }
+
+function kindOf(heading: string): SectionKind | null {
+  // Substring match so an emoji prefix (## 🎬 内容) still resolves to its kind.
+  for (const k of ['封面标题', '内容', '动效', '截图'] as SectionKind[]) {
+    if (heading.includes(k)) return k;
+  }
+  return null;
+}
+
+// Force every heading to `## <emoji> <kind…>`, upgrading old headings (no emoji)
+// and de-duplicating any existing emoji, so the note stays visually consistent.
+function emojiHeading(text: string, kind: SectionKind): string {
+  return text.replace(/^## .*$/m, (line) => {
+    const heading = line.slice(3);
+    const idx = heading.indexOf(kind);
+    const tail = idx >= 0 ? heading.slice(idx) : kind;
+    return `## ${EMOJI[kind]} ${tail}`;
+  });
+}
+
+// Drop a trailing horizontal rule (the inter-section separator) plus surrounding
+// whitespace, so re-rendering never stacks `---` lines across merges.
+function stripTrailingRule(t: string): string {
+  return t.replace(/\s+$/, '').replace(/\n-{3,}$/, '').replace(/\s+$/, '');
+}
+
+// Rebuild the top [!abstract] overview from the frontmatter + the dimensions
+// currently present, preserving any other preamble the user added.
+function syncOverview(head: string, frontmatter: string, dims: SectionKind[]): string {
+  const channel = frontmatter.match(/^channel:\s*"?(.*?)"?\s*$/m)?.[1];
+  const platform = frontmatter.match(/^platform:\s*(.*?)\s*$/m)?.[1];
+  const label = [channel, platform].filter(Boolean).join(' · ') || '视频';
+  const overview = `> [!abstract] ${label}\n> ${dims.map((d) => `${EMOJI[d]} ${d}`).join(' · ')}`;
+  const cleaned = head.replace(/\n*> \[!abstract\][^\n]*(?:\n>[^\n]*)*/g, '');
+  if (/^# .+$/m.test(cleaned)) return cleaned.replace(/^(# .+)$/m, `$1\n\n${overview}`);
+  return `${cleaned.replace(/\s+$/, '')}\n\n${overview}`;
+}
+
+function parseSections(body: string): { head: string; sections: ParsedSection[] } {
+  const lines = body.split('\n');
+  const head: string[] = [];
+  const sections: ParsedSection[] = [];
+  let cur: string[] | null = null;
+  let curHeading = '';
+  const flush = () => {
+    if (cur) {
+      const kind = kindOf(curHeading) ?? '动效';
+      const m = curHeading.match(/(\d+)s/);
+      sections.push({ kind, startSeconds: m ? parseInt(m[1], 10) : 0, text: cur.join('\n') });
+    }
+  };
+  let inFence = false;
+  for (const line of lines) {
+    if (/^\s*(```|~~~)/.test(line)) inFence = !inFence;
+    if (!inFence && line.startsWith('## ')) {
+      flush();
+      cur = [line];
+      curHeading = line.slice(3).trim();
+    } else if (cur) {
+      cur.push(line);
+    } else {
+      head.push(line);
+    }
+  }
+  flush();
+  return { head: head.join('\n'), sections };
+}
+
+const DIMENSION_ORDER: SectionKind[] = ['封面标题', '内容', '动效', '截图'];
+
+function addDimension(frontmatter: string, dim: string): string {
+  return frontmatter.replace(/^(dimensions:\s*\[)([^\]]*)(\])/m, (_, open, inner, close) => {
+    const dims = inner.split(',').map((d: string) => d.trim()).filter(Boolean);
+    if (!dims.includes(dim)) dims.push(dim);
+    dims.sort((a, b) => DIMENSION_ORDER.indexOf(a as SectionKind) - DIMENSION_ORDER.indexOf(b as SectionKind));
+    return `${open}${dims.join(', ')}${close}`;
+  });
+}
+
+function renumber(sections: ParsedSection[]): ParsedSection[] {
+  const counters: Partial<Record<SectionKind, number>> = {};
+  return sections.map((s) => {
+    if (s.kind !== '动效' && s.kind !== '截图') return s;
+    counters[s.kind] = (counters[s.kind] ?? 0) + 1;
+    const text = s.text.replace(new RegExp(`^(## .*?${s.kind} )\\S+( ·.*)?$`, 'm'), `$1${circledNumber(counters[s.kind]!)}$2`);
+    return { ...s, text };
+  });
+}
+
+export function mergeSection(existing: string, section: NewSection): { content: string; skipped: boolean } {
+  const fmMatch = existing.match(/^---\n[\s\S]*?\n---/);
+  const frontmatter = fmMatch ? fmMatch[0] : '';
+  const body = fmMatch ? existing.slice(frontmatter.length) : existing;
+
+  const { head, sections } = parseSections(body);
+
+  if (section.kind !== '动效' && section.kind !== '截图' && sections.some((s) => s.kind === section.kind)) {
+    return { content: existing, skipped: true };
+  }
+
+  const incoming: ParsedSection = { kind: section.kind, startSeconds: section.startSeconds, text: section.text };
+  const all = [...sections, incoming].sort((a, b) =>
+    RANK[a.kind] - RANK[b.kind] || a.startSeconds - b.startSeconds,
+  );
+  const ordered = renumber(all);
+
+  const newFrontmatter = addDimension(frontmatter, section.kind);
+  const dims = DIMENSION_ORDER.filter((k) => ordered.some((s) => s.kind === k));
+  const newHead = syncOverview(head, newFrontmatter, dims).replace(/\s+$/, '');
+  const renderedSections = ordered.map((s) => stripTrailingRule(emojiHeading(s.text, s.kind))).join('\n\n---\n\n');
+  const newBody = [newHead, '', renderedSections, ''].join('\n');
+  return { content: `${newFrontmatter}${newBody}`, skipped: false };
+}
+
+// Re-export sanitize for use in clip-router.ts via this module (avoids double import)
+export { sanitize };

@@ -1,16 +1,11 @@
 import * as http from 'http';
 
-export type LegacyClipPayload = {
-  image_base64: string;
-  source_url: string;
-  title: string;
-};
-
 export type ScreenshotPayload = {
   mode: 'screenshot';
   images: string[];
   url: string;
   title: string;
+  cover_url?: string;
 };
 
 export type HookPayload = {
@@ -23,6 +18,8 @@ export type HookPayload = {
   url: string;
   captured_at: string;
   time_range?: { start: number; end: number };
+  cover_url?: string;
+  frames_select?: number;
 };
 
 export type KeyframePayload = {
@@ -32,6 +29,8 @@ export type KeyframePayload = {
   url: string;
   time_range: { start: number; end: number };
   captured_at: string;
+  cover_url?: string;
+  frames_select?: number;
 };
 
 export type ThumbnailPayload = {
@@ -41,9 +40,10 @@ export type ThumbnailPayload = {
   video_url: string;
   thumbnail_url: string;
   title: string;
-  channel: string;
-  channel_handle?: string;
-  views?: string;
+  source_name?: string;
+  channel?: string | null;
+  channel_handle?: string | null;
+  views?: string | null;
   captured_at: string;
 };
 
@@ -51,23 +51,28 @@ export type ClipPayload =
   | ThumbnailPayload
   | ScreenshotPayload
   | HookPayload
-  | KeyframePayload
-  | LegacyClipPayload;
+  | KeyframePayload;
 
-// Returns an obsidian:// deep link to the created/updated note, or undefined
-// when the clip produced no note (e.g. legacy image drop).
-export type ClipHandler = (payload: ClipPayload) => Promise<string | undefined>;
+// Returns an obsidian:// deep link to the created/updated note (optional) and
+// a notice string when a section was skipped (e.g. already exists).
+export type ClipHandler = (payload: ClipPayload) => Promise<{ obsidianUrl?: string; notice?: string }>;
 
-export function createServer(port: number, onClip: ClipHandler): http.Server {
+export function createServer(port: number, onClip: ClipHandler, version = ''): http.Server {
   const server = http.createServer((req, res) => {
     const origin = req.headers['origin'] || '';
     if (origin.startsWith('chrome-extension://')) {
       res.setHeader('Access-Control-Allow-Origin', origin);
-      res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     }
 
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+
+    if (req.method === 'GET' && req.url === '/ping') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ app: 'vault-autopilot', version }));
+      return;
+    }
 
     if (req.method !== 'POST' || req.url !== '/clip') {
       res.writeHead(404, { 'Content-Type': 'application/json' });
@@ -91,9 +96,9 @@ export function createServer(port: number, onClip: ClipHandler): http.Server {
     req.on('end', async () => {
       try {
         const payload = JSON.parse(body) as ClipPayload;
-        const obsidianUrl = await onClip(payload);
+        const { obsidianUrl, notice } = await onClip(payload);
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(obsidianUrl ? { success: true, obsidianUrl } : { success: true }));
+        res.end(JSON.stringify({ success: true, ...(obsidianUrl ? { obsidianUrl } : {}), ...(notice ? { notice } : {}) }));
       } catch (err) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: false, error: String(err) }));

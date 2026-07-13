@@ -71,3 +71,15 @@ describe('buildVideoEmbed', () => {
     expect(result).not.toContain('<iframe');
   });
 });
+
+describe('buildVideoEmbed end param', () => {
+  test('YouTube embed includes start and end when end given', () => {
+    const out = buildVideoEmbed('https://www.youtube.com/watch?v=abc123', 'youtube', 10, 25);
+    expect(out).toContain('youtube.com/embed/abc123?start=10&end=25');
+  });
+  test('YouTube embed omits end when not given', () => {
+    const out = buildVideoEmbed('https://www.youtube.com/watch?v=abc123', 'youtube', 10);
+    expect(out).toContain('start=10');
+    expect(out).not.toContain('end=');
+  });
+});
