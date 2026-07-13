@@ -24,6 +24,12 @@ jobs:
           npm ci
           npm run build
 
+      - name: Package zip
+        run: |
+          mkdir vault-autopilot
+          cp main.js manifest.json vault-autopilot/
+          zip -r vault-autopilot.zip vault-autopilot
+
       - name: Create release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -32,5 +38,4 @@ jobs:
 
           gh release create "$tag" \
             --title="$tag" \
-            --draft \
-            main.js manifest.json
+            main.js manifest.json vault-autopilot.zip
