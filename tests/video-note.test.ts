@@ -1,4 +1,8 @@
 import { buildAnchor, mergeSection, coverSection, hookSection, keyframeSection, screenshotSection, VideoNoteMeta } from '../src/video-note';
+import { setLanguage } from '../src/i18n';
+
+beforeEach(() => setLanguage('zh'));
+afterEach(() => setLanguage('en'));
 
 test('screenshot sections sort after 动效 and renumber ①②', () => {
   let c = buildAnchor({ platform: 'youtube', videoId: 'abc123', videoUrl: 'https://www.youtube.com/watch?v=abc123', title: 'Bee' });
@@ -98,7 +102,7 @@ test('a ## line inside a user code fence is NOT treated as a section', () => {
 
 test('hook section embeds the whole video from start (no end) + frames + 字幕', () => {
   const s = hookSection({ url: meta.videoUrl, platform: 'youtube', endSeconds: 15, frameNames: ['f1.png'], transcript: 'hello' });
-  expect(s.kind).toBe('内容');
+  expect(s.kind).toBe('content');
   expect(s.text).toContain('embed/abc123?start=0');
   expect(s.text).not.toContain('end=');
   expect(s.text).toContain('![[f1.png]]');
@@ -125,4 +129,57 @@ test('keyframe float times become integer seconds in embed and heading', () => {
   expect(s.text).toContain('embed/abc123?start=369');
   expect(s.text).not.toContain('369.35');
   expect(s.text).toContain('## 动效 ① · 369s–386s');
+});
+
+describe('bilingual headings', () => {
+  const bMeta: VideoNoteMeta = {
+    platform: 'youtube', videoId: 'abc123',
+    videoUrl: 'https://www.youtube.com/watch?v=abc123',
+    title: 'Bee Keeper', channel: 'NatureCh',
+  };
+
+  test('English mode writes English headings and dimensions', () => {
+    setLanguage('en');
+    let c = buildAnchor(bMeta);
+    c = mergeSection(c, coverSection('cover.webp')).content;
+    c = mergeSection(c, keyframeSection({ url: bMeta.videoUrl, platform: 'youtube', start: 45, end: 52, frameNames: ['k.png'] })).content;
+    expect(c).toContain('## 🖼️ Cover & Title');
+    expect(c).toContain('## ✨ Motion ① · 45s–52s');
+    expect(c).toContain('dimensions: [Cover & Title, Motion]');
+  });
+
+  test('English section appended to a Chinese note: recognized, ordered, renumbered', () => {
+    setLanguage('zh');
+    let c = buildAnchor(bMeta);
+    c = mergeSection(c, hookSection({ url: bMeta.videoUrl, platform: 'youtube', endSeconds: 15, frameNames: ['f1.png'] })).content;
+    c = mergeSection(c, keyframeSection({ url: bMeta.videoUrl, platform: 'youtube', start: 130, end: 138, frameNames: ['a.png'] })).content;
+    setLanguage('en');
+    const note = mergeSection(c, keyframeSection({ url: bMeta.videoUrl, platform: 'youtube', start: 45, end: 52, frameNames: ['b.png'] })).content;
+    // Chinese hook still recognized and stays before both motion sections
+    expect(note.indexOf('## 🎬 内容')).toBeGreaterThanOrEqual(0);
+    expect(note.indexOf('## 🎬 内容')).toBeLessThan(note.indexOf('## ✨ Motion ①'));
+    // Mixed-language motion sections renumber as one sequence, sorted by start time
+    expect(note).toContain('## ✨ Motion ① · 45s–52s');
+    expect(note).toContain('## ✨ 动效 ② · 130s–138s');
+  });
+
+  test('singular-section skip works across languages', () => {
+    setLanguage('zh');
+    let c = buildAnchor(bMeta);
+    c = mergeSection(c, hookSection({ url: bMeta.videoUrl, platform: 'youtube', endSeconds: 15, frameNames: ['f1.png'] })).content;
+    setLanguage('en');
+    const r = mergeSection(c, hookSection({ url: bMeta.videoUrl, platform: 'youtube', endSeconds: 15, frameNames: ['f2.png'] }));
+    expect(r.skipped).toBe(true);
+  });
+
+  test('dimensions dedupe by kind across languages', () => {
+    setLanguage('zh');
+    let c = buildAnchor(bMeta);
+    c = mergeSection(c, keyframeSection({ url: bMeta.videoUrl, platform: 'youtube', start: 130, end: 138, frameNames: ['a.png'] })).content;
+    setLanguage('en');
+    const note = mergeSection(c, keyframeSection({ url: bMeta.videoUrl, platform: 'youtube', start: 45, end: 52, frameNames: ['b.png'] })).content;
+    // motion is already listed as 动效 — appending an English Motion section must not add a second entry
+    expect(note).toContain('dimensions: [动效]');
+    expect(note).not.toContain('dimensions: [动效, Motion]');
+  });
 });

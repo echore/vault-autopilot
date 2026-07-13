@@ -1,3 +1,5 @@
+import { t } from './i18n';
+
 export function postProcessMarkdown(md: string): string {
   return md.replace(/(?<!`)(#[0-9A-Fa-f]{6}|#[0-9A-Fa-f]{3})\b(?!`)/g, '`$1`');
 }
@@ -68,5 +70,5 @@ export function buildVideoEmbed(url: string, platform: string | undefined, start
     // note they all start at once. autoplay=0 stops that; danmaku=0 keeps replays clean.
     if (id) return `<iframe width="100%" height="315" src="https://player.bilibili.com/player.html?bvid=${id}&page=1&t=${start}&autoplay=0&danmaku=0" frameborder="0" allowfullscreen></iframe>`;
   }
-  return `[▶ 跳转原视频](${url})`;
+  return `[${t('note.openOriginal')}](${url})`;
 }

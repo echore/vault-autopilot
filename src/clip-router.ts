@@ -1,7 +1,7 @@
 import { ClipPayload, HookPayload, KeyframePayload, ScreenshotPayload, ThumbnailPayload } from './server';
 import { ClipRule, PluginSettings, ScreenshotClipRule, ThumbnailClipRule } from './types';
 import { sanitize, buildVideoEmbed, extractVideoId, detectPlatform, videoKey } from './util';
-import { buildAnchor, mergeSection, coverSection, hookSection, keyframeSection, screenshotSection, VideoNoteMeta, NewSection } from './video-note';
+import { buildAnchor, mergeSection, coverSection, hookSection, keyframeSection, screenshotSection, VideoNoteMeta, NewSection, headingLabel } from './video-note';
 
 export interface VaultOps {
   ensureFolder(folderPath: string): Promise<void>;
@@ -52,7 +52,7 @@ async function upsertVideoNote(
   const existing = meta.videoId ? await findNoteByVideoId(meta.videoId, folder, vaultOps) : null;
   if (existing) {
     const { content, skipped } = mergeSection(existing.content, section);
-    if (skipped) return { notePath: existing.path, notice: `「${section.kind}」已存在，未覆盖。想重做请先删掉该小节再点。` };
+    if (skipped) return { notePath: existing.path, notice: `「${headingLabel(section.kind)}」已存在，未覆盖。想重做请先删掉该小节再点。` };
     await vaultOps.modify(existing.path, content);
     return { notePath: existing.path };
   }

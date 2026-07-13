@@ -1,6 +1,10 @@
 import { routeClip, VaultOps } from '../src/clip-router';
 import { ClipRule, ScreenshotClipRule, ThumbnailClipRule } from '../src/types';
 import { ClipPayload } from '../src/server';
+import { setLanguage } from '../src/i18n';
+
+beforeEach(() => setLanguage('zh'));
+afterAll(() => setLanguage('en'));
 
 function makeVaultOps(): jest.Mocked<VaultOps> {
   return {
