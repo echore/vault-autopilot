@@ -79,7 +79,7 @@ Vault Autopilot starts a local HTTP server bound to `127.0.0.1:17183` (configura
 
 - The server only binds to `127.0.0.1` (loopback) — it is not reachable from your network or the internet.
 - `GET /ping` is a health-check endpoint returning `{ "app": "vault-autopilot", "version": "<version>" }`, used by the extension's self-check.
-- `POST /clip` is the only endpoint that accepts data; it only accepts requests whose `Origin` is a `chrome-extension://` origin.
+- `POST /clip` is the only endpoint that accepts data. The server sets CORS response headers only for `chrome-extension://` origins, so ordinary web pages cannot read its responses; combined with the loopback-only bind, only software running on your own machine can reach it.
 - **The one outbound network request the plugin itself makes** is downloading a video's cover/thumbnail image from the video platform's CDN (e.g. YouTube's or Bilibili's image servers), so it can save that image into your vault. No other outbound requests are made, and no data is sent anywhere except to your own local filesystem.
 - Nothing is uploaded, tracked, or sent to any third-party service by this plugin.
 
