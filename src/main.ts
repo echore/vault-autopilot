@@ -5,6 +5,7 @@ import { DEFAULT_SETTINGS, VaultAutopilotSettingTab, normalizePort, emptyToDefau
 import { PluginSettings, ClipMode } from './types';
 import { createServer, ClipPayload } from './server';
 import { routeClip, VaultOps } from './clip-router';
+import { t, setLanguage } from './i18n';
 
 export default class VaultAutopilotPlugin extends Plugin {
   settings: PluginSettings = DEFAULT_SETTINGS;
@@ -12,6 +13,7 @@ export default class VaultAutopilotPlugin extends Plugin {
 
   async onload(): Promise<void> {
     await this.loadSettings();
+    setLanguage(this.settings.language);
     this.addSettingTab(new VaultAutopilotSettingTab(this.app, this));
     if (this.settings.httpServer.enabled) this.startServer();
   }
@@ -68,7 +70,7 @@ export default class VaultAutopilotPlugin extends Plugin {
     if (this.settings.firstSaveNoticed[mode]) return;
     this.settings.firstSaveNoticed[mode] = true;
     const folder = notePath.includes('/') ? notePath.split('/').slice(0, -1).join('/') : '/';
-    new Notice(`已存到 ${folder}\n想换位置？设置 → Vault Autopilot → 存储位置`, 8000);
+    new Notice(t('notice.savedTo', { folder }), 8000);
     try {
       await this.saveSettings();
     } catch {
@@ -124,7 +126,7 @@ export default class VaultAutopilotPlugin extends Plugin {
     );
     this.server.on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'EADDRINUSE') {
-        new Notice(`Vault Autopilot：端口 ${port} 被占用。请关闭占用它的程序；或在插件设置和扩展设置两处改成同一个新端口。`, 10000);
+        new Notice(t('notice.portInUse', { port }), 10000);
       }
     });
   }

@@ -1,3 +1,5 @@
+import type { Language } from './i18n';
+
 // ── Rules ─────────────────────────────────────────────────────────────────────
 
 export interface ClipRule {
@@ -29,6 +31,7 @@ export interface HttpServerSettings {
 export type ClipMode = 'thumbnail' | 'screenshot' | 'hook' | 'keyframe';
 
 export interface PluginSettings {
+  language: Language;
   httpServer: HttpServerSettings;
   clipRules: {
     thumbnail: ThumbnailClipRule;

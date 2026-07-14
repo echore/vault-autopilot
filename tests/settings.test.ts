@@ -50,3 +50,7 @@ describe('first-save notice flags', () => {
     });
   });
 });
+
+test('default language is English', () => {
+  expect(DEFAULT_SETTINGS.language).toBe('en');
+});

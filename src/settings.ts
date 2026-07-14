@@ -1,8 +1,10 @@
 import { App, PluginSettingTab, Setting } from 'obsidian';
 import type VaultAutopilotPlugin from './main';
 import { PluginSettings } from './types';
+import { t, setLanguage, Language } from './i18n';
 
 export const DEFAULT_SETTINGS: PluginSettings = {
+  language: 'en',
   httpServer: {
     enabled: true,
     port: 17183,
@@ -45,15 +47,28 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    // ── 存储位置 ────────────────────────────────────────────────────────────────
+    new Setting(containerEl)
+      .setName(t('settings.language'))
+      .addDropdown(d => d
+        .addOption('en', 'English')
+        .addOption('zh', '中文')
+        .setValue(this.plugin.settings.language)
+        .onChange(async v => {
+          this.plugin.settings.language = v as Language;
+          setLanguage(this.plugin.settings.language);
+          await this.plugin.saveSettings();
+          this.display();
+        }));
+
+    // ── Storage locations ────────────────────────────────────────────────────────
     // One note per video: cover / hook / keyframe clips all upsert sections into
     // the same note, so there is exactly one "video notes" location — the UI must
     // not pretend each mode has its own output folder.
-    new Setting(containerEl).setName('存储位置').setHeading();
+    new Setting(containerEl).setName(t('settings.storageHeading')).setHeading();
 
     new Setting(containerEl)
-      .setName('视频笔记文件夹')
-      .setDesc('一个视频一条笔记：封面、Hook、关键帧都写进同一条。默认 Clips/Videos')
+      .setName(t('settings.videoNotesFolder.name'))
+      .setDesc(t('settings.videoNotesFolder.desc'))
       .addText(t => t
         .setValue(this.plugin.settings.clipRules.thumbnail.outputFolder)
         .onChange(async v => {
@@ -62,8 +77,8 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
         }));
 
     new Setting(containerEl)
-      .setName('封面图片文件夹')
-      .setDesc('视频封面图（<视频ID>.webp）。默认 Clips/Videos/covers')
+      .setName(t('settings.coverFolder.name'))
+      .setDesc(t('settings.coverFolder.desc'))
       .addText(t => t
         .setValue(this.plugin.settings.clipRules.thumbnail.thumbnailFolder)
         .onChange(async v => {
@@ -72,8 +87,8 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
         }));
 
     new Setting(containerEl)
-      .setName('帧图片文件夹')
-      .setDesc('Hook / 关键帧抽出的帧图。默认 Clips/Videos/frames')
+      .setName(t('settings.framesFolder.name'))
+      .setDesc(t('settings.framesFolder.desc'))
       .addText(t => t
         .setValue(this.plugin.settings.clipRules.hook.framesFolder)
         .onChange(async v => {
@@ -84,8 +99,8 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
         }));
 
     new Setting(containerEl)
-      .setName('截图文件夹')
-      .setDesc('普通网页截图独立成笔记，存在这里；图片自动放入其 frames/ 子文件夹。默认 Clips/Screenshots')
+      .setName(t('settings.screenshotFolder.name'))
+      .setDesc(t('settings.screenshotFolder.desc'))
       .addText(t => t
         .setValue(this.plugin.settings.clipRules.screenshot.outputFolder)
         .onChange(async v => {
@@ -95,12 +110,12 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         }));
 
-    // ── 高级 ────────────────────────────────────────────────────────────────────
-    new Setting(containerEl).setName('高级').setHeading();
+    // ── Advanced ──────────────────────────────────────────────────────────────────
+    new Setting(containerEl).setName(t('settings.advancedHeading')).setHeading();
 
     new Setting(containerEl)
-      .setName('启用 HTTP 服务')
-      .setDesc('接收 Chrome 扩展通过 POST /clip 发来的内容')
+      .setName(t('settings.httpEnable.name'))
+      .setDesc(t('settings.httpEnable.desc'))
       .addToggle(t => t.setValue(this.plugin.settings.httpServer.enabled).onChange(async v => {
         this.plugin.settings.httpServer.enabled = v;
         await this.plugin.saveSettings();
@@ -108,16 +123,16 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
       }));
 
     new Setting(containerEl)
-      .setName('端口')
-      .setDesc('默认 17183。仅当端口被占用时才需要改；改完必须在扩展的引导页（高级 → 端口）改成同一个值，否则两边会断开。改后重启 Obsidian。')
+      .setName(t('settings.port.name'))
+      .setDesc(t('settings.port.desc'))
       .addText(t => t.setValue(String(this.plugin.settings.httpServer.port)).onChange(async v => {
         const n = parseInt(v, 10);
         if (n > 1024 && n < 65536) { this.plugin.settings.httpServer.port = n; await this.plugin.saveSettings(); }
       }));
 
     new Setting(containerEl)
-      .setName('抽帧数量上限')
-      .setDesc('Hook / 关键帧模式最多保存几帧（1–20）。默认 5。')
+      .setName(t('settings.maxFrames.name'))
+      .setDesc(t('settings.maxFrames.desc'))
       .addText(t => t
         .setValue(String(this.plugin.settings.clipRules.hook.maxFrames))
         .onChange(async v => {
@@ -130,15 +145,15 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
         }));
 
     const sopModes = [
-      ['thumbnail', '封面 SOP 路径'],
-      ['screenshot', '截图 SOP 路径'],
-      ['hook', 'Hook SOP 路径'],
-      ['keyframe', '关键帧 SOP 路径'],
+      ['thumbnail', t('settings.sop.thumbnail')],
+      ['screenshot', t('settings.sop.screenshot')],
+      ['hook', t('settings.sop.hook')],
+      ['keyframe', t('settings.sop.keyframe')],
     ] as const;
     for (const [mode, label] of sopModes) {
       new Setting(containerEl)
         .setName(label)
-        .setDesc('留空 = 纯素材模式（不附带分析提示）。填 vault 内 markdown 文件的绝对路径。')
+        .setDesc(t('settings.sop.desc'))
         .addText(t => t
           .setValue(this.plugin.settings.clipRules[mode].sopPath)
           .onChange(async v => {
