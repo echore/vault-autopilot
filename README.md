@@ -1,3 +1,5 @@
+**English** | [简体中文](README.zh.md)
+
 # Vault Autopilot
 
 Vault Autopilot receives clips from the companion Chrome extension, **[Obsidian Visual Clipper](https://github.com/liyachen/obsidian-visual-clipper)**, and writes them into structured notes and images in your vault — automatically, with no manual paste-and-format step.
@@ -47,25 +49,29 @@ Clips/
 
 Open Settings → Vault Autopilot.
 
-### 存储位置 (Storage locations)
+### Language
+
+The **Language** dropdown at the top of the settings tab switches the plugin between English and 中文 — settings UI, notices, and the text written into generated notes. Default is English. Notes created under one language remain fully recognized after switching: section matching understands both languages, so existing notes never break (headings inside one note may end up mixed, which is cosmetic only).
+
+### Storage locations
 
 | Field | Default | Purpose |
 |---|---|---|
-| 视频笔记文件夹 (video notes folder) | `Clips/Videos` | Where video notes (cover/hook/keyframe, merged) are written |
-| 封面图片文件夹 (cover images folder) | `Clips/Videos/covers` | Where `<video_id>.webp` cover images are saved |
-| 帧图片文件夹 (frames folder) | `Clips/Videos/frames` | Where hook/keyframe extracted frames are saved |
-| 截图文件夹 (screenshots folder) | `Clips/Screenshots` (+ `/frames`) | Where standalone screenshot notes and their images go |
+| Video notes folder | `Clips/Videos` | Where video notes (cover/hook/keyframe, merged) are written |
+| Cover images folder | `Clips/Videos/covers` | Where `<video_id>.webp` cover images are saved |
+| Frame images folder | `Clips/Videos/frames` | Where hook/keyframe extracted frames are saved |
+| Screenshots folder | `Clips/Screenshots` (+ `/frames`) | Where standalone screenshot notes and their images go |
 
 All four fields accept any vault-relative folder path; leaving a field at its default keeps zero-config behavior.
 
-### 高级 (Advanced)
+### Advanced
 
 | Field | Default | Purpose |
 |---|---|---|
-| 启用 HTTP 服务 (enable HTTP server) | on | Turns the local server that receives clips on/off |
-| 端口 (port) | `17183` | The port the local server listens on. This is an escape hatch for port conflicts only — if you change it, you must change the same value in the extension's settings, or the two sides will stop talking to each other |
-| 抽帧数量上限 (max frames) | `5` | Maximum frames kept per hook/keyframe clip (1–20) |
-| Per-mode SOP path (封面/截图/Hook/关键帧 SOP 路径) | empty | Optional path to a markdown file in your vault with analysis instructions for that clip type. Leaving a SOP path empty puts that mode in **material-only mode** — the note is written with no analysis prompt block |
+| Enable HTTP server | on | Turns the local server that receives clips on/off |
+| Port | `17183` | The port the local server listens on. This is an escape hatch for port conflicts only — if you change it, you must change the same value in the extension's settings, or the two sides will stop talking to each other |
+| Max frames | `5` | Maximum frames kept per hook/keyframe clip (1–20) |
+| Cover/Screenshot/Hook/Keyframe SOP path | empty | Optional path to a markdown file in your vault with analysis instructions for that clip type. Leaving a SOP path empty puts that mode in **material-only mode** — the note is written with no analysis prompt block |
 
 ## Network use disclosure
 
@@ -73,7 +79,7 @@ Vault Autopilot starts a local HTTP server bound to `127.0.0.1:17183` (configura
 
 - The server only binds to `127.0.0.1` (loopback) — it is not reachable from your network or the internet.
 - `GET /ping` is a health-check endpoint returning `{ "app": "vault-autopilot", "version": "<version>" }`, used by the extension's self-check.
-- `POST /clip` is the only endpoint that accepts data; it only accepts requests whose `Origin` is a `chrome-extension://` origin.
+- `POST /clip` is the only endpoint that accepts data. The server sets CORS response headers only for `chrome-extension://` origins, so ordinary web pages cannot read its responses; combined with the loopback-only bind, only software running on your own machine can reach it.
 - **The one outbound network request the plugin itself makes** is downloading a video's cover/thumbnail image from the video platform's CDN (e.g. YouTube's or Bilibili's image servers), so it can save that image into your vault. No other outbound requests are made, and no data is sent anywhere except to your own local filesystem.
 - Nothing is uploaded, tracked, or sent to any third-party service by this plugin.
 
@@ -81,28 +87,17 @@ Vault Autopilot starts a local HTTP server bound to `127.0.0.1:17183` (configura
 
 **"Port already in use" / extension can't connect:**
 - Another process may already be using port 17183. Vault Autopilot will show a notice naming the conflicting port when this happens.
-- Fix: either quit whatever else is using that port, or change the port in **both** places — Vault Autopilot's settings (高级 → 端口) and the extension's settings (高级 → 端口) — to the same new value, then restart Obsidian.
+- Fix: either quit whatever else is using that port, or change the port in **both** places — Vault Autopilot's settings (Advanced → Port) and the extension's settings (Advanced → Port) — to the same new value, then restart Obsidian.
 
 **Extension shows the plugin as offline / self-check fails:**
 - Confirm Vault Autopilot is enabled in Obsidian's Community plugins list.
-- Confirm 启用 HTTP 服务 (enable HTTP server) is toggled on in the plugin's settings.
+- Confirm **Enable HTTP server** is toggled on in the plugin's settings.
 - Confirm the port configured in the extension matches the plugin's port setting exactly.
 - Vault Autopilot is desktop-only; it will not run (and the extension will not be able to reach it) if Obsidian is only open on mobile.
 
 **Clips arrive but land in an unexpected folder:**
-- Check 存储位置 in settings — folders are fully configurable, and a first-save notice tells you exactly where each mode's first note landed.
+- Check **Storage locations** in settings — folders are fully configurable, and a first-save notice tells you exactly where each mode's first note landed.
 
 ## License
 
 MIT — see [LICENSE](LICENSE).
-
----
-
-## 中文快速上手
-
-Vault Autopilot 是配合 Chrome 扩展 **Obsidian Visual Clipper** 使用的 Obsidian 插件：扩展负责在网页/视频页面截图、抓封面、抓 Hook、抓关键帧，插件负责接收并写入结构化笔记。
-
-- **零配置可用**：装好插件和扩展即可直接使用，默认存到 `Clips/` 目录下。
-- **一个视频一条笔记**：同一视频的封面、Hook、关键帧会合并写入同一条笔记，谁先到谁建笔记；网页截图则各自独立成笔记。
-- 扩展的引导页有实时自检和测试剪藏功能，装好后可以直接验证插件和扩展是否连通。
-- 所有存储路径和端口都可在设置里修改；插件仅在本机 `127.0.0.1:17183` 提供本地服务，不会被局域网或公网访问到；插件发出的唯一一次网络请求，是从视频平台下载封面图存入 vault。

@@ -331,9 +331,11 @@ describe('bilingual headings', () => {
     c = mergeSection(c, keyframeSection({ url: bMeta.videoUrl, platform: 'youtube', start: 130, end: 138, frameNames: ['a.png'] })).content;
     setLanguage('en');
     const note = mergeSection(c, keyframeSection({ url: bMeta.videoUrl, platform: 'youtube', start: 45, end: 52, frameNames: ['b.png'] })).content;
-    // Chinese hook still recognized and stays before both motion sections
+    // Chinese hook still recognized and stays before both motion sections.
+    // Compare against the full body heading — the top [!abstract] overview also
+    // contains the bare word "Motion" (current-language dimension labels).
     expect(note.indexOf('## 🎬 内容')).toBeGreaterThanOrEqual(0);
-    expect(note.indexOf('## 🎬 内容')).toBeLessThan(note.indexOf('Motion'));
+    expect(note.indexOf('## 🎬 内容')).toBeLessThan(note.indexOf('## ✨ Motion ①'));
     // Mixed-language motion sections renumber as one sequence, sorted by start time
     expect(note).toContain('## ✨ Motion ① · 45s–52s');
     expect(note).toContain('## ✨ 动效 ② · 130s–138s');

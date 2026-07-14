@@ -1,6 +1,10 @@
 import { routeClip, VaultOps } from '../src/clip-router';
 import { ClipRule, ScreenshotClipRule, ThumbnailClipRule } from '../src/types';
 import { ClipPayload } from '../src/server';
+import { setLanguage } from '../src/i18n';
+
+beforeEach(() => setLanguage('zh'));
+afterAll(() => setLanguage('en'));
 
 function makeVaultOps(): jest.Mocked<VaultOps> {
   return {
@@ -136,6 +140,29 @@ describe('routeClip — screenshot', () => {
     expect(vaultOps.create).toHaveBeenCalledWith(
       expect.stringMatching(/Screenshots\/screenshot-.+\.md/),
       expect.stringContaining('# Screenshot — Old Format'),
+    );
+  });
+});
+
+describe('routeClip — screenshot (English)', () => {
+  beforeEach(() => setLanguage('en'));
+
+  test('template note is written in English', async () => {
+    const vaultOps = makeVaultOps();
+    const payload: ClipPayload = {
+      mode: 'screenshot',
+      images: [Buffer.from('pixels').toString('base64')],
+      url: 'https://x.com',
+      title: 'My Screenshot',
+    };
+    await routeClip(payload, clipRules, vaultOps);
+    expect(vaultOps.create).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.stringContaining('Source: https://x.com'),
+    );
+    expect(vaultOps.create).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.stringContaining('## Notes'),
     );
   });
 });
@@ -413,5 +440,16 @@ describe('routeClip — unified video note (manual)', () => {
     expect(note).toContain('## 📸 截图');
     expect(note).toContain('## 🎬 内容');
     expect(note.indexOf('## 🎬 内容')).toBeLessThan(note.indexOf('## 📸 截图'));
+  });
+
+  describe('English output', () => {
+    beforeEach(() => setLanguage('en'));
+
+    test('re-capture notice is English and names the section label', async () => {
+      const { v } = vaultWithStore();
+      await routeClip(hookPayload, manual, v);
+      const r = await routeClip(hookPayload, manual, v);
+      expect(r.notice).toContain('"Content" already exists');
+    });
   });
 });
