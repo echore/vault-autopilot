@@ -1,7 +1,8 @@
 import { ClipPayload, HookPayload, KeyframePayload, ScreenshotPayload, ThumbnailPayload } from './server';
 import { ClipRule, PluginSettings, ScreenshotClipRule, ThumbnailClipRule } from './types';
 import { sanitize, buildVideoEmbed, extractVideoId, detectPlatform, videoKey } from './util';
-import { buildAnchor, mergeSection, coverSection, hookSection, keyframeSection, screenshotSection, VideoNoteMeta, NewSection, headingLabel } from './video-note';
+import { buildAnchor, mergeSection, coverSection, hookSection, keyframeSection, screenshotSection, VideoNoteMeta, NewSection, headingLabel, sopBlock } from './video-note';
+import { t } from './i18n';
 
 export interface VaultOps {
   ensureFolder(folderPath: string): Promise<void>;
@@ -52,7 +53,7 @@ async function upsertVideoNote(
   const existing = meta.videoId ? await findNoteByVideoId(meta.videoId, folder, vaultOps) : null;
   if (existing) {
     const { content, skipped } = mergeSection(existing.content, section);
-    if (skipped) return { notePath: existing.path, notice: `「${headingLabel(section.kind)}」已存在，未覆盖。想重做请先删掉该小节再点。` };
+    if (skipped) return { notePath: existing.path, notice: t('notice.sectionExists', { section: headingLabel(section.kind) }) };
     await vaultOps.modify(existing.path, content);
     return { notePath: existing.path };
   }
@@ -96,19 +97,14 @@ function buildScreenshotTemplate(payload: ScreenshotPayload, imageNames: string[
   const parts = [
     `# Screenshot — ${payload.title}`,
     ``,
-    `来源：${payload.url}`,
+    t('note.source', { url: payload.url }),
     ``,
-    `> [!NOTE] 截图`,
+    `> [!NOTE] ${t('note.screenshotCallout')}`,
     imageLines,
     ``,
   ];
-  // sopBlock is now in video-note; inline the template here for screenshots
-  if (sopContent) {
-    const lines = sopContent.split('\n').map((l) => `> ${l}`).join('\n');
-    const checklist = [`> `, `> ---`, `> **完成后执行：**`, `> - [ ] 分析已写入笔记各章节`, `> - [ ] 删除此整个提示块`].join('\n');
-    parts.push(`> [!TIP] 分析提示\n${lines}\n${checklist}`, ``);
-  }
-  parts.push(`---`, ``, `## 笔记`, ``);
+  if (sopContent) parts.push(sopBlock(sopContent), ``);
+  parts.push(`---`, ``, `## ${t('note.notesHeading')}`, ``);
   return parts.join('\n');
 }
 
@@ -120,7 +116,7 @@ async function handleScreenshot(
   assetFolder: string,
 ): Promise<{ notePath: string }> {
   if (!rule.outputFolder) {
-    throw new Error('截图文件夹未配置：请在 设置 → Vault Autopilot → 存储位置 → 截图文件夹 填写。');
+    throw new Error(t('error.screenshotFolderNotConfigured'));
   }
   const stem = `screenshot-${sanitize(payload.title)}-${Date.now()}`;
   const notePath = `${rule.outputFolder}/${stem}.md`;
@@ -180,7 +176,7 @@ async function handleThumbnail(
   vaultOps: VaultOps,
 ): Promise<{ notePath: string; notice?: string }> {
   if (!rule.outputFolder || !rule.thumbnailFolder) {
-    throw new Error('视频笔记文件夹或封面图片文件夹未配置：请在 设置 → Vault Autopilot → 存储位置 填写。');
+    throw new Error(t('error.videoFolderNotConfigured'));
   }
   await vaultOps.ensureFolder(rule.thumbnailFolder);
 
