@@ -1,9 +1,3 @@
----
-title: Video Hook Analysis SOP
-type: note
-permalink: obsidian-sop/05-aesthetic-collection/video-hook-analysis-sop
----
-
 # Video Hook Analysis Prompt
 
 _After reading this document, output your Hook analysis directly using the framework below._

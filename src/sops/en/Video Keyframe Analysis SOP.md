@@ -1,9 +1,3 @@
----
-title: Video Keyframe Analysis SOP
-type: note
-permalink: obsidian-sop/05-aesthetic-collection/video-keyframe-analysis-sop
----
-
 # Video Keyframe Analysis SOP
 
 > Input: multiple keyframe screenshots from a segment of the video (filename prefix `keyframe-`).

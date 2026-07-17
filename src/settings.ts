@@ -1,12 +1,13 @@
 import { App, Notice, PluginSettingTab, Setting, TextComponent } from 'obsidian';
 import type VaultAutopilotPlugin from './main';
-import { PluginSettings } from './types';
-import { t, setLanguage, Language } from './i18n';
-import { installBundledSops } from './bundled-sops';
+import { PluginSettings, ClipMode } from './types';
+import { t, setLanguage, Language, LocaleKey } from './i18n';
+import { exportBuiltinSop } from './bundled-sops';
 
 export const DEFAULT_SETTINGS: PluginSettings = {
   language: 'en',
   baseFolder: 'Clips',
+  useBuiltinSops: true,
   httpServer: {
     enabled: true,
     port: 17183,
@@ -209,37 +210,77 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
           }
         }));
 
+    // ── Analysis SOPs ─────────────────────────────────────────────────────────────
+    // Empty sopPath = the mode's built-in SOP (when the master switch is on).
+    // The Customize button forks the built-in into <base>/SOPs and points the
+    // path at the copy; clearing the path returns the mode to built-in.
+    new Setting(containerEl).setName(t('settings.sopHeading')).setHeading();
+
+    const sopRows = [
+      { mode: 'thumbnail' as const, name: t('settings.sopRow.cover'), hasBuiltin: true },
+      { mode: 'screenshot' as const, name: t('settings.sopRow.screenshot'), hasBuiltin: false },
+      { mode: 'hook' as const, name: t('settings.sopRow.hook'), hasBuiltin: true },
+      { mode: 'keyframe' as const, name: t('settings.sopRow.keyframe'), hasBuiltin: true },
+    ];
+    const sopStateEls: Partial<Record<ClipMode, HTMLElement>> = {};
+    const refreshSopStates = () => {
+      for (const row of sopRows) {
+        const el = sopStateEls[row.mode];
+        if (!el) continue;
+        const custom = this.plugin.settings.clipRules[row.mode].sopPath.trim().length > 0;
+        let key: LocaleKey;
+        let color: string;
+        if (custom) { key = 'settings.sopState.custom'; color = '#b08c2e'; }
+        else if (!row.hasBuiltin) { key = 'settings.sopState.none'; color = 'var(--text-muted)'; }
+        else if (this.plugin.settings.useBuiltinSops) { key = 'settings.sopState.builtin'; color = 'var(--color-green, #3d8a5f)'; }
+        else { key = 'settings.sopState.off'; color = 'var(--text-muted)'; }
+        el.textContent = t(key);
+        el.style.color = color;
+      }
+    };
+
     new Setting(containerEl)
-      .setName(t('settings.installSops.name'))
-      .setDesc(t('settings.installSops.desc'))
-      .addButton(b => b
-        .setButtonText(t('settings.installSops.button'))
-        .onClick(async () => {
-          const { written, skipped } = await installBundledSops(
-            this.plugin.sopInstallOps(), this.plugin.settings.baseFolder);
-          new Notice(t('notice.sopsInstalled', {
-            count: written.length,
-            folder: `${this.plugin.settings.baseFolder}/SOPs`,
-            skipped: skipped.length,
-          }), 8000);
+      .setName(t('settings.useBuiltinSops.name'))
+      .setDesc(t('settings.useBuiltinSops.desc'))
+      .addToggle(tg => tg
+        .setValue(this.plugin.settings.useBuiltinSops)
+        .onChange(async v => {
+          this.plugin.settings.useBuiltinSops = v;
+          await this.plugin.saveSettings();
+          refreshSopStates();
         }));
 
-    const sopModes = [
-      ['thumbnail', t('settings.sop.thumbnail')],
-      ['screenshot', t('settings.sop.screenshot')],
-      ['hook', t('settings.sop.hook')],
-      ['keyframe', t('settings.sop.keyframe')],
-    ] as const;
-    for (const [mode, label] of sopModes) {
-      new Setting(containerEl)
-        .setName(label)
-        .setDesc(t('settings.sop.desc'))
-        .addText(t => t
-          .setValue(this.plugin.settings.clipRules[mode].sopPath)
+    for (const row of sopRows) {
+      const setting = new Setting(containerEl)
+        .setName(row.name)
+        .setDesc(t(row.hasBuiltin ? 'settings.sopRow.desc' : 'settings.sopRow.descNoBuiltin'))
+        .addText(txt => txt
+          .setPlaceholder(t(row.hasBuiltin ? 'settings.sopRow.placeholder' : 'settings.sopRow.placeholderNoBuiltin'))
+          .setValue(this.plugin.settings.clipRules[row.mode].sopPath)
           .onChange(async v => {
-            this.plugin.settings.clipRules[mode].sopPath = v.trim();
+            this.plugin.settings.clipRules[row.mode].sopPath = v.trim();
             await this.plugin.saveSettings();
+            refreshSopStates();
           }));
+      if (row.hasBuiltin) {
+        setting.addButton(b => b
+          .setButtonText(t('settings.sopCustomize'))
+          .onClick(async () => {
+            const r = await exportBuiltinSop(
+              this.plugin.sopInstallOps(), this.plugin.settings.baseFolder,
+              row.mode, this.plugin.settings.language);
+            if (!r) return;
+            this.plugin.settings.clipRules[row.mode].sopPath = r.path;
+            await this.plugin.saveSettings();
+            new Notice(t(r.existed ? 'notice.sopExportExists' : 'notice.sopExported', { path: r.path }), 8000);
+            this.display();
+          }));
+      }
+      const stateEl = setting.infoEl.createDiv();
+      stateEl.style.fontSize = '12px';
+      stateEl.style.marginTop = '4px';
+      sopStateEls[row.mode] = stateEl;
     }
+    refreshSopStates();
   }
 }

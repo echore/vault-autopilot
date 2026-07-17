@@ -1,9 +1,3 @@
----
-title: 视频Hook分析 SOP
-type: note
-permalink: obsidian-sop/05-审美积累/视频-hook-分析-sop
----
-
 # 视频 Hook 分析 Prompt
 
 _读完这份文档后，直接按以下框架输出 Hook 分析。_

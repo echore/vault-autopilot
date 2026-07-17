@@ -1,9 +1,3 @@
----
-title: 封面拆解学习 SOP2
-type: note
-permalink: obsidian-sop/02-写作与内容/封面拆解学习-sop2
----
-
 # 封面与标题分析 Prompt
 
 _读完这份文档后，直接按以下框架输出分析。_

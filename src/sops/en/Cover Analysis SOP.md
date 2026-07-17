@@ -1,9 +1,3 @@
----
-title: Cover Analysis SOP2
-type: note
-permalink: obsidian-sop/02-writing-and-content/cover-analysis-sop2
----
-
 # Cover and Title Analysis Prompt
 
 _After reading this document, output your analysis directly using the framework below._

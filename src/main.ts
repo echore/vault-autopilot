@@ -1,11 +1,12 @@
 import * as http from 'http';
 import * as fs from 'fs';
-import { Notice, Plugin, TFile, requestUrl } from 'obsidian';
+import * as nodePath from 'path';
+import { FileSystemAdapter, Notice, Plugin, TFile, requestUrl } from 'obsidian';
 import { DEFAULT_SETTINGS, VaultAutopilotSettingTab, normalizePort, emptyToDefault } from './settings';
 import { PluginSettings, ClipMode } from './types';
 import { createServer, ClipPayload } from './server';
 import { routeClip, VaultOps } from './clip-router';
-import { SopInstallOps } from './bundled-sops';
+import { SopInstallOps, builtinSopFor } from './bundled-sops';
 import { t, setLanguage } from './i18n';
 
 export default class VaultAutopilotPlugin extends Plugin {
@@ -65,6 +66,18 @@ export default class VaultAutopilotPlugin extends Plugin {
     }
   }
 
+  // Built-in SOP contents for modes whose sopPath is empty, respecting the
+  // master switch and the plugin language.
+  builtinSops(): Partial<Record<ClipMode, string>> {
+    if (!this.settings.useBuiltinSops) return {};
+    const lang = this.settings.language;
+    return {
+      thumbnail: builtinSopFor('thumbnail', lang),
+      hook: builtinSopFor('hook', lang),
+      keyframe: builtinSopFor('keyframe', lang),
+    };
+  }
+
   // Narrow vault access for the settings tab's bundled-SOP installer.
   sopInstallOps(): SopInstallOps {
     return {
@@ -100,7 +113,14 @@ export default class VaultAutopilotPlugin extends Plugin {
         else await this.app.vault.createBinary(p, data);
       },
       create: async (p, content) => { await this.app.vault.create(p, content); },
-      readFileSync: (p) => fs.readFileSync(p, 'utf8'),
+      readFileSync: (p) => {
+        // sopPath accepts both absolute paths and vault-relative ones (the
+        // Customize button fills vault-relative paths).
+        const abs = nodePath.isAbsolute(p)
+          ? p
+          : nodePath.join((this.app.vault.adapter as FileSystemAdapter).getBasePath(), p);
+        return fs.readFileSync(abs, 'utf8');
+      },
       downloadUrl: async (url) => {
         const resp = await requestUrl({ url, method: 'GET' });
         return resp.arrayBuffer;
@@ -125,7 +145,7 @@ export default class VaultAutopilotPlugin extends Plugin {
     this.server = createServer(
       port,
       async (payload) => {
-        const { notePath, notice } = await routeClip(payload, this.settings.clipRules, vaultOps);
+        const { notePath, notice } = await routeClip(payload, this.settings.clipRules, vaultOps, this.builtinSops());
         if (notePath) await this.maybeFirstSaveNotice(payload.mode, notePath);
         const obsidianUrl = notePath
           ? `obsidian://open?vault=${encodeURIComponent(this.app.vault.getName())}&file=${encodeURIComponent(notePath)}`

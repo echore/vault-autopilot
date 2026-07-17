@@ -35,6 +35,9 @@ export interface PluginSettings {
   // Root folder for everything the plugin writes; the four folder fields
   // below derive from it when the user edits it in settings.
   baseFolder: string;
+  // When true, a mode with an empty sopPath falls back to its bundled SOP
+  // (cover, hook, keyframe); false means empty sopPath = material-only.
+  useBuiltinSops: boolean;
   httpServer: HttpServerSettings;
   clipRules: {
     thumbnail: ThumbnailClipRule;

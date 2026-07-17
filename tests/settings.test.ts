@@ -59,6 +59,9 @@ describe('base folder derivation', () => {
   test('default settings carry baseFolder Clips', () => {
     expect(DEFAULT_SETTINGS.baseFolder).toBe('Clips');
   });
+  test('built-in SOPs are on by default', () => {
+    expect(DEFAULT_SETTINGS.useBuiltinSops).toBe(true);
+  });
   test('derives all five paths from a base name', () => {
     expect(deriveFolders('Great Videos')).toEqual({
       videoNotes: 'Great Videos/Videos',

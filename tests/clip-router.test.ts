@@ -453,3 +453,55 @@ describe('routeClip — unified video note (manual)', () => {
     });
   });
 });
+
+// ── built-in SOP fallback ─────────────────────────────────────────────────────
+
+describe('routeClip — built-in SOP fallback', () => {
+  const payload: ClipPayload = {
+    mode: 'thumbnail',
+    platform: 'youtube',
+    video_id: 'abc123',
+    video_url: 'https://www.youtube.com/watch?v=abc123',
+    thumbnail_url: 'https://img.youtube.com/vi/abc123/maxresdefault.jpg',
+    title: 'How to Get Rich on Easy Mode',
+    channel: 'Ali Abdaal',
+    channel_handle: '@aliabdaal',
+    views: '27.8万',
+    captured_at: '2026-05-31T00:00:00Z',
+  };
+
+  test('empty sopPath uses the provided built-in SOP content', async () => {
+    const vaultOps = makeVaultOps();
+    const rules = { ...clipRules, thumbnail: { ...thumbnailClipRule, sopPath: '' } };
+    await routeClip(payload, rules, vaultOps, { thumbnail: '# Built-in cover SOP\ncheck contrast' });
+    const [, noteContent] = (vaultOps.create as jest.Mock).mock.calls[0];
+    expect(noteContent).toContain('# Built-in cover SOP');
+    expect(vaultOps.readFileSync).not.toHaveBeenCalled();
+  });
+
+  test('a configured sopPath wins over the built-in', async () => {
+    const vaultOps = makeVaultOps();
+    await routeClip(payload, clipRules, vaultOps, { thumbnail: '# Built-in cover SOP' });
+    const [, noteContent] = (vaultOps.create as jest.Mock).mock.calls[0];
+    expect(noteContent).toContain('# SOP');
+    expect(noteContent).toContain('Analyze this.');
+    expect(noteContent).not.toContain('# Built-in cover SOP');
+  });
+
+  test('empty sopPath and no built-in stays material-only', async () => {
+    const vaultOps = makeVaultOps();
+    const rules = { ...clipRules, thumbnail: { ...thumbnailClipRule, sopPath: '' } };
+    await routeClip(payload, rules, vaultOps, {});
+    const [, noteContent] = (vaultOps.create as jest.Mock).mock.calls[0];
+    expect(noteContent).not.toContain('Built-in');
+    expect(vaultOps.readFileSync).not.toHaveBeenCalled();
+  });
+
+  test('a broken custom path falls back to the built-in instead of failing silent', async () => {
+    const vaultOps = makeVaultOps();
+    (vaultOps.readFileSync as jest.Mock).mockImplementation(() => { throw new Error('missing'); });
+    await routeClip(payload, clipRules, vaultOps, { thumbnail: '# Built-in cover SOP' });
+    const [, noteContent] = (vaultOps.create as jest.Mock).mock.calls[0];
+    expect(noteContent).toContain('# Built-in cover SOP');
+  });
+});

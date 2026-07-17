@@ -1,9 +1,3 @@
----
-title: 视频关键帧分析 SOP
-type: note
-permalink: obsidian-sop/05-审美积累/视频关键帧分析-sop
----
-
 # 视频关键帧分析 SOP
 
 > 输入：视频某段时间内的多张关键帧截图（文件名前缀 `keyframe-`）。

@@ -20,14 +20,15 @@ export async function routeClip(
   payload: ClipPayload,
   clipRules: PluginSettings['clipRules'],
   vaultOps: VaultOps,
+  builtinSops: Partial<Record<ClipPayload['mode'], string>> = {},
 ): Promise<{ notePath?: string; notice?: string }> {
-  if (payload.mode === 'thumbnail') return handleThumbnail(payload, clipRules.thumbnail, vaultOps);
+  if (payload.mode === 'thumbnail') return handleThumbnail(payload, clipRules.thumbnail, vaultOps, builtinSops.thumbnail);
   if (payload.mode === 'screenshot') {
     const normalized = normalizeScreenshot(payload);
-    return handleScreenshot(normalized, clipRules.screenshot, vaultOps, clipRules.thumbnail.outputFolder, clipRules.thumbnail.thumbnailFolder);
+    return handleScreenshot(normalized, clipRules.screenshot, vaultOps, clipRules.thumbnail.outputFolder, clipRules.thumbnail.thumbnailFolder, builtinSops.screenshot);
   }
-  if (payload.mode === 'hook') return handleMultiFrame(payload, clipRules.hook, vaultOps, clipRules.thumbnail.outputFolder, clipRules.thumbnail.thumbnailFolder);
-  if (payload.mode === 'keyframe') return handleMultiFrame(payload, clipRules.keyframe, vaultOps, clipRules.thumbnail.outputFolder, clipRules.thumbnail.thumbnailFolder);
+  if (payload.mode === 'hook') return handleMultiFrame(payload, clipRules.hook, vaultOps, clipRules.thumbnail.outputFolder, clipRules.thumbnail.thumbnailFolder, builtinSops.hook);
+  if (payload.mode === 'keyframe') return handleMultiFrame(payload, clipRules.keyframe, vaultOps, clipRules.thumbnail.outputFolder, clipRules.thumbnail.thumbnailFolder, builtinSops.keyframe);
   throw new Error('Unknown clip mode');
 }
 
@@ -114,6 +115,7 @@ async function handleScreenshot(
   vaultOps: VaultOps,
   searchFolder: string,
   assetFolder: string,
+  builtinSop?: string,
 ): Promise<{ notePath: string }> {
   if (!rule.outputFolder) {
     throw new Error(t('error.screenshotFolderNotConfigured'));
@@ -140,7 +142,7 @@ async function handleScreenshot(
   const intoVideoNote = !!existing || extractVideoId(payload.url, undefined) != null;
   const meta: VideoNoteMeta = { platform: detectPlatform(payload.url), videoId: key, videoUrl: payload.url, title: payload.title };
 
-  const sopContent = readSopSafely(rule.sopPath, vaultOps);
+  const sopContent = readSopSafely(rule.sopPath, vaultOps) ?? builtinSop;
   if (intoVideoNote) {
     const r = await upsertVideoNote(meta, screenshotSection(imageNames, sopContent), vaultOps, searchFolder);
     await ensureCover(meta.videoId, payload.cover_url, vaultOps, assetFolder);
@@ -174,6 +176,7 @@ async function handleThumbnail(
   payload: ThumbnailPayload,
   rule: ThumbnailClipRule,
   vaultOps: VaultOps,
+  builtinSop?: string,
 ): Promise<{ notePath: string; notice?: string }> {
   if (!rule.outputFolder || !rule.thumbnailFolder) {
     throw new Error(t('error.videoFolderNotConfigured'));
@@ -187,7 +190,7 @@ async function handleThumbnail(
   const imgData = await vaultOps.downloadUrl(payload.thumbnail_url);
   await vaultOps.createBinary(thumbnailPath, imgData);
 
-  const sopContent = readSopSafely(rule.sopPath, vaultOps);
+  const sopContent = readSopSafely(rule.sopPath, vaultOps) ?? builtinSop;
   const section = coverSection(thumbnailFile, sopContent);
   const meta: VideoNoteMeta = {
     platform: payload.platform,
@@ -205,6 +208,7 @@ async function handleMultiFrame(
   vaultOps: VaultOps,
   searchFolder: string,
   assetFolder: string,
+  builtinSop?: string,
 ): Promise<{ notePath: string; notice?: string }> {
   // ── Pick which frames to keep from the candidates the extension sent ──────────
   // The extension already curates frames; save them as-is, or sample uniformly
@@ -232,7 +236,7 @@ async function handleMultiFrame(
     await vaultOps.createBinary(`${framesDir}/${name}`, bytes.buffer as ArrayBuffer);
     frameNames.push(name);
   }
-  const sopContent = readSopSafely(rule.sopPath, vaultOps);
+  const sopContent = readSopSafely(rule.sopPath, vaultOps) ?? builtinSop;
   let section: NewSection;
   if (payload.mode === 'hook') {
     section = hookSection(
