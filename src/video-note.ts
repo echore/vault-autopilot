@@ -22,7 +22,7 @@ function labelVariants(kind: SectionKind): string[] {
 }
 
 // Exact-match a frontmatter dimension label (either language) back to its kind.
-function labelToKind(label: string): SectionKind | null {
+export function labelToKind(label: string): SectionKind | null {
   for (const k of KINDS) if (labelVariants(k).includes(label)) return k;
   return null;
 }

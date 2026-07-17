@@ -7,6 +7,7 @@ import { PluginSettings, ClipMode } from './types';
 import { createServer, ClipPayload } from './server';
 import { routeClip, VaultOps } from './clip-router';
 import { SopInstallOps, builtinSopFor } from './bundled-sops';
+import { GalleryView, GALLERY_VIEW_TYPE } from './gallery-view';
 import { t, setLanguage } from './i18n';
 
 export default class VaultAutopilotPlugin extends Plugin {
@@ -17,7 +18,16 @@ export default class VaultAutopilotPlugin extends Plugin {
     await this.loadSettings();
     setLanguage(this.settings.language);
     this.addSettingTab(new VaultAutopilotSettingTab(this.app, this));
+    this.registerView(GALLERY_VIEW_TYPE, (leaf) => new GalleryView(leaf, this));
+    this.addRibbonIcon('layout-grid', t('gallery.open'), () => this.activateGallery());
     if (this.settings.httpServer.enabled) this.startServer();
+  }
+
+  async activateGallery(): Promise<void> {
+    const existing = this.app.workspace.getLeavesOfType(GALLERY_VIEW_TYPE)[0];
+    if (existing) { this.app.workspace.revealLeaf(existing); return; }
+    const leaf = this.app.workspace.getLeaf(true);
+    await leaf.setViewState({ type: GALLERY_VIEW_TYPE, active: true });
   }
 
   onunload(): void {
