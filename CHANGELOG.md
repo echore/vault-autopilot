@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0
+
+- Base folder setting: change one field and the four storage paths follow automatically. A Restore button resets the factory layout under `Clips/`.
+- Built-in analysis SOPs (cover, hook, keyframe; each in Chinese and English) ship inside the plugin and are on by default: a mode whose SOP path is empty now carries its built-in analysis prompt in every saved note. A master switch in settings turns this off for material-only clipping.
+- Per-mode Customize button forks the built-in SOP into `<Base folder>/SOPs` and points that mode's SOP path at the copy; clearing the path returns the mode to built-in. Each SOP row shows which source is currently in effect.
+- SOP paths accept vault-relative paths in addition to absolute ones.
+- English settings copy avoids dashes; all new settings strings are bilingual (English and Chinese).
+
 ## 0.1.0 — Initial release
 
 First public release of Vault Autopilot, the vault-side companion to the **Obsidian Visual Clipper** Chrome extension.
