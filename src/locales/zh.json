@@ -1,6 +1,11 @@
 {
   "settings.language": "语言",
   "settings.storageHeading": "存储位置",
+  "settings.baseFolder.name": "根文件夹",
+  "settings.baseFolder.desc": "本插件保存的所有内容的根目录。改这一项，下面四个路径自动跟着换。默认：Clips",
+  "settings.restoreDefaults.name": "恢复默认文件夹",
+  "settings.restoreDefaults.desc": "把根文件夹和下面四个路径重置回 Clips/ 出厂布局。",
+  "settings.restoreDefaults.button": "恢复",
   "settings.videoNotesFolder.name": "视频笔记文件夹",
   "settings.videoNotesFolder.desc": "一个视频一条笔记：封面、Hook、关键帧都写进同一条。默认 Clips/Videos",
   "settings.coverFolder.name": "封面图片文件夹",

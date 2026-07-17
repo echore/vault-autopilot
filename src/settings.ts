@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting } from 'obsidian';
+import { App, PluginSettingTab, Setting, TextComponent } from 'obsidian';
 import type VaultAutopilotPlugin from './main';
 import { PluginSettings } from './types';
 import { t, setLanguage, Language } from './i18n';
@@ -89,48 +89,89 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
     // not pretend each mode has its own output folder.
     new Setting(containerEl).setName(t('settings.storageHeading')).setHeading();
 
+    const folderInputs: TextComponent[] = []; // [videoNotes, covers, frames, screenshots]
+
+    new Setting(containerEl)
+      .setName(t('settings.baseFolder.name'))
+      .setDesc(t('settings.baseFolder.desc'))
+      .addText(txt => txt
+        .setValue(this.plugin.settings.baseFolder)
+        .onChange(async v => {
+          applyBaseFolder(this.plugin.settings, v);
+          const f = deriveFolders(v);
+          // setValue does not fire onChange, so this cannot loop.
+          folderInputs[0]?.setValue(f.videoNotes);
+          folderInputs[1]?.setValue(f.covers);
+          folderInputs[2]?.setValue(f.frames);
+          folderInputs[3]?.setValue(f.screenshots);
+          await this.plugin.saveSettings();
+        }));
+
     new Setting(containerEl)
       .setName(t('settings.videoNotesFolder.name'))
       .setDesc(t('settings.videoNotesFolder.desc'))
-      .addText(t => t
-        .setValue(this.plugin.settings.clipRules.thumbnail.outputFolder)
-        .onChange(async v => {
-          this.plugin.settings.clipRules.thumbnail.outputFolder = v.trim();
-          await this.plugin.saveSettings();
-        }));
+      .addText(t2 => {
+        folderInputs.push(t2);
+        t2
+          .setValue(this.plugin.settings.clipRules.thumbnail.outputFolder)
+          .onChange(async v => {
+            this.plugin.settings.clipRules.thumbnail.outputFolder = v.trim();
+            await this.plugin.saveSettings();
+          });
+      });
 
     new Setting(containerEl)
       .setName(t('settings.coverFolder.name'))
       .setDesc(t('settings.coverFolder.desc'))
-      .addText(t => t
-        .setValue(this.plugin.settings.clipRules.thumbnail.thumbnailFolder)
-        .onChange(async v => {
-          this.plugin.settings.clipRules.thumbnail.thumbnailFolder = v.trim();
-          await this.plugin.saveSettings();
-        }));
+      .addText(t2 => {
+        folderInputs.push(t2);
+        t2
+          .setValue(this.plugin.settings.clipRules.thumbnail.thumbnailFolder)
+          .onChange(async v => {
+            this.plugin.settings.clipRules.thumbnail.thumbnailFolder = v.trim();
+            await this.plugin.saveSettings();
+          });
+      });
 
     new Setting(containerEl)
       .setName(t('settings.framesFolder.name'))
       .setDesc(t('settings.framesFolder.desc'))
-      .addText(t => t
-        .setValue(this.plugin.settings.clipRules.hook.framesFolder)
-        .onChange(async v => {
-          const folder = v.trim();
-          this.plugin.settings.clipRules.hook.framesFolder = folder;
-          this.plugin.settings.clipRules.keyframe.framesFolder = folder;
-          await this.plugin.saveSettings();
-        }));
+      .addText(t2 => {
+        folderInputs.push(t2);
+        t2
+          .setValue(this.plugin.settings.clipRules.hook.framesFolder)
+          .onChange(async v => {
+            const folder = v.trim();
+            this.plugin.settings.clipRules.hook.framesFolder = folder;
+            this.plugin.settings.clipRules.keyframe.framesFolder = folder;
+            await this.plugin.saveSettings();
+          });
+      });
 
     new Setting(containerEl)
       .setName(t('settings.screenshotFolder.name'))
       .setDesc(t('settings.screenshotFolder.desc'))
-      .addText(t => t
-        .setValue(this.plugin.settings.clipRules.screenshot.outputFolder)
-        .onChange(async v => {
-          const folder = v.trim();
-          this.plugin.settings.clipRules.screenshot.outputFolder = folder;
-          this.plugin.settings.clipRules.screenshot.framesFolder = folder ? `${folder}/frames` : '';
+      .addText(t2 => {
+        folderInputs.push(t2);
+        t2
+          .setValue(this.plugin.settings.clipRules.screenshot.outputFolder)
+          .onChange(async v => {
+            const folder = v.trim();
+            this.plugin.settings.clipRules.screenshot.outputFolder = folder;
+            this.plugin.settings.clipRules.screenshot.framesFolder = folder ? `${folder}/frames` : '';
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.restoreDefaults.name'))
+      .setDesc(t('settings.restoreDefaults.desc'))
+      .addButton(b => b
+        .setButtonText(t('settings.restoreDefaults.button'))
+        .onClick(async () => {
+          applyBaseFolder(this.plugin.settings, 'Clips');
           await this.plugin.saveSettings();
+          this.display();
         }));
 
     // ── Advanced ──────────────────────────────────────────────────────────────────
