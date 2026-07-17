@@ -5,6 +5,7 @@ import { DEFAULT_SETTINGS, VaultAutopilotSettingTab, normalizePort, emptyToDefau
 import { PluginSettings, ClipMode } from './types';
 import { createServer, ClipPayload } from './server';
 import { routeClip, VaultOps } from './clip-router';
+import { SopInstallOps } from './bundled-sops';
 import { t, setLanguage } from './i18n';
 
 export default class VaultAutopilotPlugin extends Plugin {
@@ -62,6 +63,15 @@ export default class VaultAutopilotPlugin extends Plugin {
         await this.app.vault.createFolder(current);
       }
     }
+  }
+
+  // Narrow vault access for the settings tab's bundled-SOP installer.
+  sopInstallOps(): SopInstallOps {
+    return {
+      fileExists: (p) => this.app.vault.getAbstractFileByPath(p) != null,
+      ensureFolder: (p) => this.ensureFolder(p),
+      create: async (p, content) => { await this.app.vault.create(p, content); },
+    };
   }
 
   // First successful save per mode: tell the user where it landed and that the

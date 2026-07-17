@@ -10,6 +10,7 @@ const ctx = await esbuild.context({
   external: ['obsidian', 'electron', 'node:*'],
   format: 'cjs',
   target: 'ES2018',
+  loader: { '.md': 'text' },
   logLevel: 'info',
   sourcemap: prod ? false : 'inline',
   treeShaking: true,

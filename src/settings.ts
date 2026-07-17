@@ -1,7 +1,8 @@
-import { App, PluginSettingTab, Setting, TextComponent } from 'obsidian';
+import { App, Notice, PluginSettingTab, Setting, TextComponent } from 'obsidian';
 import type VaultAutopilotPlugin from './main';
 import { PluginSettings } from './types';
 import { t, setLanguage, Language } from './i18n';
+import { installBundledSops } from './bundled-sops';
 
 export const DEFAULT_SETTINGS: PluginSettings = {
   language: 'en',
@@ -206,6 +207,21 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
             this.plugin.settings.clipRules.keyframe.maxFrames = n;
             await this.plugin.saveSettings();
           }
+        }));
+
+    new Setting(containerEl)
+      .setName(t('settings.installSops.name'))
+      .setDesc(t('settings.installSops.desc'))
+      .addButton(b => b
+        .setButtonText(t('settings.installSops.button'))
+        .onClick(async () => {
+          const { written, skipped } = await installBundledSops(
+            this.plugin.sopInstallOps(), this.plugin.settings.baseFolder);
+          new Notice(t('notice.sopsInstalled', {
+            count: written.length,
+            folder: `${this.plugin.settings.baseFolder}/SOPs`,
+            skipped: skipped.length,
+          }), 8000);
         }));
 
     const sopModes = [
