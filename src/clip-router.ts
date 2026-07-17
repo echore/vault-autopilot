@@ -1,7 +1,7 @@
 import { ClipPayload, HookPayload, KeyframePayload, ScreenshotPayload, ThumbnailPayload } from './server';
 import { ClipRule, PluginSettings, ScreenshotClipRule, ThumbnailClipRule } from './types';
 import { sanitize, buildVideoEmbed, extractVideoId, detectPlatform, videoKey } from './util';
-import { buildAnchor, mergeSection, coverSection, hookSection, keyframeSection, screenshotSection, VideoNoteMeta, NewSection, headingLabel, sopBlock } from './video-note';
+import { buildAnchor, ensurePublished, mergeSection, coverSection, hookSection, keyframeSection, screenshotSection, VideoNoteMeta, NewSection, headingLabel, sopBlock } from './video-note';
 import { t } from './i18n';
 
 export interface VaultOps {
@@ -54,8 +54,12 @@ async function upsertVideoNote(
   const existing = meta.videoId ? await findNoteByVideoId(meta.videoId, folder, vaultOps) : null;
   if (existing) {
     const { content, skipped } = mergeSection(existing.content, section);
-    if (skipped) return { notePath: existing.path, notice: t('notice.sectionExists', { section: headingLabel(section.kind) }) };
-    await vaultOps.modify(existing.path, content);
+    if (skipped) {
+      const patched = ensurePublished(existing.content, meta.published);
+      if (patched !== existing.content) await vaultOps.modify(existing.path, patched);
+      return { notePath: existing.path, notice: t('notice.sectionExists', { section: headingLabel(section.kind) }) };
+    }
+    await vaultOps.modify(existing.path, ensurePublished(content, meta.published));
     return { notePath: existing.path };
   }
   const { content } = mergeSection(buildAnchor(meta), section);
@@ -198,6 +202,7 @@ async function handleThumbnail(
     videoUrl: payload.video_url,
     title: payload.title,
     channel: payload.channel,
+    published: payload.published_at,
   };
   return upsertVideoNote(meta, section, vaultOps, rule.outputFolder);
 }

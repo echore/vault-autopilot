@@ -1,4 +1,4 @@
-import { buildAnchor, mergeSection, coverSection, hookSection, keyframeSection, screenshotSection, VideoNoteMeta } from '../src/video-note';
+import { buildAnchor, ensurePublished, mergeSection, coverSection, hookSection, keyframeSection, screenshotSection, VideoNoteMeta } from '../src/video-note';
 import { setLanguage } from '../src/i18n';
 
 beforeEach(() => setLanguage('zh'));
@@ -181,5 +181,34 @@ describe('bilingual headings', () => {
     // motion is already listed as 动效 — appending an English Motion section must not add a second entry
     expect(note).toContain('dimensions: [动效]');
     expect(note).not.toContain('dimensions: [动效, Motion]');
+  });
+});
+
+describe('published frontmatter', () => {
+  const base = { platform: 'youtube', videoId: 'x', videoUrl: 'https://y/x', title: 'T' };
+
+  test('buildAnchor writes published when meta carries it', () => {
+    expect(buildAnchor({ ...base, published: '2026-07-10' })).toContain('published: 2026-07-10');
+  });
+
+  test('buildAnchor omits published when absent', () => {
+    expect(buildAnchor(base)).not.toContain('published:');
+  });
+
+  test('ensurePublished inserts into existing frontmatter', () => {
+    const content = '---\ntype: video\ntitle: "T"\n---\n\n# T\n';
+    const out = ensurePublished(content, '2026-07-10');
+    expect(out).toContain('published: 2026-07-10');
+    expect(out.indexOf('published:')).toBeLessThan(out.indexOf('\n---\n'));
+  });
+
+  test('ensurePublished is a no-op when already present', () => {
+    const content = '---\ntype: video\npublished: 2026-01-01\n---\n\n# T\n';
+    expect(ensurePublished(content, '2026-07-10')).toBe(content);
+  });
+
+  test('ensurePublished is a no-op without a date or frontmatter', () => {
+    expect(ensurePublished('---\ntype: video\n---\n', undefined)).toBe('---\ntype: video\n---\n');
+    expect(ensurePublished('no frontmatter', '2026-07-10')).toBe('no frontmatter');
   });
 });

@@ -45,6 +45,7 @@ export type ThumbnailPayload = {
   channel_handle?: string | null;
   views?: string | null;
   captured_at: string;
+  published_at?: string;
 };
 
 export type ClipPayload =

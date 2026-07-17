@@ -33,6 +33,7 @@ export interface VideoNoteMeta {
   videoUrl: string;
   title: string;
   channel?: string | null;
+  published?: string | null;
 }
 
 export interface NewSection {
@@ -112,9 +113,22 @@ export function buildAnchor(meta: VideoNoteMeta): string {
     `video_id: "${meta.videoId}"`, `video_url: "${meta.videoUrl}"`,
     `title: "${meta.title}"`,
     ...(meta.channel ? [`channel: "${meta.channel}"`] : []),
+    ...(meta.published ? [`published: ${meta.published}`] : []),
     `dimensions: []`, `analyzed_at: ${today}`, `tags: []`, `depth: normal`, `---`,
   ].join('\n');
   return `${fm}\n\n# ${meta.title}\n`;
+}
+
+// Backfill path: notes created by hook/keyframe (or an older version) have no
+// `published` — patch it into the frontmatter the next time a thumbnail clip
+// for the same video arrives with one.
+export function ensurePublished(content: string, published?: string | null): string {
+  if (!published || !content.startsWith('---\n')) return content;
+  const end = content.indexOf('\n---', 4);
+  if (end === -1) return content;
+  const fm = content.slice(0, end);
+  if (/^published:/m.test(fm)) return content;
+  return `${fm}\npublished: ${published}${content.slice(end)}`;
 }
 
 interface ParsedSection { kind: SectionKind; startSeconds: number; text: string; }
