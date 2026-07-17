@@ -32,6 +32,9 @@ export type ClipMode = 'thumbnail' | 'screenshot' | 'hook' | 'keyframe';
 
 export interface PluginSettings {
   language: Language;
+  // Root folder for everything the plugin writes; the four folder fields
+  // below derive from it when the user edits it in settings.
+  baseFolder: string;
   httpServer: HttpServerSettings;
   clipRules: {
     thumbnail: ThumbnailClipRule;

@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, normalizePort, emptyToDefault } from '../src/settings';
+import { DEFAULT_SETTINGS, normalizePort, emptyToDefault, deriveFolders, applyBaseFolder } from '../src/settings';
 
 describe('port migration', () => {
   test('default port is 17183', () => {
@@ -53,4 +53,46 @@ describe('first-save notice flags', () => {
 
 test('default language is English', () => {
   expect(DEFAULT_SETTINGS.language).toBe('en');
+});
+
+describe('base folder derivation', () => {
+  test('default settings carry baseFolder Clips', () => {
+    expect(DEFAULT_SETTINGS.baseFolder).toBe('Clips');
+  });
+  test('derives all five paths from a base name', () => {
+    expect(deriveFolders('Great Videos')).toEqual({
+      videoNotes: 'Great Videos/Videos',
+      covers: 'Great Videos/Videos/covers',
+      frames: 'Great Videos/Videos/frames',
+      screenshots: 'Great Videos/Screenshots',
+      screenshotFrames: 'Great Videos/Screenshots/frames',
+    });
+  });
+  test('trims whitespace and trailing slashes; empty falls back to Clips', () => {
+    expect(deriveFolders(' class// ').videoNotes).toBe('class/Videos');
+    expect(deriveFolders('').videoNotes).toBe('Clips/Videos');
+  });
+  test('applyBaseFolder rewrites every folder field and baseFolder itself', () => {
+    const s = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+    applyBaseFolder(s, 'class');
+    expect(s.baseFolder).toBe('class');
+    expect(s.clipRules.thumbnail.outputFolder).toBe('class/Videos');
+    expect(s.clipRules.thumbnail.thumbnailFolder).toBe('class/Videos/covers');
+    expect(s.clipRules.hook.framesFolder).toBe('class/Videos/frames');
+    expect(s.clipRules.keyframe.framesFolder).toBe('class/Videos/frames');
+    expect(s.clipRules.screenshot.outputFolder).toBe('class/Screenshots');
+    expect(s.clipRules.screenshot.framesFolder).toBe('class/Screenshots/frames');
+  });
+  test('applyBaseFolder with Clips restores the factory layout', () => {
+    const s = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+    applyBaseFolder(s, 'somewhere/else');
+    applyBaseFolder(s, 'Clips');
+    expect(s.clipRules).toEqual(DEFAULT_SETTINGS.clipRules);
+  });
+  test('applyBaseFolder never touches sopPath', () => {
+    const s = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+    s.clipRules.hook.sopPath = '/keep/me.md';
+    applyBaseFolder(s, 'class');
+    expect(s.clipRules.hook.sopPath).toBe('/keep/me.md');
+  });
 });

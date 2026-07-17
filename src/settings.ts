@@ -5,6 +5,7 @@ import { t, setLanguage, Language } from './i18n';
 
 export const DEFAULT_SETTINGS: PluginSettings = {
   language: 'en',
+  baseFolder: 'Clips',
   httpServer: {
     enabled: true,
     port: 17183,
@@ -36,6 +37,28 @@ export function emptyToDefault<T extends object>(loaded: Partial<T> | undefined,
     if (key !== 'sopPath' && merged[key] === '' && defaults[key] !== '') merged[key] = defaults[key];
   }
   return merged;
+}
+
+export function deriveFolders(base: string) {
+  const b = base.trim().replace(/\/+$/, '') || 'Clips';
+  return {
+    videoNotes: `${b}/Videos`,
+    covers: `${b}/Videos/covers`,
+    frames: `${b}/Videos/frames`,
+    screenshots: `${b}/Screenshots`,
+    screenshotFrames: `${b}/Screenshots/frames`,
+  };
+}
+
+export function applyBaseFolder(settings: PluginSettings, base: string): void {
+  const f = deriveFolders(base);
+  settings.baseFolder = base.trim().replace(/\/+$/, '') || 'Clips';
+  settings.clipRules.thumbnail.outputFolder = f.videoNotes;
+  settings.clipRules.thumbnail.thumbnailFolder = f.covers;
+  settings.clipRules.hook.framesFolder = f.frames;
+  settings.clipRules.keyframe.framesFolder = f.frames;
+  settings.clipRules.screenshot.outputFolder = f.screenshots;
+  settings.clipRules.screenshot.framesFolder = f.screenshotFrames;
 }
 
 export class VaultAutopilotSettingTab extends PluginSettingTab {
