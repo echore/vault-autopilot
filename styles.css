@@ -65,11 +65,15 @@
 .vap-card-deep { border-left: 3px solid #6c3fcc; }
 
 /* Video embeds the plugin writes into notes render wide at 16:9 instead of
-   the cramped default. Scoped to the two platforms we embed. */
+   the cramped default. Scoped to the two platforms we embed.
+   .markdown-source-view covers Live Preview (CM6 html embeds), which the
+   reading-view classes don't reach. */
 .markdown-preview-view iframe[src*="youtube.com"],
 .markdown-preview-view iframe[src*="bilibili.com"],
 .markdown-rendered iframe[src*="youtube.com"],
-.markdown-rendered iframe[src*="bilibili.com"] {
+.markdown-rendered iframe[src*="bilibili.com"],
+.markdown-source-view iframe[src*="youtube.com"],
+.markdown-source-view iframe[src*="bilibili.com"] {
   width: 100% !important;
   aspect-ratio: 16 / 9 !important;
   height: auto !important;
