@@ -34,7 +34,7 @@ __export(main_exports, {
 module.exports = __toCommonJS(main_exports);
 var fs = __toESM(require("fs"));
 var nodePath = __toESM(require("path"));
-var import_obsidian2 = require("obsidian");
+var import_obsidian3 = require("obsidian");
 
 // src/settings.ts
 var import_obsidian = require("obsidian");
@@ -63,6 +63,11 @@ var en_default = {
   "settings.port.desc": "Default 17183. Only change it if the port is taken; after changing, set the same value on the extension's welcome page (Advanced \u2192 Port), or the two sides will disconnect. Restart Obsidian afterwards.",
   "settings.maxFrames.name": "Max frames",
   "settings.maxFrames.desc": "Maximum frames kept per hook / keyframe clip (1 to 20). Default 5.",
+  "gallery.title": "Video library",
+  "gallery.open": "Open video library",
+  "gallery.all": "All",
+  "gallery.deep": "Deep dives",
+  "gallery.empty": "No videos yet. Open any video page, click the extension icon, and save a cover. It will show up here.",
   "settings.sopHeading": "Analysis SOPs",
   "settings.useBuiltinSops.name": "Use built-in analysis SOPs",
   "settings.useBuiltinSops.desc": "On: every saved clip carries its matching built-in SOP (cover, hook, keyframe), and plugin updates keep them current. Off: clips save material only, with no analysis prompt.",
@@ -128,6 +133,11 @@ var zh_default = {
   "settings.port.desc": "\u9ED8\u8BA4 17183\u3002\u4EC5\u5F53\u7AEF\u53E3\u88AB\u5360\u7528\u65F6\u624D\u9700\u8981\u6539\uFF1B\u6539\u5B8C\u5FC5\u987B\u5728\u6269\u5C55\u7684\u5F15\u5BFC\u9875\uFF08\u9AD8\u7EA7 \u2192 \u7AEF\u53E3\uFF09\u6539\u6210\u540C\u4E00\u4E2A\u503C\uFF0C\u5426\u5219\u4E24\u8FB9\u4F1A\u65AD\u5F00\u3002\u6539\u540E\u91CD\u542F Obsidian\u3002",
   "settings.maxFrames.name": "\u62BD\u5E27\u6570\u91CF\u4E0A\u9650",
   "settings.maxFrames.desc": "Hook / \u5173\u952E\u5E27\u6A21\u5F0F\u6700\u591A\u4FDD\u5B58\u51E0\u5E27\uFF081\u201320\uFF09\u3002\u9ED8\u8BA4 5\u3002",
+  "gallery.title": "\u89C6\u9891\u5E93",
+  "gallery.open": "\u6253\u5F00\u89C6\u9891\u5E93",
+  "gallery.all": "\u5168\u90E8",
+  "gallery.deep": "\u6DF1\u5EA6\u7814\u7A76",
+  "gallery.empty": "\u8FD8\u6CA1\u6709\u89C6\u9891\u3002\u6253\u5F00\u4EFB\u610F\u89C6\u9891\u9875\uFF0C\u70B9\u6269\u5C55\u56FE\u6807\u5B58\u4E00\u4E2A\u5C01\u9762\uFF0C\u5B83\u5C31\u4F1A\u51FA\u73B0\u5728\u8FD9\u91CC\u3002",
   "settings.sopHeading": "\u5206\u6790 SOP",
   "settings.useBuiltinSops.name": "\u4F7F\u7528\u5185\u7F6E\u5206\u6790 SOP",
   "settings.useBuiltinSops.desc": "\u5F00\u7740\uFF1A\u4FDD\u5B58 clip \u65F6\u81EA\u52A8\u9644\u5E26\u5BF9\u5E94\u7684\u5185\u7F6E\u5206\u6790 SOP\uFF08\u5C01\u9762\u3001Hook\u3001\u5173\u952E\u5E27\uFF09\uFF0C\u63D2\u4EF6\u66F4\u65B0\u65F6 SOP \u81EA\u52A8\u66F4\u65B0\u3002\u5173\u6389\uFF1A\u53EA\u5B58\u7D20\u6750\uFF0C\u4E0D\u5E26\u5206\u6790\u63D0\u793A\u3002",
@@ -975,8 +985,187 @@ async function handleMultiFrame(payload, rule, vaultOps, searchFolder, assetFold
   return result;
 }
 
+// src/gallery-view.ts
+var import_obsidian2 = require("obsidian");
+
+// src/gallery-model.ts
+var EMPTY_FILTER = { dims: [], platform: null, source: null };
+var DEEP_SOURCE = "__deep__";
+var CHANNEL_CHIP_MIN = 6;
+function dimensionChips(cards) {
+  const seen = [];
+  for (const c of cards)
+    for (const d of c.dimensions)
+      if (!seen.includes(d)) seen.push(d);
+  return seen;
+}
+function platformChips(cards) {
+  const seen = [];
+  for (const c of cards)
+    if (c.platform && !seen.includes(c.platform)) seen.push(c.platform);
+  return seen.length > 1 ? seen : [];
+}
+function channelChips(cards, min = CHANNEL_CHIP_MIN) {
+  var _a;
+  const counts = /* @__PURE__ */ new Map();
+  for (const c of cards)
+    if (c.channel) counts.set(c.channel, ((_a = counts.get(c.channel)) != null ? _a : 0) + 1);
+  return [...counts.entries()].filter(([, n]) => n >= min).sort((a, b) => b[1] - a[1]).map(([ch]) => ch);
+}
+function hasDeep(cards) {
+  return cards.some((c) => c.depth === "deep");
+}
+function filterCards(cards, filter) {
+  return cards.filter((c) => {
+    if (filter.platform && c.platform !== filter.platform) return false;
+    if (filter.source === DEEP_SOURCE && c.depth !== "deep") return false;
+    if (filter.source && filter.source !== DEEP_SOURCE && c.channel !== filter.source) return false;
+    if (filter.dims.length > 0 && !filter.dims.some((d) => c.dimensions.includes(d))) return false;
+    return true;
+  }).sort((a, b) => {
+    if (!a.date && !b.date) return 0;
+    if (!a.date) return 1;
+    if (!b.date) return -1;
+    return b.date.localeCompare(a.date);
+  });
+}
+
+// src/gallery-view.ts
+var GALLERY_VIEW_TYPE = "vault-autopilot-gallery";
+var PLATFORM_LABELS = { youtube: "YouTube", bilibili: "Bilibili" };
+var GalleryView = class extends import_obsidian2.ItemView {
+  constructor(leaf, plugin) {
+    super(leaf);
+    this.plugin = plugin;
+    this.filter = { ...EMPTY_FILTER, dims: [] };
+  }
+  getViewType() {
+    return GALLERY_VIEW_TYPE;
+  }
+  getDisplayText() {
+    return t("gallery.title");
+  }
+  getIcon() {
+    return "layout-grid";
+  }
+  async onOpen() {
+    this.registerEvent(this.app.metadataCache.on("resolved", () => this.render()));
+    this.render();
+  }
+  collectCards() {
+    var _a;
+    const folder = this.plugin.settings.clipRules.thumbnail.outputFolder;
+    const cards = [];
+    for (const file of this.app.vault.getMarkdownFiles()) {
+      if (!file.path.startsWith(`${folder}/`)) continue;
+      const fm = (_a = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a.frontmatter;
+      if (!fm || fm.type !== "video") continue;
+      const rawDims = fm.dimensions;
+      const dims = (Array.isArray(rawDims) ? rawDims : rawDims ? [rawDims] : []).map(String).map((label) => {
+        var _a2;
+        return (_a2 = labelToKind(label)) != null ? _a2 : label;
+      });
+      cards.push({
+        path: file.path,
+        title: fm.title ? String(fm.title) : file.basename,
+        videoId: fm.video_id ? String(fm.video_id) : "",
+        platform: fm.platform ? String(fm.platform) : void 0,
+        channel: fm.channel ? String(fm.channel) : void 0,
+        dimensions: [...new Set(dims)],
+        depth: fm.depth ? String(fm.depth) : void 0,
+        views: fm.views ? String(fm.views) : void 0,
+        note: fm.note ? String(fm.note) : void 0,
+        date: fm.analyzed_at ? String(fm.analyzed_at).slice(0, 10) : new Date(file.stat.ctime).toISOString().slice(0, 10)
+      });
+    }
+    return cards;
+  }
+  dimLabel(dim) {
+    const kinds = ["cover", "content", "motion", "screenshot"];
+    return kinds.includes(dim) ? headingLabel(dim) : dim;
+  }
+  render() {
+    var _a, _b;
+    const root = this.contentEl;
+    root.empty();
+    root.addClass("vap-gallery");
+    const cards = this.collectCards();
+    if (cards.length === 0) {
+      root.createEl("div", { text: t("gallery.empty"), cls: "vap-empty" });
+      return;
+    }
+    const bar = root.createEl("div", { cls: "vap-filter-bar" });
+    const chip = (text, active, onClick) => {
+      const el = bar.createEl("span", { text, cls: "vap-chip" + (active ? " active" : "") });
+      el.onclick = () => {
+        onClick();
+        this.render();
+      };
+    };
+    const f = this.filter;
+    const isAll = f.dims.length === 0 && !f.platform && !f.source;
+    chip(t("gallery.all"), isAll, () => {
+      this.filter = { ...EMPTY_FILTER, dims: [] };
+    });
+    for (const p of platformChips(cards)) {
+      chip(
+        (_a = PLATFORM_LABELS[p]) != null ? _a : p,
+        f.platform === p,
+        () => {
+          f.platform = f.platform === p ? null : p;
+        }
+      );
+    }
+    for (const dim of dimensionChips(cards)) {
+      chip(
+        this.dimLabel(dim),
+        f.dims.includes(dim),
+        () => {
+          f.dims = f.dims.includes(dim) ? f.dims.filter((d) => d !== dim) : [...f.dims, dim];
+        }
+      );
+    }
+    if (hasDeep(cards)) {
+      chip(
+        t("gallery.deep"),
+        f.source === DEEP_SOURCE,
+        () => {
+          f.source = f.source === DEEP_SOURCE ? null : DEEP_SOURCE;
+        }
+      );
+    }
+    for (const ch of channelChips(cards)) {
+      chip(ch, f.source === ch, () => {
+        f.source = f.source === ch ? null : ch;
+      });
+    }
+    const grid = root.createEl("div", { cls: "vap-grid" });
+    const coversFolder = this.plugin.settings.clipRules.thumbnail.thumbnailFolder;
+    for (const c of filterCards(cards, this.filter)) {
+      const card = grid.createEl("a", { cls: "vap-card" + (c.depth === "deep" ? " vap-card-deep" : "") });
+      card.onclick = (e) => {
+        e.preventDefault();
+        this.app.workspace.openLinkText(c.path, "", false);
+      };
+      const imgWrap = card.createEl("div", { cls: "vap-img-wrap" });
+      if (c.videoId) {
+        const src = this.app.vault.adapter.getResourcePath(`${coversFolder}/${c.videoId}.webp`);
+        imgWrap.createEl("img", { attr: { src, loading: "lazy" } });
+      }
+      if (c.depth === "deep") imgWrap.createEl("span", { text: t("gallery.deep"), cls: "vap-deep-badge" });
+      const body = card.createEl("div", { cls: "vap-body" });
+      if (c.channel) body.createEl("span", { text: c.channel, cls: "vap-creator" });
+      body.createEl("div", { text: c.title, cls: "vap-title" });
+      if (c.note) body.createEl("div", { text: c.note, cls: "vap-highlight" });
+      const footer = body.createEl("div", { cls: "vap-footer" });
+      footer.createEl("span", { text: c.views ? `\u25B6 ${c.views}` : "", cls: "vap-views" });
+      footer.createEl("span", { text: (_b = c.date) != null ? _b : "", cls: "vap-date" });
+    }
+  }
+};
+
 // src/main.ts
-var VaultAutopilotPlugin = class extends import_obsidian2.Plugin {
+var VaultAutopilotPlugin = class extends import_obsidian3.Plugin {
   constructor() {
     super(...arguments);
     this.settings = DEFAULT_SETTINGS;
@@ -986,7 +1175,18 @@ var VaultAutopilotPlugin = class extends import_obsidian2.Plugin {
     await this.loadSettings();
     setLanguage(this.settings.language);
     this.addSettingTab(new VaultAutopilotSettingTab(this.app, this));
+    this.registerView(GALLERY_VIEW_TYPE, (leaf) => new GalleryView(leaf, this));
+    this.addRibbonIcon("layout-grid", t("gallery.open"), () => this.activateGallery());
     if (this.settings.httpServer.enabled) this.startServer();
+  }
+  async activateGallery() {
+    const existing = this.app.workspace.getLeavesOfType(GALLERY_VIEW_TYPE)[0];
+    if (existing) {
+      this.app.workspace.revealLeaf(existing);
+      return;
+    }
+    const leaf = this.app.workspace.getLeaf(true);
+    await leaf.setViewState({ type: GALLERY_VIEW_TYPE, active: true });
   }
   onunload() {
     var _a;
@@ -1059,7 +1259,7 @@ var VaultAutopilotPlugin = class extends import_obsidian2.Plugin {
     if (this.settings.firstSaveNoticed[mode]) return;
     this.settings.firstSaveNoticed[mode] = true;
     const folder = notePath.includes("/") ? notePath.split("/").slice(0, -1).join("/") : "/";
-    new import_obsidian2.Notice(t("notice.savedTo", { folder }), 8e3);
+    new import_obsidian3.Notice(t("notice.savedTo", { folder }), 8e3);
     try {
       await this.saveSettings();
     } catch (e) {
@@ -1071,7 +1271,7 @@ var VaultAutopilotPlugin = class extends import_obsidian2.Plugin {
       ensureFolder: (p) => this.ensureFolder(p),
       createBinary: async (p, data) => {
         const existing = this.app.vault.getAbstractFileByPath(p);
-        if (existing instanceof import_obsidian2.TFile) await this.app.vault.modifyBinary(existing, data);
+        if (existing instanceof import_obsidian3.TFile) await this.app.vault.modifyBinary(existing, data);
         else await this.app.vault.createBinary(p, data);
       },
       create: async (p, content) => {
@@ -1082,7 +1282,7 @@ var VaultAutopilotPlugin = class extends import_obsidian2.Plugin {
         return fs.readFileSync(abs, "utf8");
       },
       downloadUrl: async (url) => {
-        const resp = await (0, import_obsidian2.requestUrl)({ url, method: "GET" });
+        const resp = await (0, import_obsidian3.requestUrl)({ url, method: "GET" });
         return resp.arrayBuffer;
       },
       fileExists: (p) => this.app.vault.getAbstractFileByPath(p) != null,
@@ -1091,12 +1291,12 @@ var VaultAutopilotPlugin = class extends import_obsidian2.Plugin {
       },
       read: async (filePath) => {
         const file = this.app.vault.getAbstractFileByPath(filePath);
-        if (!(file instanceof import_obsidian2.TFile)) throw new Error(`File not found: ${filePath}`);
+        if (!(file instanceof import_obsidian3.TFile)) throw new Error(`File not found: ${filePath}`);
         return this.app.vault.read(file);
       },
       modify: async (filePath, content) => {
         const file = this.app.vault.getAbstractFileByPath(filePath);
-        if (!(file instanceof import_obsidian2.TFile)) throw new Error(`File not found: ${filePath}`);
+        if (!(file instanceof import_obsidian3.TFile)) throw new Error(`File not found: ${filePath}`);
         await this.app.vault.modify(file, content);
       }
     };
@@ -1112,7 +1312,7 @@ var VaultAutopilotPlugin = class extends import_obsidian2.Plugin {
     );
     this.server.on("error", (err) => {
       if (err.code === "EADDRINUSE") {
-        new import_obsidian2.Notice(t("notice.portInUse", { port }), 1e4);
+        new import_obsidian3.Notice(t("notice.portInUse", { port }), 1e4);
       }
     });
   }
