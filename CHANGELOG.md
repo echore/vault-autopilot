@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0
+
+- Video library gallery: a ribbon icon opens a native cover-card view of every video note, no Dataview or CSS snippets needed. Filter chips are data driven: platforms (when more than one), analysis dimensions (localized), deep dives (when present), and frequent creators. Cards open their notes; the view refreshes as new clips arrive.
+- The gallery and all its labels follow the plugin language setting (English and Chinese).
+- Video embeds in notes now render wide at 16:9 on every install (the fix ships in the plugin's styles.css, scoped to YouTube and Bilibili embeds).
+
 ## 0.2.0
 
 - Base folder setting: change one field and the four storage paths follow automatically. A Restore button resets the factory layout under `Clips/`.
