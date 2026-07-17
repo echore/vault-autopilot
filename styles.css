@@ -1,0 +1,76 @@
+/* Vault Autopilot — video library gallery view */
+
+.vap-gallery { padding: 12px 16px; font-family: -apple-system, "PingFang SC", sans-serif; }
+
+.vap-empty { color: var(--text-muted); padding: 32px 8px; }
+
+.vap-filter-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+.vap-chip {
+  padding: 4px 14px; border-radius: 99px; font-size: 12px; font-weight: 500;
+  border: 1.5px solid var(--background-modifier-border);
+  color: var(--text-muted); cursor: pointer; transition: all 0.15s;
+}
+.vap-chip.active {
+  background: var(--text-normal); color: var(--background-primary);
+  border-color: var(--text-normal);
+}
+.vap-chip:hover:not(.active) { border-color: var(--text-muted); color: var(--text-normal); }
+
+.vap-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+}
+
+.vap-card {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px; overflow: hidden;
+  text-decoration: none; color: inherit; display: block;
+  transition: transform 0.15s, box-shadow 0.15s;
+  cursor: pointer;
+}
+.vap-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+
+.vap-img-wrap {
+  width: 100%; aspect-ratio: 16 / 9; overflow: hidden;
+  background: var(--background-modifier-border); position: relative;
+}
+.vap-img-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.vap-body { padding: 10px 12px 12px; }
+.vap-creator { font-size: 11px; color: #e05a2b; font-weight: 500; display: block; margin-bottom: 4px; }
+.vap-title {
+  font-size: 13px; font-weight: 600; line-height: 1.4; margin-bottom: 6px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.vap-highlight {
+  font-size: 11px; color: var(--text-muted); line-height: 1.45; margin-bottom: 3px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.vap-footer { display: flex; justify-content: space-between; }
+.vap-views { font-size: 11px; color: #22863a; font-weight: 500; }
+.vap-date { font-size: 11px; color: var(--text-faint); }
+
+.vap-deep-badge {
+  position: absolute; top: 7px; left: 7px;
+  font-size: 10px; font-weight: 600;
+  background: #6c3fcc; color: white;
+  padding: 2px 7px; border-radius: 4px;
+  pointer-events: none;
+}
+.vap-card-deep { border-left: 3px solid #6c3fcc; }
+
+/* Video embeds the plugin writes into notes render wide at 16:9 instead of
+   the cramped default. Scoped to the two platforms we embed. */
+.markdown-preview-view iframe[src*="youtube.com"],
+.markdown-preview-view iframe[src*="bilibili.com"],
+.markdown-rendered iframe[src*="youtube.com"],
+.markdown-rendered iframe[src*="bilibili.com"] {
+  width: 100% !important;
+  aspect-ratio: 16 / 9 !important;
+  height: auto !important;
+}

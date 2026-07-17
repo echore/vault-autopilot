@@ -27,7 +27,7 @@ jobs:
       - name: Package zip
         run: |
           mkdir vault-autopilot
-          cp main.js manifest.json vault-autopilot/
+          cp main.js manifest.json styles.css vault-autopilot/
           zip -r vault-autopilot.zip vault-autopilot
 
       - name: Create release
@@ -38,4 +38,4 @@ jobs:
 
           gh release create "$tag" \
             --title="$tag" \
-            main.js manifest.json vault-autopilot.zip
+            main.js manifest.json styles.css vault-autopilot.zip
