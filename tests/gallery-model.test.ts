@@ -1,5 +1,5 @@
 import {
-  GalleryCard, dimensionChips, platformChips, channelChips, hasDeep, filterCards,
+  GalleryCard, dimensionChips, platformChips, channelChips, hasDeep, filterCards, displayDate,
   DEEP_SOURCE, EMPTY_FILTER,
 } from '../src/gallery-model';
 
@@ -80,5 +80,18 @@ describe('filterCards', () => {
     const before = lib.map(c => c.path);
     filterCards(lib, EMPTY_FILTER);
     expect(lib.map(c => c.path)).toEqual(before);
+  });
+});
+
+describe('displayDate', () => {
+  const base = { path: 'p.md', title: 't', videoId: 'v', dimensions: [] as string[] };
+
+  test('prefers published over clip date', () => {
+    expect(displayDate({ ...base, published: '2026-07-10', date: '2026-07-16' })).toBe('2026-07-10');
+  });
+
+  test('falls back to clip date, then empty string', () => {
+    expect(displayDate({ ...base, date: '2026-07-16' })).toBe('2026-07-16');
+    expect(displayDate(base)).toBe('');
   });
 });

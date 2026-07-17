@@ -3,7 +3,7 @@ import type VaultAutopilotPlugin from './main';
 import { t } from './i18n';
 import { labelToKind, headingLabel, SectionKind } from './video-note';
 import {
-  GalleryCard, GalleryFilter, EMPTY_FILTER, DEEP_SOURCE,
+  GalleryCard, GalleryFilter, EMPTY_FILTER, DEEP_SOURCE, displayDate,
   dimensionChips, platformChips, channelChips, hasDeep, filterCards,
 } from './gallery-model';
 
@@ -52,6 +52,7 @@ export class GalleryView extends ItemView {
         date: fm.analyzed_at
           ? String(fm.analyzed_at).slice(0, 10)
           : new Date(file.stat.ctime).toISOString().slice(0, 10),
+        published: fm.published ? String(fm.published).slice(0, 10) : undefined,
       });
     }
     return cards;
@@ -117,7 +118,7 @@ export class GalleryView extends ItemView {
       if (c.note) body.createEl('div', { text: c.note, cls: 'vap-highlight' });
       const footer = body.createEl('div', { cls: 'vap-footer' });
       footer.createEl('span', { text: c.views ? `▶ ${c.views}` : '', cls: 'vap-views' });
-      footer.createEl('span', { text: c.date ?? '', cls: 'vap-date' });
+      footer.createEl('span', { text: displayDate(c), cls: 'vap-date' });
     }
   }
 }

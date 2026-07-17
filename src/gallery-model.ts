@@ -15,6 +15,12 @@ export interface GalleryCard {
   note?: string;
   // ISO date string used for sorting (analyzed_at, or file ctime fallback).
   date?: string;
+  // Video publish date, display-only; sorting stays on `date`.
+  published?: string;
+}
+
+export function displayDate(card: GalleryCard): string {
+  return card.published ?? card.date ?? '';
 }
 
 export interface GalleryFilter {
