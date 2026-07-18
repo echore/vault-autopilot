@@ -1,41 +1,59 @@
-# Video Hook Analysis Prompt
+# Video Hook Analysis SOP
 
-_After reading this document, output your Hook analysis directly using the framework below._
+_After reading this document, output your analysis directly in the framework below._
 
-> The job of a hook is to make people stay, not to make them click in (that is the job of the cover and title). When analyzing, always focus on this one thing: whether through words or visuals, how does this opening keep people from leaving?
+> A hook's job is to make people stay, not to make them click (that is
+> the cover and title's job). The whole analysis answers one question:
+> what does this opening do that stops people from swiping away?
 
 ---
 
 ## Input
 
-- Screenshot of the video's opening frames (0 to 15 seconds)
-- Subtitle text (use it if available, otherwise analyze only the visuals and note that there is no subtitle)
+- Sequential screenshots of the video's opening (in time order; length varies)
+- Subtitle text (use it if available; otherwise analyze the visuals only
+  and say there is no subtitle)
 
 ---
 
 ## Output Structure
 
-**Hook Type**
-Choose one or two from the list below and explain why in one sentence:
-Suspense / Conflict / Value Promise / Identity / Visual Impact / Counterintuitive / Story Opening
+**Hook Type** (1 sentence)
+Suspense / Conflict / Value Promise / Identity / Visual Impact /
+Counterintuitive / Story Opening. Pick one or two and say why in one
+sentence.
 
-**What Was Said**
-Analyze the first sentence or first few sentences of the opening: how does this sentence grab attention right away? What sentence pattern, what promise, what number, or what contrast is used?
+**What Was Said** (2-3 sentences)
+Quote the actual opening lines and point at the exact words: what
+promise, what number, what contradiction, and the question that pops
+into your head after hearing it.
 
-**How the Visuals Support It**
-Do not describe frame by frame, such as "the first frame is X, the second frame is Y." Analyze what the visuals are doing and why doing it this way makes people stay. Is the relationship between the visuals and the words one of amplification or one of supplement?
+**What the Visuals Do** (2-4 sentences)
+The screenshots are moments of one animation in time order. First work
+out what changes from the first shot to the last: what appears, what is
+hidden, what gets revealed. The change is the animation. Then say why
+that change makes people stay.
 
-**How to Replicate**
-Give a template or steps that can be directly applied, specific down to the sentence pattern and visual treatment. Do not write something like "use a similar technique."
+**How to Replicate** (a checklist for an editor)
+Write it as "what the mouth says + what the screen shows at the same
+time", down to the sentence pattern and the on-screen action. Pass bar:
+an editor who never watched the original could build something close
+from your checklist. If they could not, it is not specific enough.
 
 **My Thoughts**
-(leave blank, this is for you to fill in yourself)
+(leave blank, the human fills this in)
 
 ---
 
-## Tone Requirements
+## Hard Rules
 
-Write like you are describing how you felt watching this video, not writing an analysis report.
-
-Do not use: visual hierarchy, information density, reinforces cognition, frame by frame listing
-Do this instead: short sentences, conversational, no more than 3 to 5 sentences per item
+- Do not guess the visuals: write nothing that is not in the
+  screenshots; if you cannot read a shot, write "cannot read this",
+  because an invented line kills the whole analysis.
+- Point at things: every line must answer "which shot, which word are
+  you talking about?"
+- The generic test: if a line still holds under a different video's
+  opening, it is empty talk. Cut it or make it specific.
+- The say-it-out-loud test: would you say this line to a friend about
+  this opening? If not, rewrite it. Short direct sentences, no dashes
+  chaining clauses, no fancy words.

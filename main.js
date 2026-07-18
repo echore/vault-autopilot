@@ -197,63 +197,134 @@ function variants(key) {
 }
 
 // src/sops/zh/封面拆解学习 SOP.md
-var SOP_default = '# \u5C01\u9762\u4E0E\u6807\u9898\u5206\u6790 Prompt\n\n_\u8BFB\u5B8C\u8FD9\u4EFD\u6587\u6863\u540E\uFF0C\u76F4\u63A5\u6309\u4EE5\u4E0B\u6846\u67B6\u8F93\u51FA\u5206\u6790\u3002_\n\n---\n\n## \u8F93\u51FA\u7ED3\u6784\n\n**\u63CF\u8FF0**\n\u4E00\u53E5\u8BDD\u8BF4\u6E05\u695A\u5C01\u9762\u91CC\u6709\u4EC0\u4E48\uFF1A\u6709\u6CA1\u6709\u4EBA\u7269\u3001\u5728\u505A\u4EC0\u4E48\u3001\u6709\u6CA1\u6709\u9053\u5177\u6216\u5927\u5B57\u3001\u80CC\u666F\u5927\u6982\u662F\u4EC0\u4E48\u3002\n\n**\u5C01\u9762\u94A9\u5B50**\n\u7B2C\u4E00\u773C\u89E6\u53D1\u4E86\u4EC0\u4E48\u53CD\u5E94\u2014\u2014\u597D\u5947\u3001\u4E0D\u4FE1\u3001\u88AB\u770B\u89C1\u3001\u60F3\u77E5\u9053\u7B54\u6848\u2026\u2026\u8BF4\u6E05\u695A\u662F\u4EC0\u4E48\u8BA9\u4F60\u6709\u8FD9\u4E2A\u53CD\u5E94\uFF0C\u4EE5\u53CA\u4E3A\u4EC0\u4E48\u8FD9\u4E2A\u53CD\u5E94\u4F1A\u8BA9\u4F60\u70B9\u8FDB\u53BB\u3002\n\n**\u6807\u9898\u94A9\u5B50**\uFF08\u6709\u6807\u9898\u65F6\u5FC5\u586B\uFF0C\u65E0\u6807\u9898\u65F6\u8DF3\u8FC7\uFF09\n\u8BFB\u5B8C\u6807\u9898\u4E4B\u540E\u8111\u5B50\u91CC\u5192\u51FA\u6765\u7684\u7B2C\u4E00\u4E2A\u95EE\u9898\u662F\u4EC0\u4E48\u2014\u2014\u90A3\u4E2A\u95EE\u9898\u5C31\u662F\u94A9\u5B50\u3002\u8BF4\u6E05\u695A\u5B83\u662F\u600E\u4E48\u5236\u9020\u51FA\u8FD9\u4E2A\u95EE\u9898\u7684\uFF0C\u4EE5\u53CA\u4E3A\u4EC0\u4E48\u4F60\u4F1A\u60F3\u70B9\u8FDB\u53BB\u627E\u7B54\u6848\u3002\n\n**\u534F\u4F5C**\uFF08\u6709\u6807\u9898\u65F6\u5FC5\u586B\uFF0C\u65E0\u6807\u9898\u65F6\u8DF3\u8FC7\uFF09\n\u5C01\u9762\u548C\u6807\u9898\u52A0\u5728\u4E00\u8D77\uFF0C\u70B9\u51FB\u7684\u7406\u7531\u6709\u6CA1\u6709\u53D8\u5F97\u66F4\u5F3A\uFF1F\u8FD8\u662F\u8BF4\u4E00\u4E2A\u5C31\u591F\u4E86\uFF1F\n\n**\u7279\u6B8A\u5904\u7406**\uFF08\u6761\u4EF6\u89E6\u53D1\uFF0C\u4E0D\u662F\u6BCF\u5F20\u90FD\u6709\uFF09\n\u89E6\u53D1\u6761\u4EF6\uFF1A\u5C01\u9762\u6709\u7279\u6B8A\u89C6\u89C9\u6548\u679C\u3001\u660E\u663E\u7684\u5B57\u4F53\u5904\u7406\u3001\u6216\u503C\u5F97\u5B66\u4E60\u7684\u6784\u56FE\u624B\u6CD5\u3002\u666E\u901A\u7684\u300C\u4EBA\u8138 + \u80CC\u666F + \u6587\u5B57\u300D\u4E0D\u89E6\u53D1\u3002\n\u89E6\u53D1\u65F6\u5199\u4E09\u70B9\uFF1A\n- \u8FD9\u4E2A\u6548\u679C\u6216\u6280\u6CD5\u662F\u4EC0\u4E48\n- \u4E3A\u4EC0\u4E48\u8FD9\u6837\u505A\n- \u600E\u4E48\u590D\u523B\n\n---\n\n## \u8BED\u6C14\u8981\u6C42\n\n\u50CF\u5728\u8DDF\u4EBA\u8BF4"\u4F60\u770B\u8FD9\u5F20\u56FE\uFF0C\u4F60\u770B\u5B8C\u4EC0\u4E48\u611F\u89C9"\uFF0C\u4E0D\u662F\u5728\u5199\u8BBE\u8BA1\u62A5\u544A\u3002\n\n\u4E0D\u8981\u7528\uFF1A\n- "\u5929\u7136\u89C6\u89C9\u5165\u53E3"\u3001"\u89C6\u89C9\u5C42\u7EA7"\u3001"\u6784\u6210\u5B8C\u6574\u7684\u70B9\u51FB\u7406\u7531"\n- \u957F\u6392\u6BD4\u53E5\u3001AI \u603B\u7ED3\u8154\n\n\u8981\u505A\u5230\uFF1A\u6BCF\u9879 2-3 \u53E5\uFF0C\u77ED\uFF0C\u76F4\u63A5\uFF0C\u53E3\u8BED\u611F\u3002\n\n';
+var SOP_default = '# \u5C01\u9762 & \u6807\u9898\u5206\u6790 SOP\n\n_\u8BFB\u5B8C\u672C\u6587\u6863\u540E\uFF0C\u76F4\u63A5\u6309\u4E0B\u9762\u7684\u6846\u67B6\u8F93\u51FA\u5206\u6790\u3002_\n\n---\n\n## \u8F93\u51FA\u7ED3\u6784\n\n**\u7B2C\u4E00\u773C**\uFF08\u5FC5\u5199\uFF0C1\u20132 \u53E5\uFF09\n\u4F60\u6CA1\u6709\u773C\u775B\uFF0C\u522B\u5047\u88C5\u6709\u3002\u4ECE\u56FE\u7684\u5C5E\u6027\u63A8\uFF1A\u4EBA\u773C\u5148\u770B\u8138\uFF0C\u7136\u540E\u662F\u9971\u548C\u5EA6\u6700\u9AD8\u3001\n\u6700\u5927\u3001\u6700\u9760\u4E2D\u5FC3\u7684\u4E1C\u897F\u3002\u6309\u8FD9\u4E2A\u89C4\u5219\u8BF4\u51FA\u8C01\u8D62\u3001\u5269\u4E0B\u7684\u6309\u4EC0\u4E48\u987A\u5E8F\u770B\u3002\n\u8FD9\u662F\u63A8\u6D4B\uFF1B\u5982\u679C\u4EBA\u770B\u5B8C\u7684\u771F\u5B9E\u53CD\u5E94\u548C\u4F60\u4E0D\u4E00\u6837\uFF0C\u4EE5\u4EBA\u7684\u4E3A\u51C6\u3002\n\n**\u597D\u5728\u54EA**\uFF08\u6838\u5FC3\uFF0C2\u20134 \u6761\uFF09\n\u4E0D\u63CF\u8FF0\u753B\u9762\u2014\u2014\u56FE\u5C31\u5728\u5206\u6790\u4E0A\u65B9\uFF0C\u6C38\u8FDC\u4E0D\u8981\u590D\u8FF0\u56FE\u91CC\u6709\u4EC0\u4E48\u3002\n\u6BCF\u6761\u6307\u8BA4\u4E00\u4E2A\u80FD\u7528\u624B\u6307\u51FA\u6765\u7684\u5177\u4F53\u8BBE\u8BA1\u52A8\u4F5C\uFF08\u6784\u56FE\u3001\u989C\u8272\u3001\u8868\u60C5\u3001\u9053\u5177\u3001\n\u6587\u5B57\u600E\u4E48\u5904\u7406\u7684\uFF09\uFF0C\u4E00\u53E5\u8BDD\u8BF4\u6E05\u5B83\u4E3A\u4EC0\u4E48\u6293\u4EBA\uFF0C\u518D\u52A0\u4E00\u53E5\u600E\u4E48\u590D\u5236\u3002\n\n\u683C\u5F0F\uFF1A\n- **[\u52A8\u4F5C]** \u2014\u2014 \u4E3A\u4EC0\u4E48\u6293\u4EBA\uFF0C\u4E00\u53E5\u8BDD\u3002\u2192 \u60F3\u590D\u5236\uFF1A\u53EF\u64CD\u4F5C\u7684\u4E00\u53E5\u8BDD\u3002\n\n**\u6807\u9898\u94A9\u5B50**\uFF08\u6709\u6807\u9898\u624D\u5199\uFF0C2\u20133 \u53E5\uFF09\n\u6807\u9898\u9760\u4E09\u79CD\u60C5\u7EEA\u6293\u4EBA\uFF1A\u597D\u5947\uFF08\u60F3\u77E5\u9053\u7B54\u6848\uFF09\u3001\u6B32\u671B\uFF08\u60F3\u8981\u90A3\u4E2A\u7ED3\u679C\uFF09\u3001\n\u6050\u60E7\uFF08\u6015\u8E29\u5751\u6015\u635F\u5931\uFF09\uFF0C\u901A\u5E38\u4E00\u4E3B\u4E00\u8F85\u3002\u6307\u51FA\u8FD9\u4E2A\u6807\u9898\u62C9\u7684\u662F\u54EA\u79CD\u60C5\u7EEA\u3001\n\u5177\u4F53\u9760\u54EA\u4E2A\u8BCD\uFF0C\u4EE5\u53CA\u770B\u5B8C\u6807\u9898\u4F60\u81EA\u7136\u4F1A\u5192\u51FA\u7684\u90A3\u4E2A\u95EE\u9898\u3002\n\n**\u5C01\u9762\u6807\u9898\u914D\u5408**\uFF08\u6709\u6807\u9898\u624D\u5199\uFF0C1\u20132 \u53E5\uFF09\n\u597D\u7684\u642D\u914D\u662F\u4E24\u8005\u4E0D\u91CD\u590D\uFF1A\u5404\u8BB2\u4E00\u534A\uFF0C\u62FC\u8D77\u6765\u624D\u662F\u5B8C\u6574\u7684\u94A9\u5B50\u3002\n\u6307\u51FA\u5C01\u9762\u8D1F\u8D23\u4EC0\u4E48\u3001\u6807\u9898\u8D1F\u8D23\u4EC0\u4E48\uFF1B\u5982\u679C\u4E92\u76F8\u91CD\u590D\u4E86\uFF0C\u4E5F\u6307\u51FA\u6765\u3002\n\n---\n\n## \u786C\u6027\u89C4\u5219\n\n- \u6574\u7BC7\u5206\u6790\u4E0D\u8D85\u8FC7 12 \u884C\u3002\u5199\u957F\u4E86\u5C31\u662F\u5728\u63CF\u8FF0\uFF0C\u4E0D\u662F\u5728\u5206\u6790\u3002\n- \u901A\u7528\u6027\u68C0\u9A8C\uFF1A\u4E00\u6761\u5206\u6790\u5982\u679C\u539F\u5C01\u4E0D\u52A8\u642C\u5230\u522B\u7684\u5C01\u9762\u4E0B\u4E5F\u6210\u7ACB\n  \uFF08"\u89C6\u89C9\u5C42\u6B21\u5206\u660E""\u5F15\u53D1\u597D\u5947"\uFF09\uFF0C\u5C31\u662F\u7A7A\u8BDD\u2014\u2014\u5220\u6389\u6216\u5199\u5177\u4F53\u3002\n- \u6307\u7740\u4E1C\u897F\u8BF4\u8BDD\uFF1A\u6BCF\u53E5\u5206\u6790\u90FD\u8981\u80FD\u56DE\u7B54"\u4F60\u8BF4\u7684\u662F\u56FE\u91CC\u7684\u54EA\u4E2A\u4E1C\u897F\uFF1F"\n  \u6307\u4E0D\u51FA\u6765\u7684\u53E5\u5B50\uFF0C\u5220\u6389\uFF0C\u6216\u8005\u6539\u5230\u6307\u5F97\u51FA\u6765\u4E3A\u6B62\u3002\n- \u597D\u5C01\u9762\u901A\u5E38\u53EA\u9760 2\u20133 \u4E2A\u5143\u7D20\u6210\u7ACB\u3002\u627E\u51FA\u662F\u54EA\u51E0\u4E2A\uFF0C\u522B\u628A\u914D\u89D2\u4E5F\u5206\u6790\u4E00\u904D\u3002\n- \u8BF4\u4EBA\u8BDD\u6D4B\u8BD5\uFF1A\u6BCF\u53E5\u5199\u5B8C\u95EE\u81EA\u5DF1\u2014\u2014\u5F53\u9762\u8DDF\u670B\u53CB\u804A\u8FD9\u4E2A\u5C01\u9762\u7684\u65F6\u5019\uFF0C\n  \u6211\u4F1A\u8FD9\u4E48\u8BF4\u5417\uFF1F\u4E0D\u4F1A\u8BF4\u51FA\u53E3\u7684\u53E5\u5B50\uFF0C\u6539\u6210\u4F60\u4F1A\u8BF4\u51FA\u53E3\u7684\u6837\u5B50\u3002\n';
 
 // src/sops/zh/视频Hook分析 SOP.md
-var Hook_SOP_default = '# \u89C6\u9891 Hook \u5206\u6790 Prompt\n\n_\u8BFB\u5B8C\u8FD9\u4EFD\u6587\u6863\u540E\uFF0C\u76F4\u63A5\u6309\u4EE5\u4E0B\u6846\u67B6\u8F93\u51FA Hook \u5206\u6790\u3002_\n\n> Hook \u7684\u4F5C\u7528\u662F\u8BA9\u4EBA\u7559\u4E0B\uFF0C\u4E0D\u662F\u8BA9\u4EBA\u70B9\u8FDB\u6765\uFF08\u90A3\u662F\u5C01\u9762\u548C\u6807\u9898\u7684\u4E8B\uFF09\u3002\u5206\u6790\u65F6\u59CB\u7EC8\u56F4\u7ED5\u8FD9\u4E00\u4EF6\u4E8B\uFF1A\u8FD9\u6BB5\u5F00\u573A\u65E0\u8BBA\u662F\u8BDD\u8FD8\u662F\u753B\u9762\uFF0C\u600E\u4E48\u8BA9\u4EBA\u4E0D\u8D70\uFF1F\n\n---\n\n## \u8F93\u5165\n\n- \u89C6\u9891\u5F00\u573A\u5E27\u622A\u56FE\uFF080\u201315 \u79D2\uFF09\n- \u5B57\u5E55\u6587\u672C\uFF08\u6709\u5219\u7528\uFF0C\u6CA1\u6709\u5219\u53EA\u5206\u6790\u753B\u9762\u5E76\u6CE8\u660E\uFF09\n\n---\n\n## \u8F93\u51FA\u7ED3\u6784\n\n**Hook \u7C7B\u578B**\n\u4ECE\u4EE5\u4E0B\u9009\u4E00\u4E2A\u6216\u4E24\u4E2A\uFF0C\u4E00\u53E5\u8BDD\u8BF4\u4E3A\u4EC0\u4E48\uFF1A\n\u60AC\u5FF5\u578B / \u51B2\u7A81\u578B / \u4EF7\u503C\u627F\u8BFA\u578B / \u8EAB\u4EFD\u8BA4\u540C\u578B / \u89C6\u89C9\u51B2\u51FB\u578B / \u53CD\u5E38\u8BC6\u578B / \u6545\u4E8B\u5207\u5165\u578B\n\n**\u4ED6\u8BF4\u4E86\u4EC0\u4E48**\n\u5206\u6790\u5F00\u573A\u7684\u7B2C\u4E00\u53E5\u8BDD\u6216\u524D\u51E0\u53E5\u8BDD\uFF1A\u8FD9\u53E5\u8BDD\u5982\u4F55\u5728\u7B2C\u4E00\u65F6\u95F4\u62A2\u5360\u6CE8\u610F\u529B\uFF1F\u662F\u4EC0\u4E48\u53E5\u5F0F\u3001\u4EC0\u4E48\u627F\u8BFA\u3001\u4EC0\u4E48\u6570\u5B57\u3001\u8FD8\u662F\u4EC0\u4E48\u53CD\u5DEE\uFF1F\n\n**\u753B\u9762\u600E\u4E48\u914D\u5408**\n\u4E0D\u8981\u9010\u5E27\u63CF\u8FF0"\u7B2C\u4E00\u5E27\u662FX\uFF0C\u7B2C\u4E8C\u5E27\u662FY"\u3002\u5206\u6790\u753B\u9762\u5728\u505A\u4EC0\u4E48\u4E8B\u3001\u4E3A\u4EC0\u4E48\u8FD9\u6837\u505A\u80FD\u8BA9\u4EBA\u7559\u4E0B\u6765\u3002\u753B\u9762\u548C\u8BDD\u4E4B\u95F4\u662F\u653E\u5927\u5173\u7CFB\u8FD8\u662F\u8865\u5145\u5173\u7CFB\uFF1F\n\n**\u5982\u4F55\u590D\u5236**\n\u7ED9\u51FA\u53EF\u4EE5\u76F4\u63A5\u5957\u7528\u7684\u6A21\u677F\u6216\u64CD\u4F5C\u6B65\u9AA4\uFF0C\u5177\u4F53\u5230\u53E5\u5F0F\u3001\u753B\u9762\u5904\u7406\u65B9\u5F0F\u3002\u4E0D\u80FD\u5199"\u7528\u7C7B\u4F3C\u624B\u6CD5"\u3002\n\n**\u6211\u7684\u60F3\u6CD5**\n\uFF08\u7559\u7A7A\u2014\u2014\u8FD9\u662F\u4F60\u81EA\u5DF1\u586B\u7684\uFF09\n\n---\n\n## \u8BED\u6C14\u8981\u6C42\n\n\u50CF\u5728\u8DDF\u4EBA\u63CF\u8FF0\u4F60\u770B\u8FD9\u6BB5\u89C6\u9891\u7684\u611F\u53D7\uFF0C\u4E0D\u662F\u5728\u5199\u5206\u6790\u62A5\u544A\u3002\n\n\u4E0D\u8981\u7528\uFF1A\u89C6\u89C9\u5C42\u7EA7\u3001\u4FE1\u606F\u5BC6\u5EA6\u3001\u5F3A\u5316\u8BA4\u77E5\u3001\u9010\u5E27\u7F57\u5217\n\u8981\u505A\u5230\uFF1A\u77ED\u53E5\uFF0C\u53E3\u8BED\u611F\uFF0C\u6BCF\u9879 3-5 \u53E5\u4EE5\u5185\n\n';
+var Hook_SOP_default = '# \u89C6\u9891 Hook \u5206\u6790 SOP\n\n_\u8BFB\u5B8C\u672C\u6587\u6863\u540E\uFF0C\u76F4\u63A5\u6309\u4E0B\u9762\u7684\u6846\u67B6\u8F93\u51FA\u5206\u6790\u3002_\n\n> Hook \u7684\u4EFB\u52A1\u662F\u8BA9\u70B9\u8FDB\u6765\u7684\u4EBA\u7559\u4E0B\uFF0C\u4E0D\u662F\u8BA9\u4EBA\u70B9\u8FDB\u6765\uFF08\u90A3\u662F\u5C01\u9762\u548C\u6807\u9898\u7684\u4E8B\uFF09\u3002\n> \u6574\u4E2A\u5206\u6790\u53EA\u56DE\u7B54\u4E00\u4EF6\u4E8B\uFF1A\u8FD9\u4E2A\u5F00\u5934\u9760\u4EC0\u4E48\u8BA9\u4EBA\u4E0D\u5212\u8D70\u3002\n\n---\n\n## \u8F93\u5165\n\n- \u89C6\u9891\u5F00\u5934\u90E8\u5206\u7684\u8FDE\u7EED\u622A\u56FE\uFF08\u6309\u65F6\u95F4\u987A\u5E8F\uFF0C\u65F6\u957F\u4E0D\u5B9A\uFF09\n- \u5B57\u5E55\u6587\u672C\uFF08\u6709\u5C31\u7528\uFF1B\u6CA1\u6709\u5C31\u53EA\u5206\u6790\u753B\u9762\uFF0C\u5E76\u6CE8\u660E\u6CA1\u6709\u5B57\u5E55\uFF09\n\n---\n\n## \u8F93\u51FA\u7ED3\u6784\n\n**Hook \u7C7B\u578B**\uFF081 \u53E5\uFF09\n\u60AC\u5FF5 / \u51B2\u7A81 / \u4EF7\u503C\u627F\u8BFA / \u8EAB\u4EFD\u4EE3\u5165 / \u89C6\u89C9\u51B2\u51FB / \u53CD\u76F4\u89C9 / \u6545\u4E8B\u5F00\u573A\uFF0C\n\u9009\u4E00\u5230\u4E24\u4E2A\uFF0C\u4E00\u53E5\u8BDD\u8BF4\u4E3A\u4EC0\u4E48\u3002\n\n**\u8BF4\u4E86\u4EC0\u4E48**\uFF082\u20133 \u53E5\uFF09\n\u5F15\u7528\u5F00\u5934\u7684\u539F\u8BDD\uFF0C\u6307\u7740\u5177\u4F53\u7684\u8BCD\u8BF4\uFF1A\u4EC0\u4E48\u627F\u8BFA\u3001\u4EC0\u4E48\u6570\u5B57\u3001\u4EC0\u4E48\u53CD\u5DEE\uFF0C\n\u4EE5\u53CA\u542C\u5B8C\u4F60\u5FC3\u91CC\u5192\u51FA\u7684\u95EE\u9898\u3002\n\n**\u753B\u9762\u505A\u4E86\u4EC0\u4E48**\uFF082\u20134 \u53E5\uFF09\n\u622A\u56FE\u662F\u540C\u4E00\u6BB5\u753B\u9762\u7684\u5148\u540E\u51E0\u4E2A\u77AC\u95F4\u3002\u5148\u641E\u6E05\u695A\u4ECE\u7B2C\u4E00\u5F20\u5230\u6700\u540E\u4E00\u5F20\uFF0C\n\u4EC0\u4E48\u4E1C\u897F\u53D8\u4E86\uFF1A\u51FA\u73B0\u4E86\u4EC0\u4E48\u3001\u85CF\u4F4F\u4E86\u4EC0\u4E48\u3001\u9732\u51FA\u4E86\u4EC0\u4E48\u3002\u53D8\u5316\u672C\u8EAB\u5C31\u662F\n\u52A8\u753B\u3002\u7136\u540E\u8BF4\u8FD9\u4E2A\u53D8\u5316\u4E3A\u4EC0\u4E48\u8BA9\u4EBA\u7559\u4E0B\u3002\n\n**\u600E\u4E48\u590D\u73B0**\uFF08\u7ED9\u526A\u8F91\u5E08\u7684\u6E05\u5355\uFF09\n\u5199\u6210"\u5634\u4E0A\u8BF4\u4EC0\u4E48 + \u5C4F\u5E55\u540C\u65F6\u653E\u4EC0\u4E48"\u7684\u5BF9\u7167\u6B65\u9AA4\uFF0C\u5177\u4F53\u5230\u53E5\u5F0F\u548C\u753B\u9762\n\u52A8\u4F5C\u3002\u5408\u683C\u6807\u51C6\uFF1A\u4E00\u4E2A\u6CA1\u770B\u8FC7\u539F\u89C6\u9891\u7684\u526A\u8F91\u5E08\uFF0C\u7167\u7740\u6E05\u5355\u80FD\u505A\u51FA\u5DEE\u4E0D\u591A\n\u7684\u4E1C\u897F\u3002\u505A\u4E0D\u51FA\u6765\u5C31\u662F\u5199\u5F97\u4E0D\u591F\u5177\u4F53\u3002\n\n**\u6211\u7684\u60F3\u6CD5**\n\uFF08\u7559\u7A7A\uFF0C\u4EBA\u6765\u586B\uFF09\n\n---\n\n## \u786C\u6027\u89C4\u5219\n\n- \u522B\u731C\u753B\u9762\uFF1A\u622A\u56FE\u91CC\u6CA1\u6709\u7684\u4E1C\u897F\u4E00\u4E2A\u5B57\u90FD\u4E0D\u8BB8\u5199\uFF1B\u54EA\u5F20\u56FE\u6CA1\u770B\u61C2\u5C31\u5199\n  "\u6CA1\u770B\u61C2"\uFF0C\u7F16\u51FA\u6765\u7684\u5206\u6790\u6574\u6761\u4F5C\u5E9F\u3002\n- \u6307\u7740\u4E1C\u897F\u8BF4\u8BDD\uFF1A\u6BCF\u53E5\u90FD\u80FD\u56DE\u7B54"\u4F60\u8BF4\u7684\u662F\u54EA\u5F20\u56FE\u3001\u54EA\u53E5\u8BDD\u91CC\u7684\u54EA\u4E2A\u4E1C\u897F"\u3002\n- \u901A\u7528\u6027\u68C0\u9A8C\uFF1A\u8FD9\u53E5\u8BDD\u653E\u5230\u522B\u7684\u89C6\u9891\u5F00\u5934\u4E5F\u6210\u7ACB\uFF0C\u5C31\u662F\u7A7A\u8BDD\uFF0C\u5220\u6389\u6216\u5199\u5177\u4F53\u3002\n- \u8BF4\u4EBA\u8BDD\u6D4B\u8BD5\uFF1A\u5F53\u9762\u8DDF\u670B\u53CB\u8BB2\u8FD9\u4E2A\u5F00\u5934\u65F6\u4F1A\u8FD9\u4E48\u8BF4\u5417\uFF1F\u4E0D\u4F1A\u8BF4\u51FA\u53E3\u7684\u91CD\u5199\u3002\n  \u77ED\u53E5\u76F4\u8BF4\uFF0C\u4E0D\u7528\u7834\u6298\u53F7\u4E32\u53E5\u5B50\uFF0C\u4E0D\u7528 fancy \u8BCD\u3002\n';
 
 // src/sops/zh/视频关键帧分析 SOP.md
-var SOP_default2 = '# \u89C6\u9891\u5173\u952E\u5E27\u5206\u6790 SOP\n\n> \u8F93\u5165\uFF1A\u89C6\u9891\u67D0\u6BB5\u65F6\u95F4\u5185\u7684\u591A\u5F20\u5173\u952E\u5E27\u622A\u56FE\uFF08\u6587\u4EF6\u540D\u524D\u7F00 `keyframe-`\uFF09\u3002\n> \u8F93\u51FA\uFF1A\u4E00\u4EFD\u52A8\u6548\u5206\u6790\u7B14\u8BB0\uFF0C\u4E24\u5C42\u5185\u5BB9\uFF1A\u8BBE\u8BA1\u7406\u89E3 + \u5B9E\u73B0\u7EA6\u5B9A\u3002\n> \u76EE\u7684\uFF1A\u65E2\u80FD\u4F5C\u4E3A\u6539\u7F16\u53C2\u8003\uFF08\u7406\u89E3\u6846\u67B6\u548C\u611F\u89C9\uFF09\uFF0C\u4E5F\u80FD\u76F4\u63A5\u4EA4\u7ED9 Agent \u5B9E\u73B0\u800C\u4E0D\u9700\u8981 back and forth\u3002\n\n---\n\n## \u8F93\u51FA\u683C\u5F0F\n\n```\n# \u52A8\u6548\u5206\u6790 \u2014 {\u89C6\u9891\u6807\u9898} \xB7 \u52A8\u6548{N} \xB7 {start}s\u2013{end}s\n\n## \u5173\u952E\u5E27\u63CF\u8FF0\n\uFF08\u6309\u5E27\u987A\u5E8F\u63CF\u8FF0\uFF1A\u753B\u9762\u91CC\u6709\u4EC0\u4E48\u5143\u7D20\uFF0C\u5E27\u4E0E\u5E27\u4E4B\u95F4\u53D1\u751F\u4E86\u4EC0\u4E48\u53D8\u5316\u3002\n \u5BA2\u89C2\u63CF\u8FF0\uFF0C\u4E0D\u89E3\u91CA\u539F\u56E0\u3002\uFF09\n\n## \u52A8\u6548\u903B\u8F91\n\uFF08\u8FD9\u4E9B\u53D8\u5316\u80CC\u540E\u7684\u8BBE\u8BA1\u610F\u56FE\uFF1A\u4E3A\u4EC0\u4E48\u8FD9\u6837\u8FD0\u52A8\u3001\u8282\u594F\u611F\u662F\u4EC0\u4E48\u3001\n \u60F3\u7ED9\u89C2\u4F17\u4EC0\u4E48\u611F\u53D7\u3002\u5199\u6E05\u695A"\u6846\u67B6"\uFF0C\u800C\u4E0D\u662F\u5177\u4F53\u6570\u5B57\u2014\u2014\n \u8FD9\u6837\u6539\u5185\u5BB9\u65F6\u6846\u67B6\u8FD8\u80FD\u590D\u7528\u3002\uFF09\n\n## \u5B9E\u73B0\u7EA6\u5B9A\n\uFF08\u4EE5\u4E0B\u662F\u6BCF\u6B21\u505A\u8FD9\u7C7B HTML \u52A8\u6548 overlay \u90FD\u5FC5\u987B\u9075\u5B88\u7684\u7EA6\u5B9A\uFF0C\n \u4E0D\u9700\u8981\u518D\u95EE\uFF0C\u4E0D\u9700\u8981\u518D\u6539\uFF1A\uFF09\n\n- \u80CC\u666F\u6C38\u8FDC\u900F\u660E\uFF0C\u7528\u4E8E\u53E0\u52A0\u5B9E\u62CD\u89C6\u9891\n- \u52A0 `?preview` URL \u53C2\u6570\u65F6\u663E\u793A\u6DF1\u7070\u80CC\u666F `#1a1a1a`\uFF0C\u65B9\u4FBF\u9884\u89C8\u767D\u8272\u5143\u7D20\uFF1B\u6E32\u67D3\u65F6\u53BB\u6389\u53C2\u6570\n- \u6587\u4EF6\u9876\u90E8\u56FA\u5B9A CONFIG \u5757\uFF1A\n    DURATION = [\u89C6\u9891\u65F6\u957F ms]   \u2190 \u63A7\u5236\u6E32\u67D3\u51FA\u6765\u7684\u89C6\u9891\u957F\u5EA6\n    FPS      = 30\n    [\u5176\u4ED6\u5185\u5BB9\u53C2\u6570]              \u2190 \u8FD9\u4E2A\u52A8\u6548\u7279\u6709\uFF0C\u5217\u5728\u4E0B\u9762\n- \u6587\u4EF6\u4FDD\u5B58\u5728 `Raw/Superpower/`\n\n## \u6211\u7684\u60F3\u6CD5\n\uFF08\u7559\u7A7A\uFF09\n```\n\n---\n\n## \u586B\u5199\u89C4\u5219\n\n- **\u5173\u952E\u5E27\u63CF\u8FF0**\uFF1A\u53EA\u63CF\u8FF0"\u770B\u5230\u4E86\u4EC0\u4E48"\uFF0C\u9010\u5E27\u5199\uFF0C\u5E27\u95F4\u53D8\u5316\u91CD\u70B9\u6807\u51FA\n- **\u52A8\u6548\u903B\u8F91**\uFF1A\u56DE\u7B54"\u4E3A\u4EC0\u4E48\u8FD9\u6837\u505A"\uFF0C\u805A\u7126\u8BBE\u8BA1\u6846\u67B6\uFF0C\u4E0D\u8981\u5199\u6B7B\u5177\u4F53\u6570\u503C\uFF08\u6570\u503C\u662F\u5185\u5BB9\u53C2\u6570\uFF0C\u4F1A\u53D8\uFF09\n- **\u5B9E\u73B0\u7EA6\u5B9A**\uFF1A\u8FD9\u4E00\u5757\u6BCF\u6B21\u683C\u5F0F\u5B8C\u5168\u4E00\u6837\uFF0C\u76F4\u63A5\u590D\u5236\u8FC7\u53BB\uFF0C\u4E0D\u8981\u4FEE\u6539\n\n---\n\n## \u591A\u5E27\u5904\u7406\n\n- \u6309\u65F6\u95F4\u987A\u5E8F\u63CF\u8FF0\uFF0C\u4E0D\u8981\u8DF3\u5E27\n- \u5E27\u95F4\u5DEE\u5F02\u5C0F\uFF08\u8FDE\u7EED\u52A8\u753B\uFF09\uFF1A\u91CD\u70B9\u5199\u6574\u4F53\u8FD0\u52A8\u611F\uFF0C\u4E0D\u8981\u9010\u5E27\u7F57\u5217\n- \u5E27\u95F4\u5DEE\u5F02\u5927\uFF08\u6709\u526A\u8F91\u5207\u6362\uFF09\uFF1A\u91CD\u70B9\u5206\u6790\u5207\u6362\u8282\u594F\u548C\u903B\u8F91\n';
+var SOP_default2 = "# \u89C6\u9891\u5173\u952E\u5E27\uFF08\u52A8\u6548\uFF09\u5206\u6790 SOP\n\n_\u8BFB\u5B8C\u672C\u6587\u6863\u540E\uFF0C\u76F4\u63A5\u6309\u4E0B\u9762\u7684\u6846\u67B6\u8F93\u51FA\u5206\u6790\u3002_\n\n> \u8F93\u5165\uFF1A\u4E00\u7EC4\u6309\u65F6\u95F4\u987A\u5E8F\u7684\u5173\u952E\u5E27\u622A\u56FE\u3002\u56FE\u5C31\u8D34\u5728\u5206\u6790\u4E0A\u9762\u3002\n> \u5355\u5F20\u56FE\u4EC0\u4E48\u6837\uFF0C\u4EBA\u81EA\u5DF1\u4F1A\u770B\u3002\u5206\u6790\u53EA\u5199\u8FDE\u8D77\u6765\u624D\u80FD\u770B\u89C1\u7684\u4E1C\u897F\uFF1A\n> \u8FD9\u6BB5\u4ECE\u5934\u5230\u5C3E\u600E\u4E48\u63A8\u8FDB\uFF0C\u63A8\u8FDB\u5F97\u597D\u5728\u54EA\u3002\n\n---\n\n## \u8F93\u51FA\u7ED3\u6784\n\n**\u597D\u5728\u54EA**\uFF082\u20134 \u6761\uFF09\n\u6BCF\u6761\u6307\u8BA4\u4E00\u4E2A\u8DE8\u753B\u9762\u7684\u8BBE\u8BA1\u52A8\u4F5C\u3002\u53EA\u5199\u5355\u5F20\u56FE\u770B\u4E0D\u51FA\u6765\u7684\uFF1A\n\u987A\u5E8F\u3001\u8282\u594F\u3001\u505C\u987F\u3001\u85CF\u548C\u9732\u3001\u4EAE\u548C\u6697\u3001\u955C\u5934\u600E\u4E48\u79FB\u3002\n\u683C\u5F0F\uFF1A\n- **[\u52A8\u4F5C]** \u2014\u2014 \u4E3A\u4EC0\u4E48\u597D\uFF0C\u4E00\u53E5\u8BDD\u3002\u2192 \u60F3\u590D\u5236\uFF1A\u53EF\u64CD\u4F5C\u7684\u4E00\u53E5\u8BDD\u3002\n\n**\u6211\u7684\u60F3\u6CD5**\n\uFF08\u7559\u7A7A\uFF0C\u4EBA\u6765\u586B\uFF09\n\n---\n\n## \u786C\u6027\u89C4\u5219\n\n- \u4E0D\u63CF\u8FF0\u4EFB\u4F55\u4E00\u5E55\u3002\u56FE\u91CC\u80FD\u76F4\u63A5\u770B\u89C1\u7684\u4E0D\u5199\uFF0C\u53EA\u5199\u8FDE\u8D77\u6765\u624D\u80FD\u770B\u89C1\u7684\u3002\n- \u522B\u731C\u3002\u6CA1\u6709\u5B57\u5E55\u5C31\u4E0D\u7F16\u4ED6\u5728\u8BF4\u4EC0\u4E48\uFF1B\u5B57\u5E55\u70E7\u5728\u753B\u9762\u91CC\u7684\u53EF\u4EE5\u76F4\u63A5\u5F15\u7528\uFF0C\n  \u90A3\u7B97\u6307\u7740\u4E1C\u897F\u8BF4\u8BDD\u3002\n- \u6307\u7740\u4E1C\u897F\u8BF4\u8BDD\u3002\u6BCF\u6761\u90FD\u80FD\u6307\u51FA\uFF1A\u662F\u54EA\u51E0\u5F20\u56FE\u4E4B\u95F4\u7684\u4E8B\u3002\n- \u901A\u7528\u6027\u68C0\u9A8C\u3002\u8FD9\u6761\u642C\u5230\u522B\u7684\u52A8\u6548\u4E0B\u4E5F\u6210\u7ACB\uFF0C\u5C31\u662F\u7A7A\u8BDD\u3002\n- \u8BF4\u4EBA\u8BDD\u3002\u77ED\u53E5\uFF0C\u4E00\u53E5\u8BDD\u53EA\u8BF4\u4E00\u4EF6\u4E8B\u3002\u5F53\u9762\u4E0D\u4F1A\u8FD9\u4E48\u8BF4\u7684\uFF0C\u91CD\u5199\u3002\n";
 
 // src/sops/en/Cover Analysis SOP.md
-var Cover_Analysis_SOP_default = '# Cover and Title Analysis Prompt\n\n_After reading this document, output your analysis directly using the framework below._\n\n---\n\n## Output Structure\n\n**Description**\nState in one sentence what is in the cover: is there a person, what are they doing, are there props or large text, what does the background roughly look like.\n\n**Cover Hook**\nWhat reaction did the first glance trigger: curiosity, disbelief, feeling seen, wanting to know the answer. Explain what caused this reaction and why this reaction would make someone click in.\n\n**Title Hook** (required when there is a title, skip when there is no title)\nWhat is the first question that comes to mind right after reading the title. That question is the hook. Explain how the title creates this question and why you would want to click in to find the answer.\n\n**Collaboration** (required when there is a title, skip when there is no title)\nWhen the cover and title are combined, does the reason to click become stronger, or is either one enough on its own?\n\n**Special Treatment** (conditional, not every cover has this)\nTrigger condition: the cover has a special visual effect, noticeable font treatment, or a composition technique worth learning. A plain "face plus background plus text" does not trigger this.\nWhen triggered, write three points:\n- What this effect or technique is\n- Why it was done this way\n- How to replicate it\n\n---\n\n## Tone Requirements\n\nWrite like you are telling someone "look at this image, what do you feel after seeing it," not writing a design report.\n\nDo not use:\n- Phrases like "a natural visual entry point," "visual hierarchy," "forms a complete reason to click"\n- Long parallel sentences, AI summary tone\n\nDo this instead: 2 to 3 sentences per item, short, direct, conversational.\n';
+var Cover_Analysis_SOP_default = `# Cover & Title Analysis SOP
 
-// src/sops/en/Video Hook Analysis SOP.md
-var Video_Hook_Analysis_SOP_default = `# Video Hook Analysis Prompt
-
-_After reading this document, output your Hook analysis directly using the framework below._
-
-> The job of a hook is to make people stay, not to make them click in (that is the job of the cover and title). When analyzing, always focus on this one thing: whether through words or visuals, how does this opening keep people from leaving?
-
----
-
-## Input
-
-- Screenshot of the video's opening frames (0 to 15 seconds)
-- Subtitle text (use it if available, otherwise analyze only the visuals and note that there is no subtitle)
+_After reading this document, output your analysis directly in the framework below._
 
 ---
 
 ## Output Structure
 
-**Hook Type**
-Choose one or two from the list below and explain why in one sentence:
-Suspense / Conflict / Value Promise / Identity / Visual Impact / Counterintuitive / Story Opening
+**First Glance** (required, 1-2 sentences)
+You are not a pair of eyes, so do not pretend to be one. Work it out
+from the image: the eye goes to faces first, then to whatever is most
+saturated, biggest, or closest to center. Name the element that wins by
+those rules, and the order the rest follows. This is a prediction; when
+the human's real reaction differs, theirs wins.
 
-**What Was Said**
-Analyze the first sentence or first few sentences of the opening: how does this sentence grab attention right away? What sentence pattern, what promise, what number, or what contrast is used?
+**Why It Works** (the core, 2-4 bullets)
+Never describe the image. It sits right above the analysis, so never
+restate what is in it. Each bullet points at one concrete design move
+(composition, color, facial expression, props, how the text is treated),
+says in one sentence why it grabs, then adds one sentence on how to copy it.
 
-**How the Visuals Support It**
-Do not describe frame by frame, such as "the first frame is X, the second frame is Y." Analyze what the visuals are doing and why doing it this way makes people stay. Is the relationship between the visuals and the words one of amplification or one of supplement?
+Format:
+- **[The move]**: why it grabs, one sentence. To copy: one actionable sentence.
 
-**How to Replicate**
-Give a template or steps that can be directly applied, specific down to the sentence pattern and visual treatment. Do not write something like "use a similar technique."
+**Title Hook** (only when there is a title, 2-3 sentences)
+Titles pull three emotions: curiosity (want the answer), desire (want
+that outcome), fear (afraid of losses or mistakes). Usually one leads
+and one assists. Name which emotion this title pulls, the exact word
+doing the pulling, and the question that pops into your head after
+reading it.
 
-**My Thoughts**
-(leave blank, this is for you to fill in yourself)
+**Cover + Title Together** (only when there is a title, 1-2 sentences)
+A good pair never repeats itself: each carries half the story, and only
+together do they form the full hook. Say what the cover handles, what
+the title handles, and call it out if they overlap.
 
 ---
 
-## Tone Requirements
+## Hard Rules
 
-Write like you are describing how you felt watching this video, not writing an analysis report.
+- The whole analysis fits in 12 lines. Longer means you are describing,
+  not analyzing.
+- The generic test: if a line still holds when pasted under a different
+  cover ("clear visual hierarchy", "sparks curiosity"), it is empty talk.
+  Cut it or make it specific.
+- Point at things: every line must answer "which thing in the image are
+  you talking about?" If you cannot point at it, cut the line or rewrite
+  it until you can.
+- A good cover usually stands on 2 or 3 elements. Find out which ones,
+  and skip the supporting cast.
+- The say-it-out-loud test: after each line, ask yourself whether you
+  would say it to a friend while pointing at the screen. If not, rewrite
+  it the way you would actually say it.
+`;
 
-Do not use: visual hierarchy, information density, reinforces cognition, frame by frame listing
-Do this instead: short sentences, conversational, no more than 3 to 5 sentences per item
+// src/sops/en/Video Hook Analysis SOP.md
+var Video_Hook_Analysis_SOP_default = `# Video Hook Analysis SOP
+
+_After reading this document, output your analysis directly in the framework below._
+
+> A hook's job is to make people stay, not to make them click (that is
+> the cover and title's job). The whole analysis answers one question:
+> what does this opening do that stops people from swiping away?
+
+---
+
+## Input
+
+- Sequential screenshots of the video's opening (in time order; length varies)
+- Subtitle text (use it if available; otherwise analyze the visuals only
+  and say there is no subtitle)
+
+---
+
+## Output Structure
+
+**Hook Type** (1 sentence)
+Suspense / Conflict / Value Promise / Identity / Visual Impact /
+Counterintuitive / Story Opening. Pick one or two and say why in one
+sentence.
+
+**What Was Said** (2-3 sentences)
+Quote the actual opening lines and point at the exact words: what
+promise, what number, what contradiction, and the question that pops
+into your head after hearing it.
+
+**What the Visuals Do** (2-4 sentences)
+The screenshots are moments of one animation in time order. First work
+out what changes from the first shot to the last: what appears, what is
+hidden, what gets revealed. The change is the animation. Then say why
+that change makes people stay.
+
+**How to Replicate** (a checklist for an editor)
+Write it as "what the mouth says + what the screen shows at the same
+time", down to the sentence pattern and the on-screen action. Pass bar:
+an editor who never watched the original could build something close
+from your checklist. If they could not, it is not specific enough.
+
+**My Thoughts**
+(leave blank, the human fills this in)
+
+---
+
+## Hard Rules
+
+- Do not guess the visuals: write nothing that is not in the
+  screenshots; if you cannot read a shot, write "cannot read this",
+  because an invented line kills the whole analysis.
+- Point at things: every line must answer "which shot, which word are
+  you talking about?"
+- The generic test: if a line still holds under a different video's
+  opening, it is empty talk. Cut it or make it specific.
+- The say-it-out-loud test: would you say this line to a friend about
+  this opening? If not, rewrite it. Short direct sentences, no dashes
+  chaining clauses, no fancy words.
 `;
 
 // src/sops/en/Video Keyframe Analysis SOP.md
-var Video_Keyframe_Analysis_SOP_default = '# Video Keyframe Analysis SOP\n\n> Input: multiple keyframe screenshots from a segment of the video (filename prefix `keyframe-`).\n> Output: a motion analysis note with two layers of content: design understanding plus implementation conventions.\n> Purpose: can be used as a reference for adaptation (understanding the framework and feel), and can also be handed directly to an Agent to implement without back and forth.\n\n---\n\n## Output Format\n\n```\n# Motion Analysis - {Video Title} \xB7 Motion {N} \xB7 {start}s-{end}s\n\n## Keyframe Description\n(Describe in frame order: what elements are in the frame, what changes\n between frames. Describe objectively, do not explain the reason.)\n\n## Motion Logic\n(The design intent behind these changes: why it moves this way, what the\n rhythm is, what feeling it should give the viewer. Describe the "framework"\n clearly, not specific numbers, so the framework can be reused when the\n content changes.)\n\n## Implementation Conventions\n(The following are conventions that must be followed every time you build\n this type of HTML motion overlay. No need to ask again, no need to change\n them:)\n\n- The background is always transparent, for overlaying on top of the real footage\n- Adding the `?preview` URL parameter shows a dark gray background `#1a1a1a`, to make it easier to preview white elements; remove the parameter when rendering\n- A fixed CONFIG block at the top of the file:\n    DURATION = [video duration in ms]   \u2190 controls the length of the rendered video\n    FPS      = 30\n    [other content parameters]          \u2190 specific to this motion, listed below\n- File saved in `Raw/Superpower/`\n\n## My Thoughts\n(leave blank)\n```\n\n---\n\n## Filling Rules\n\n- **Keyframe Description**: only describe "what you see," write frame by frame, highlight the changes between frames\n- **Motion Logic**: answer "why it was done this way," focus on the design framework, do not hardcode specific values (values are content parameters and will change)\n- **Implementation Conventions**: this section is exactly the same format every time, copy it over directly, do not modify it\n\n---\n\n## Handling Multiple Frames\n\n- Describe in chronological order, do not skip frames\n- When the difference between frames is small (continuous animation): focus on the overall sense of motion, do not list frame by frame\n- When the difference between frames is large (there are cuts or transitions): focus on analyzing the rhythm and logic of the transitions\n';
+var Video_Keyframe_Analysis_SOP_default = "# Video Keyframe (Motion) Analysis SOP\n\n_After reading this document, output your analysis directly in the framework below._\n\n> Input: a set of keyframe screenshots in time order. The images sit\n> right above the analysis. What a single frame looks like, people can\n> see for themselves. The analysis only covers what you can see across\n> frames: how the segment moves from start to end, and what makes that\n> flow good.\n\n---\n\n## Output Structure\n\n**Why It Works** (2-4 bullets)\nEach bullet points at one design move that spans frames. Only write\nwhat a single frame cannot show: order, rhythm, pauses, hiding and\nrevealing, dimming and highlighting, how the camera moves.\nFormat:\n- **[The move]**: why it works, one sentence. To copy: one actionable sentence.\n\n**My Thoughts**\n(leave blank, the human fills this in)\n\n---\n\n## Hard Rules\n\n- Describe no single frame. What is visible in one image, skip; write\n  only what appears across images.\n- Do not guess. No subtitles means do not invent what is being said;\n  subtitles burned into the frame are fine to quote, that counts as\n  pointing at things.\n- Point at things. Every bullet must say which frames it happens\n  between.\n- The generic test: if a bullet still holds under a different motion\n  sequence, it is empty talk.\n- Plain speech. Short sentences, one idea per sentence. If you would\n  not say it out loud, rewrite it.\n";
 
 // src/bundled-sops.ts
 var BUILTIN = {
@@ -680,6 +751,7 @@ function buildAnchor(meta) {
     `video_url: "${meta.videoUrl}"`,
     `title: "${meta.title}"`,
     ...meta.channel ? [`channel: "${meta.channel}"`] : [],
+    ...meta.published ? [`published: ${meta.published}`] : [],
     `dimensions: []`,
     `analyzed_at: ${today}`,
     `tags: []`,
@@ -690,6 +762,15 @@ function buildAnchor(meta) {
 
 # ${meta.title}
 `;
+}
+function ensurePublished(content, published) {
+  if (!published || !content.startsWith("---\n")) return content;
+  const end = content.indexOf("\n---", 4);
+  if (end === -1) return content;
+  const fm = content.slice(0, end);
+  if (/^published:/m.test(fm)) return content;
+  return `${fm}
+published: ${published}${content.slice(end)}`;
 }
 function kindOf(heading) {
   for (const k of KINDS) {
@@ -835,8 +916,12 @@ async function upsertVideoNote(meta, section, vaultOps, folder) {
   const existing = meta.videoId ? await findNoteByVideoId(meta.videoId, folder, vaultOps) : null;
   if (existing) {
     const { content: content2, skipped } = mergeSection(existing.content, section);
-    if (skipped) return { notePath: existing.path, notice: t("notice.sectionExists", { section: headingLabel(section.kind) }) };
-    await vaultOps.modify(existing.path, content2);
+    if (skipped) {
+      const patched = ensurePublished(existing.content, meta.published);
+      if (patched !== existing.content) await vaultOps.modify(existing.path, patched);
+      return { notePath: existing.path, notice: t("notice.sectionExists", { section: headingLabel(section.kind) }) };
+    }
+    await vaultOps.modify(existing.path, ensurePublished(content2, meta.published));
     return { notePath: existing.path };
   }
   const { content } = mergeSection(buildAnchor(meta), section);
@@ -940,7 +1025,8 @@ async function handleThumbnail(payload, rule, vaultOps, builtinSop) {
     videoId: videoKey(payload.video_url, payload.platform),
     videoUrl: payload.video_url,
     title: payload.title,
-    channel: payload.channel
+    channel: payload.channel,
+    published: payload.published_at
   };
   return upsertVideoNote(meta, section, vaultOps, rule.outputFolder);
 }
@@ -989,6 +1075,10 @@ async function handleMultiFrame(payload, rule, vaultOps, searchFolder, assetFold
 var import_obsidian2 = require("obsidian");
 
 // src/gallery-model.ts
+function displayDate(card) {
+  var _a, _b;
+  return (_b = (_a = card.published) != null ? _a : card.date) != null ? _b : "";
+}
 var EMPTY_FILTER = { dims: [], platform: null, source: null };
 var DEEP_SOURCE = "__deep__";
 var CHANNEL_CHIP_MIN = 6;
@@ -1075,7 +1165,8 @@ var GalleryView = class extends import_obsidian2.ItemView {
         depth: fm.depth ? String(fm.depth) : void 0,
         views: fm.views ? String(fm.views) : void 0,
         note: fm.note ? String(fm.note) : void 0,
-        date: fm.analyzed_at ? String(fm.analyzed_at).slice(0, 10) : new Date(file.stat.ctime).toISOString().slice(0, 10)
+        date: fm.analyzed_at ? String(fm.analyzed_at).slice(0, 10) : new Date(file.stat.ctime).toISOString().slice(0, 10),
+        published: fm.published ? String(fm.published).slice(0, 10) : void 0
       });
     }
     return cards;
@@ -1085,7 +1176,7 @@ var GalleryView = class extends import_obsidian2.ItemView {
     return kinds.includes(dim) ? headingLabel(dim) : dim;
   }
   render() {
-    var _a, _b;
+    var _a;
     const root = this.contentEl;
     root.empty();
     root.addClass("vap-gallery");
@@ -1159,7 +1250,7 @@ var GalleryView = class extends import_obsidian2.ItemView {
       if (c.note) body.createEl("div", { text: c.note, cls: "vap-highlight" });
       const footer = body.createEl("div", { cls: "vap-footer" });
       footer.createEl("span", { text: c.views ? `\u25B6 ${c.views}` : "", cls: "vap-views" });
-      footer.createEl("span", { text: (_b = c.date) != null ? _b : "", cls: "vap-date" });
+      footer.createEl("span", { text: displayDate(c), cls: "vap-date" });
     }
   }
 };
