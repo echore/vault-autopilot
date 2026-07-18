@@ -88,6 +88,7 @@ var en_default = {
   "notice.sopExportExists": "{path} already exists. The path now points to it.",
   "notice.savedTo": "Saved to {folder}\nWant a different location? Settings \u2192 Vault Autopilot \u2192 Storage locations",
   "notice.portInUse": "Vault Autopilot: port {port} is already in use. Quit the program using it, or set the same new port in both the plugin settings and the extension settings.",
+  "notice.serverError": "Vault Autopilot: the local server on port {port} stopped. Toggle it off and on in settings to retry.",
   "notice.sectionExists": '"{section}" already exists \u2014 not overwritten. To redo it, delete that section first, then clip again.',
   "error.screenshotFolderNotConfigured": "Screenshots folder not configured: set it in Settings \u2192 Vault Autopilot \u2192 Storage locations \u2192 Screenshots folder.",
   "error.videoFolderNotConfigured": "Video notes folder or cover images folder not configured: set them in Settings \u2192 Vault Autopilot \u2192 Storage locations.",
@@ -158,6 +159,7 @@ var zh_default = {
   "notice.sopExportExists": "{path} \u5DF2\u5B58\u5728\uFF0C\u8DEF\u5F84\u5DF2\u6307\u5411\u5B83\u3002",
   "notice.savedTo": "\u5DF2\u5B58\u5230 {folder}\n\u60F3\u6362\u4F4D\u7F6E\uFF1F\u8BBE\u7F6E \u2192 Vault Autopilot \u2192 \u5B58\u50A8\u4F4D\u7F6E",
   "notice.portInUse": "Vault Autopilot\uFF1A\u7AEF\u53E3 {port} \u88AB\u5360\u7528\u3002\u8BF7\u5173\u95ED\u5360\u7528\u5B83\u7684\u7A0B\u5E8F\uFF1B\u6216\u5728\u63D2\u4EF6\u8BBE\u7F6E\u548C\u6269\u5C55\u8BBE\u7F6E\u4E24\u5904\u6539\u6210\u540C\u4E00\u4E2A\u65B0\u7AEF\u53E3\u3002",
+  "notice.serverError": "Vault Autopilot\uFF1A\u7AEF\u53E3 {port} \u4E0A\u7684\u672C\u5730\u670D\u52A1\u5DF2\u505C\u6B62\u3002\u8BF7\u5728\u8BBE\u7F6E\u91CC\u5173\u95ED\u518D\u6253\u5F00\u91CD\u8BD5\u3002",
   "notice.sectionExists": "\u300C{section}\u300D\u5DF2\u5B58\u5728\uFF0C\u672A\u8986\u76D6\u3002\u60F3\u91CD\u505A\u8BF7\u5148\u5220\u6389\u8BE5\u5C0F\u8282\u518D\u70B9\u3002",
   "error.screenshotFolderNotConfigured": "\u622A\u56FE\u6587\u4EF6\u5939\u672A\u914D\u7F6E\uFF1A\u8BF7\u5728 \u8BBE\u7F6E \u2192 Vault Autopilot \u2192 \u5B58\u50A8\u4F4D\u7F6E \u2192 \u622A\u56FE\u6587\u4EF6\u5939 \u586B\u5199\u3002",
   "error.videoFolderNotConfigured": "\u89C6\u9891\u7B14\u8BB0\u6587\u4EF6\u5939\u6216\u5C01\u9762\u56FE\u7247\u6587\u4EF6\u5939\u672A\u914D\u7F6E\uFF1A\u8BF7\u5728 \u8BBE\u7F6E \u2192 Vault Autopilot \u2192 \u5B58\u50A8\u4F4D\u7F6E \u586B\u5199\u3002",
@@ -481,6 +483,7 @@ var VaultAutopilotSettingTab = class extends import_obsidian.PluginSettingTab {
       if (n > 1024 && n < 65536) {
         this.plugin.settings.httpServer.port = n;
         await this.plugin.saveSettings();
+        this.plugin.restartServer();
       }
     }));
     new import_obsidian.Setting(containerEl).setName(t("settings.maxFrames.name")).setDesc(t("settings.maxFrames.desc")).addText((t2) => t2.setValue(String(this.plugin.settings.clipRules.hook.maxFrames)).onChange(async (v) => {
@@ -572,6 +575,14 @@ var MODES = ["thumbnail", "screenshot", "hook", "keyframe"];
 function isStringArray(v) {
   return Array.isArray(v) && v.every((x) => typeof x === "string");
 }
+function assertOptionalStrings(p, keys) {
+  for (const key of keys) {
+    const v = p[key];
+    if (v !== void 0 && v !== null && typeof v !== "string") {
+      throw new ClipValidationError(`${key} must be a string`);
+    }
+  }
+}
 function validateClipPayload(raw) {
   if (typeof raw !== "object" || raw === null) {
     throw new ClipValidationError("Body must be a JSON object");
@@ -596,13 +607,12 @@ function validateClipPayload(raw) {
     if (typeof p.video_id !== "string" || typeof p.thumbnail_url !== "string" || typeof p.video_url !== "string") {
       throw new ClipValidationError("thumbnail requires video_id, thumbnail_url, video_url");
     }
+    assertOptionalStrings(p, ["title", "platform", "published_at", "channel"]);
     return p;
   }
   if (!isStringArray(p.frames)) throw new ClipValidationError(`${p.mode} requires frames[]`);
   if (typeof p.url !== "string") throw new ClipValidationError(`${p.mode} requires url`);
-  if (!(typeof p.video_title === "string" || p.video_title === null || p.video_title === void 0)) {
-    throw new ClipValidationError("video_title must be a string or null");
-  }
+  assertOptionalStrings(p, ["video_title", "transcript", "channel"]);
   return p;
 }
 
@@ -643,6 +653,8 @@ function createServer2(port, onClip, version = "") {
       }
       body += chunk;
     });
+    req.on("error", () => {
+    });
     req.on("end", async () => {
       let payload;
       try {
@@ -667,17 +679,54 @@ function createServer2(port, onClip, version = "") {
 }
 
 // src/util.ts
+function makeSerialQueue() {
+  let tail = Promise.resolve();
+  return (task) => {
+    const result = tail.then(task, task);
+    tail = result.catch(() => void 0);
+    return result;
+  };
+}
 function sanitize(str) {
-  return (str || "").replace(/[/\\:*?"<>|]/g, " ").replace(/\s+/g, " ").trim().slice(0, 60);
+  return (str || "").replace(/[/\\:*?"<>|#^\[\]`]/g, " ").replace(/\s+/g, " ").trim().slice(0, 60);
+}
+function isPrivateHost(hostname) {
+  let h = hostname.replace(/^\[|\]$/g, "").toLowerCase().replace(/\.$/, "");
+  if (h === "localhost" || h.endsWith(".local")) return true;
+  if (h.startsWith("::ffff:")) {
+    const rest = h.slice(7);
+    const hex = rest.match(/^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+    if (hex) {
+      const hi = parseInt(hex[1], 16);
+      const lo = parseInt(hex[2], 16);
+      h = `${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`;
+    } else {
+      h = rest;
+    }
+  }
+  const v4 = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (v4) {
+    const a = Number(v4[1]);
+    const b = Number(v4[2]);
+    return a === 0 || a === 10 || a === 127 || a === 172 && b >= 16 && b <= 31 || a === 192 && b === 168 || a === 169 && b === 254;
+  }
+  if (h.includes(":")) {
+    return h === "::1" || h === "::" || /^f[cd]/.test(h) || /^fe[89ab]/.test(h);
+  }
+  return false;
 }
 function assertDownloadable(url) {
-  let scheme;
+  let parsed;
   try {
-    scheme = new URL(url).protocol;
+    parsed = new URL(url);
   } catch (e) {
     throw new Error("Invalid URL");
   }
-  if (scheme !== "http:" && scheme !== "https:") throw new Error("Unsupported URL scheme");
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new Error("Unsupported URL scheme");
+  if (isPrivateHost(parsed.hostname)) throw new Error("Blocked host");
+}
+function inlineText(v) {
+  return String(v != null ? v : "").replace(/`/g, "").replace(/[\r\n]+/g, " ").trim();
 }
 function yamlString(v) {
   const s = String(v != null ? v : "").replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/[\r\n]+/g, " ");
@@ -694,7 +743,7 @@ function extractVideoId(url, platform) {
     if (short) return short[1];
     const watch = url.match(/[?&]v=([a-zA-Z0-9_-]+)/);
     if (watch) return watch[1];
-    const embed = url.match(/embed\/([a-zA-Z0-9_-]+)/);
+    const embed = url.match(/(?:embed|shorts|live)\/([a-zA-Z0-9_-]+)/);
     if (embed) return embed[1];
   }
   if (p === "bilibili" || url.includes("bilibili.com")) {
@@ -790,7 +839,7 @@ function hookSection(p, sop) {
     parts.push(p.aiResult, ``);
   } else {
     parts.push(framesBlock(p.frameNames), ``);
-    if (p.transcript) parts.push(`### ${t("note.transcript")}`, ``, p.transcript, ``);
+    if (p.transcript) parts.push(`### ${t("note.transcript")}`, ``, p.transcript.replace(/`/g, ""), ``);
     if (sop) parts.push(sopBlock(sop), ``);
   }
   return { kind: "content", startSeconds: 0, text: parts.join("\n") };
@@ -818,12 +867,12 @@ function buildAnchor(meta) {
   const fm = [
     `---`,
     `type: video`,
-    `platform: ${meta.platform}`,
+    `platform: ${yamlString(meta.platform)}`,
     `video_id: ${yamlString(meta.videoId)}`,
     `video_url: ${yamlString(meta.videoUrl)}`,
     `title: ${yamlString(meta.title)}`,
     ...meta.channel ? [`channel: ${yamlString(meta.channel)}`] : [],
-    ...meta.published ? [`published: ${meta.published}`] : [],
+    ...meta.published ? [`published: ${yamlString(meta.published)}`] : [],
     `dimensions: []`,
     `analyzed_at: ${today}`,
     `tags: []`,
@@ -832,7 +881,7 @@ function buildAnchor(meta) {
   ].join("\n");
   return `${fm}
 
-# ${meta.title}
+# ${inlineText(meta.title)}
 `;
 }
 function ensurePublished(content, published) {
@@ -842,7 +891,7 @@ function ensurePublished(content, published) {
   const fm = content.slice(0, end);
   if (/^published:/m.test(fm)) return content;
   return `${fm}
-published: ${published}${content.slice(end)}`;
+published: ${yamlString(published)}${content.slice(end)}`;
 }
 function kindOf(heading) {
   for (const k of KINDS) {
@@ -872,7 +921,7 @@ function stripTrailingRule(t2) {
 function syncOverview(head, frontmatter, dims) {
   var _a, _b;
   const channel = (_a = frontmatter.match(/^channel:\s*"?(.*?)"?\s*$/m)) == null ? void 0 : _a[1];
-  const platform = (_b = frontmatter.match(/^platform:\s*(.*?)\s*$/m)) == null ? void 0 : _b[1];
+  const platform = (_b = frontmatter.match(/^platform:\s*"?(.*?)"?\s*$/m)) == null ? void 0 : _b[1];
   const label = [channel, platform].filter(Boolean).join(" \xB7 ") || t("note.videoFallback");
   const overview = `> [!abstract] ${label}
 > ${dims.map((d) => `${EMOJI[d]} ${headingLabel(d)}`).join(" \xB7 ")}`;
@@ -891,9 +940,8 @@ function parseSections(body) {
   let cur = null;
   let curHeading = "";
   const flush = () => {
-    var _a;
     if (cur) {
-      const kind = (_a = kindOf(curHeading)) != null ? _a : "motion";
+      const kind = kindOf(curHeading);
       const m = curHeading.match(/(\d+)s/);
       sections.push({ kind, startSeconds: m ? parseInt(m[1], 10) : 0, text: cur.join("\n") });
     }
@@ -915,15 +963,29 @@ function parseSections(body) {
   return { head: head.join("\n"), sections };
 }
 function addDimension(frontmatter, kind) {
-  return frontmatter.replace(/^(dimensions:\s*\[)([^\]]*)(\])/m, (_, open, inner, close) => {
-    const dims = inner.split(",").map((d) => d.trim()).filter(Boolean);
+  const unquote = (d) => d.replace(/^"(.*)"$/, "$1");
+  const merged = (dims) => {
     if (!dims.some((d) => labelToKind(d) === kind)) dims.push(headingLabel(kind));
     const rank = (d) => {
       const k = labelToKind(d);
       return k ? KINDS.indexOf(k) : -1;
     };
-    dims.sort((a, b) => rank(a) - rank(b));
-    return `${open}${dims.join(", ")}${close}`;
+    return dims.sort((a, b) => rank(a) - rank(b));
+  };
+  const inline = /^(dimensions:\s*\[)([^\]]*)(\])/m;
+  if (inline.test(frontmatter)) {
+    return frontmatter.replace(inline, (_, open, inner, close) => {
+      const dims = merged(inner.split(",").map((d) => unquote(d.trim())).filter(Boolean));
+      return `${open}${dims.join(", ")}${close}`;
+    });
+  }
+  return frontmatter.replace(/^dimensions:\n((?:[ \t]+- [^\n]*(?:\n|$))*)/m, (_, items) => {
+    const dims = merged(
+      items.split("\n").map((l) => unquote(l.replace(/^[ \t]+- /, "").trim())).filter(Boolean)
+    );
+    return `dimensions:
+${dims.map((d) => `  - ${d}`).join("\n")}
+`;
   });
 }
 function renumber(sections) {
@@ -946,14 +1008,15 @@ function mergeSection(existing, section) {
     return { content: existing, skipped: true };
   }
   const incoming = { kind: section.kind, startSeconds: section.startSeconds, text: section.text };
+  const rank = (k) => k === null ? KINDS.length : KINDS.indexOf(k);
   const all = [...sections, incoming].sort(
-    (a, b) => KINDS.indexOf(a.kind) - KINDS.indexOf(b.kind) || a.startSeconds - b.startSeconds
+    (a, b) => rank(a.kind) - rank(b.kind) || (a.kind === null || b.kind === null ? 0 : a.startSeconds - b.startSeconds)
   );
   const ordered = renumber(all);
   const newFrontmatter = addDimension(frontmatter, section.kind);
   const dims = KINDS.filter((k) => ordered.some((s) => s.kind === k));
   const newHead = syncOverview(head, newFrontmatter, dims).replace(/\s+$/, "");
-  const renderedSections = ordered.map((s) => stripTrailingRule(emojiHeading(s.text, s.kind))).join("\n\n---\n\n");
+  const renderedSections = ordered.map((s) => stripTrailingRule(s.kind === null ? s.text : emojiHeading(s.text, s.kind))).join("\n\n---\n\n");
   const newBody = [newHead, "", renderedSections, ""].join("\n");
   return { content: `${newFrontmatter}${newBody}`, skipped: false };
 }
@@ -1024,7 +1087,7 @@ async function ensureCover(videoId, coverUrl, vaultOps, assetFolder) {
 function buildScreenshotTemplate(payload, imageNames, sopContent) {
   const imageLines = imageNames.map((n) => `> ![[${n}]]`).join("\n");
   const parts = [
-    `# Screenshot \u2014 ${payload.title}`,
+    `# Screenshot \u2014 ${inlineText(payload.title)}`,
     ``,
     t("note.source", { url: payload.url }),
     ``,
@@ -1050,7 +1113,7 @@ async function handleScreenshot(payload, rule, vaultOps, searchFolder, assetFold
   for (let i = 0; i < payload.images.length; i++) {
     const name = `${stem}-${String(i + 1).padStart(2, "0")}.png`;
     const bytes = Buffer.from(payload.images[i], "base64");
-    await vaultOps.createBinary(`${framesDir}/${name}`, bytes.buffer);
+    await vaultOps.createBinary(`${framesDir}/${name}`, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
     imageNames.push(name);
   }
   const key = videoKey(payload.url);
@@ -1072,11 +1135,21 @@ function sampleFrames(frames, max) {
   const step = frames.length / max;
   return Array.from({ length: max }, (_, i) => frames[Math.floor(i * step)]);
 }
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 async function findNoteByVideoId(videoId, folder, vaultOps) {
+  var _a;
   const files = vaultOps.listMarkdownFiles(folder);
+  const pattern = new RegExp(`^video_id:\\s*"?${escapeRegExp(videoId)}"?\\s*$`, "m");
   for (const filePath of files) {
+    const fm = vaultOps.getFrontmatter(filePath);
+    if (fm) {
+      if (String((_a = fm.video_id) != null ? _a : "") === videoId) return { path: filePath, content: await vaultOps.read(filePath) };
+      continue;
+    }
     const content = await vaultOps.read(filePath);
-    if (content.includes(`video_id: "${videoId}"`)) return { path: filePath, content };
+    if (pattern.test(content)) return { path: filePath, content };
   }
   return null;
 }
@@ -1122,7 +1195,7 @@ async function handleMultiFrame(payload, rule, vaultOps, searchFolder, assetFold
   for (let i = 0; i < sampled.length; i++) {
     const name = `${stem}-f${String(i + 1).padStart(2, "0")}.jpg`;
     const bytes = Buffer.from(sampled[i], "base64");
-    await vaultOps.createBinary(`${framesDir}/${name}`, bytes.buffer);
+    await vaultOps.createBinary(`${framesDir}/${name}`, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
     frameNames.push(name);
   }
   const sopContent = (_b = readSopSafely(rule.sopPath, vaultOps)) != null ? _b : builtinSop;
@@ -1333,6 +1406,9 @@ var VaultAutopilotPlugin = class extends import_obsidian3.Plugin {
     super(...arguments);
     this.settings = DEFAULT_SETTINGS;
     this.server = null;
+    // Double-clicks / extension retries race their read-modify-write on the same
+    // note; every clip goes through this queue so only one is in flight at a time.
+    this.enqueueClip = makeSerialQueue();
   }
   async onload() {
     await this.loadSettings();
@@ -1380,10 +1456,13 @@ var VaultAutopilotPlugin = class extends import_obsidian3.Plugin {
     await this.saveData(this.settings);
   }
   restartServer() {
-    var _a;
-    (_a = this.server) == null ? void 0 : _a.close();
+    const start = () => {
+      if (this.settings.httpServer.enabled) this.startServer();
+    };
+    const old = this.server;
     this.server = null;
-    if (this.settings.httpServer.enabled) this.startServer();
+    if (old) old.close(() => start());
+    else start();
   }
   async ensureFolder(folderPath) {
     const parts = folderPath.split("/");
@@ -1464,22 +1543,30 @@ var VaultAutopilotPlugin = class extends import_obsidian3.Plugin {
         const file = this.app.vault.getAbstractFileByPath(filePath);
         if (!(file instanceof import_obsidian3.TFile)) throw new Error(`File not found: ${filePath}`);
         await this.app.vault.modify(file, content);
+      },
+      getFrontmatter: (filePath) => {
+        var _a, _b;
+        const file = this.app.vault.getAbstractFileByPath(filePath);
+        if (!(file instanceof import_obsidian3.TFile)) return null;
+        return (_b = (_a = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a.frontmatter) != null ? _b : null;
       }
     };
     this.server = createServer2(
       port,
-      async (payload) => {
+      (payload) => this.enqueueClip(async () => {
         const { notePath, notice } = await routeClip(payload, this.settings.clipRules, vaultOps, this.builtinSops());
         if (notePath) await this.maybeFirstSaveNotice(payload.mode, notePath);
         const obsidianUrl = notePath ? `obsidian://open?vault=${encodeURIComponent(this.app.vault.getName())}&file=${encodeURIComponent(notePath)}` : void 0;
         return { obsidianUrl, notice };
-      },
+      }),
       this.manifest.version
     );
     this.server.on("error", (err) => {
-      if (err.code === "EADDRINUSE") {
-        new import_obsidian3.Notice(t("notice.portInUse", { port }), 1e4);
-      }
+      this.server = null;
+      new import_obsidian3.Notice(
+        err.code === "EADDRINUSE" ? t("notice.portInUse", { port }) : t("notice.serverError", { port }),
+        1e4
+      );
     });
   }
 };

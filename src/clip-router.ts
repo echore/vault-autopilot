@@ -1,6 +1,6 @@
 import { ClipPayload, HookPayload, KeyframePayload, ScreenshotPayload, ThumbnailPayload } from './server';
 import { ClipRule, PluginSettings, ScreenshotClipRule, ThumbnailClipRule } from './types';
-import { sanitize, buildVideoEmbed, extractVideoId, detectPlatform, videoKey, safeFileId } from './util';
+import { sanitize, buildVideoEmbed, extractVideoId, detectPlatform, videoKey, safeFileId, inlineText } from './util';
 import { buildAnchor, ensurePublished, mergeSection, coverSection, hookSection, keyframeSection, screenshotSection, VideoNoteMeta, NewSection, headingLabel, sopBlock } from './video-note';
 import { t } from './i18n';
 
@@ -14,6 +14,8 @@ export interface VaultOps {
   listMarkdownFiles(folderPath: string): string[];
   read(filePath: string): Promise<string>;
   modify(filePath: string, content: string): Promise<void>;
+  // Parsed frontmatter from Obsidian's metadataCache; null when not indexed yet.
+  getFrontmatter(filePath: string): Record<string, unknown> | null;
 }
 
 export async function routeClip(
@@ -100,7 +102,7 @@ async function ensureCover(videoId: string, coverUrl: string | undefined, vaultO
 function buildScreenshotTemplate(payload: ScreenshotPayload, imageNames: string[], sopContent?: string): string {
   const imageLines = imageNames.map((n) => `> ![[${n}]]`).join('\n');
   const parts = [
-    `# Screenshot — ${payload.title}`,
+    `# Screenshot — ${inlineText(payload.title)}`,
     ``,
     t('note.source', { url: payload.url }),
     ``,
@@ -134,7 +136,7 @@ async function handleScreenshot(
   for (let i = 0; i < payload.images.length; i++) {
     const name = `${stem}-${String(i + 1).padStart(2, '0')}.png`;
     const bytes = Buffer.from(payload.images[i], 'base64');
-    await vaultOps.createBinary(`${framesDir}/${name}`, bytes.buffer as ArrayBuffer);
+    await vaultOps.createBinary(`${framesDir}/${name}`, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer);
     imageNames.push(name);
   }
 
@@ -163,15 +165,30 @@ function sampleFrames(frames: string[], max: number): string[] {
   return Array.from({ length: max }, (_, i) => frames[Math.floor(i * step)]);
 }
 
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 async function findNoteByVideoId(
   videoId: string,
   folder: string,
   vaultOps: VaultOps,
 ): Promise<{ path: string; content: string } | null> {
   const files = vaultOps.listMarkdownFiles(folder);
+  // Obsidian's Properties editor re-serializes frontmatter and drops quotes, so
+  // an exact-substring match on `video_id: "x"` orphans the note forever. The
+  // metadataCache compares parsed values (quote-agnostic) without reading file
+  // contents; files the cache hasn't indexed yet (just-created notes) fall back
+  // to a quote-tolerant scan.
+  const pattern = new RegExp(`^video_id:\\s*"?${escapeRegExp(videoId)}"?\\s*$`, 'm');
   for (const filePath of files) {
+    const fm = vaultOps.getFrontmatter(filePath);
+    if (fm) {
+      if (String(fm.video_id ?? '') === videoId) return { path: filePath, content: await vaultOps.read(filePath) };
+      continue;
+    }
     const content = await vaultOps.read(filePath);
-    if (content.includes(`video_id: "${videoId}"`)) return { path: filePath, content };
+    if (pattern.test(content)) return { path: filePath, content };
   }
   return null;
 }
@@ -238,7 +255,7 @@ async function handleMultiFrame(
   for (let i = 0; i < sampled.length; i++) {
     const name = `${stem}-f${String(i + 1).padStart(2, '0')}.jpg`;
     const bytes = Buffer.from(sampled[i], 'base64');
-    await vaultOps.createBinary(`${framesDir}/${name}`, bytes.buffer as ArrayBuffer);
+    await vaultOps.createBinary(`${framesDir}/${name}`, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer);
     frameNames.push(name);
   }
   const sopContent = readSopSafely(rule.sopPath, vaultOps) ?? builtinSop;

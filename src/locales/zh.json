@@ -46,6 +46,7 @@
   "notice.sopExportExists": "{path} 已存在，路径已指向它。",
   "notice.savedTo": "已存到 {folder}\n想换位置？设置 → Vault Autopilot → 存储位置",
   "notice.portInUse": "Vault Autopilot：端口 {port} 被占用。请关闭占用它的程序；或在插件设置和扩展设置两处改成同一个新端口。",
+  "notice.serverError": "Vault Autopilot：端口 {port} 上的本地服务已停止。请在设置里关闭再打开重试。",
   "notice.sectionExists": "「{section}」已存在，未覆盖。想重做请先删掉该小节再点。",
   "error.screenshotFolderNotConfigured": "截图文件夹未配置：请在 设置 → Vault Autopilot → 存储位置 → 截图文件夹 填写。",
   "error.videoFolderNotConfigured": "视频笔记文件夹或封面图片文件夹未配置：请在 设置 → Vault Autopilot → 存储位置 填写。",

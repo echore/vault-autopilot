@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.4.2
+
+Pre-submission audit fixes. No changes to the extension↔plugin `/clip` contract.
+
+Data integrity:
+- A hand-written `##` section is preserved when the same video is clipped again, instead of being renamed to a standard heading and re-sorted.
+- Titles containing `[` `]` `#` `^` (e.g. `[Official Video]`, `C#`) no longer produce a note name Obsidian rejects or an embed that breaks.
+- Notes are matched by parsed frontmatter (via metadataCache), so editing a property in Obsidian's Properties panel no longer orphans the note and split it into duplicates on the next clip.
+- Concurrent clips of the same video (double-click / retry) are serialized, so one no longer discards the other's section or collides on note creation.
+- Small image frames are written as exactly their own bytes instead of a shared Buffer pool slice.
+
+Security (the local `/clip` endpoint is CSRF-reachable):
+- Cover/thumbnail downloads reject literal private, loopback, and link-local hosts (localhost, `127.0.0.0/8`, `10/8`, `172.16/12`, `192.168/16`, `169.254/16`, IPv6 loopback/ULA/link-local), closing an SSRF path into LAN and cloud-metadata addresses.
+- Frontmatter and note bodies are hardened against injection: `platform`/`published_at` are YAML-escaped, and untrusted titles/transcripts can no longer open a fenced code block (which, with Dataview JS enabled, would execute on render).
+
+Robustness:
+- YouTube Shorts and Live URLs are recognized as the same video as the watch URL.
+- Changing the port in settings now restarts the server immediately.
+- A failed server bind (e.g. port in use) surfaces a notice instead of silently pretending the server is running, and server restarts no longer race their own socket close.
+- A client that disconnects mid-request no longer logs an uncaught exception.
+
 ## 0.4.1
 
 - Security hardening for the local `/clip` endpoint: payloads are validated and normalized before anything touches the vault. Malformed bodies and unknown modes now get a safe 400 response, and error responses no longer leak internal details.

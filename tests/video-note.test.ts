@@ -116,6 +116,35 @@ test('a ## line inside a user code fence is NOT treated as a section', () => {
   expect(r.content).toContain('## ✨ 动效 ② · 130s–138s');
 });
 
+test('a hand-written unknown heading survives a merge untouched, placed after known sections', () => {
+  let c = buildAnchor(meta);
+  c = mergeSection(c, keyframeSection({ url: meta.videoUrl, platform: 'youtube', start: 45, end: 52, frameNames: ['k.png'] })).content;
+  c = c + '\n\n---\n\n## 我的分析\n\n这是我的想法\n';
+  const r = mergeSection(c, keyframeSection({ url: meta.videoUrl, platform: 'youtube', start: 130, end: 138, frameNames: ['k2.png'] }));
+  expect(r.content).toContain('## 我的分析');
+  expect(r.content).toContain('这是我的想法');
+  expect(r.content.indexOf('## 我的分析')).toBeGreaterThan(r.content.lastIndexOf('## ✨ 动效'));
+
+  const r2 = mergeSection(r.content, screenshotSection(['s.png']));
+  expect((r2.content.match(/## 我的分析/g) || []).length).toBe(1);
+  expect(r2.content).toContain('这是我的想法');
+  expect(r2.content.indexOf('## 我的分析')).toBeGreaterThan(r2.content.lastIndexOf('## 📸 截图'));
+});
+
+test('dimensions survive Obsidian Properties re-serialization to block-style YAML', () => {
+  // Obsidian's Properties editor rewrites `dimensions: [内容]` to a block list
+  // (quoting items it considers special). A later merge must still dedupe/append.
+  const reserialized = `---\ntype: video\nvideo_id: abc123\nvideo_url: https://www.youtube.com/watch?v=abc123\ntitle: Bee\ndimensions:\n  - "内容"\nanalyzed_at: 2026-07-01\n---\n\n# Bee\n\n## 🎬 内容\n\nbody\n`;
+  const r = mergeSection(reserialized, keyframeSection({ url: 'https://www.youtube.com/watch?v=abc123', platform: 'youtube', start: 45, end: 52, frameNames: ['k.png'] }));
+  const fm = r.content.match(/^---\n[\s\S]*?\n---/)![0];
+  expect(fm).toMatch(/dimensions:[\s\S]*内容/);
+  expect(fm).toMatch(/dimensions:[\s\S]*动效/);
+
+  const again = mergeSection(r.content, keyframeSection({ url: 'https://www.youtube.com/watch?v=abc123', platform: 'youtube', start: 100, end: 110, frameNames: ['k2.png'] }));
+  const fm2 = again.content.match(/^---\n[\s\S]*?\n---/)![0];
+  expect((fm2.match(/动效/g) || []).length).toBe(1);
+});
+
 test('hook section embeds the whole video from start (no end) + frames + 字幕', () => {
   const s = hookSection({ url: meta.videoUrl, platform: 'youtube', endSeconds: 15, frameNames: ['f1.png'], transcript: 'hello' });
   expect(s.kind).toBe('content');
@@ -200,11 +229,58 @@ describe('bilingual headings', () => {
   });
 });
 
+describe('null/undefined title', () => {
+  test('a null title never renders "# undefined" / "# null"', () => {
+    const a = buildAnchor({ videoId: 'v1', videoUrl: 'https://y.com/v1', title: null as any, platform: 'youtube' });
+    const heading = a.split('\n').find((l) => l.startsWith('# '))!;
+    expect(heading).not.toMatch(/undefined|null/);
+  });
+});
+
+describe('injection hardening', () => {
+  const base = { videoId: 'v1', videoUrl: 'https://y.com/v1', title: 'T' };
+
+  test('crafted platform cannot inject frontmatter keys', () => {
+    const a = buildAnchor({ ...base, platform: 'x"\ninjected: true' });
+    const fm = a.match(/^---\n[\s\S]*?\n---/)![0];
+    expect(fm).not.toMatch(/^injected:/m);
+  });
+
+  test('crafted published cannot inject frontmatter keys', () => {
+    const a = buildAnchor({ ...base, platform: 'youtube', published: '2026-01-01\nevil: x' });
+    expect(a.match(/^---\n[\s\S]*?\n---/)![0]).not.toMatch(/^evil:/m);
+    const patched = ensurePublished('---\ntype: video\n---\n\n# T\n', '2026-01-01\nevil: x');
+    expect(patched.match(/^---\n[\s\S]*?\n---/)![0]).not.toMatch(/^evil:/m);
+  });
+
+  test('title with newline + fence cannot open a code block in the body', () => {
+    const a = buildAnchor({ ...base, platform: 'youtube', title: 'T\n```dataviewjs\nboom' });
+    const body = a.slice(a.match(/^---\n[\s\S]*?\n---/)![0].length);
+    expect(body).not.toContain('```');
+    expect(body).not.toContain('\nboom');
+  });
+
+  test('transcript backticks cannot open a fence', () => {
+    const s = hookSection({ url: 'https://youtu.be/abc', platform: 'youtube', endSeconds: 15, frameNames: ['f.png'], transcript: 'line1\n```dataviewjs\nboom\n```\nline2' });
+    expect(s.text).not.toContain('```');
+    expect(s.text).toContain('line1');
+    expect(s.text).toContain('line2');
+  });
+
+  test('overview label strips quotes from a quoted platform', () => {
+    const quoted = `---\ntype: video\nplatform: "youtube"\nvideo_id: "q1"\ntitle: "Bee"\ndimensions: []\n---\n\n# Bee\n`;
+    const c = mergeSection(quoted, screenshotSection(['s.png'])).content;
+    const label = c.match(/> \[!abstract\] ([^\n]*)/)![1];
+    expect(label).toContain('youtube');
+    expect(label).not.toContain('"');
+  });
+});
+
 describe('published frontmatter', () => {
   const base = { platform: 'youtube', videoId: 'x', videoUrl: 'https://y/x', title: 'T' };
 
   test('buildAnchor writes published when meta carries it', () => {
-    expect(buildAnchor({ ...base, published: '2026-07-10' })).toContain('published: 2026-07-10');
+    expect(buildAnchor({ ...base, published: '2026-07-10' })).toContain('published: "2026-07-10"');
   });
 
   test('buildAnchor omits published when absent', () => {
@@ -214,7 +290,7 @@ describe('published frontmatter', () => {
   test('ensurePublished inserts into existing frontmatter', () => {
     const content = '---\ntype: video\ntitle: "T"\n---\n\n# T\n';
     const out = ensurePublished(content, '2026-07-10');
-    expect(out).toContain('published: 2026-07-10');
+    expect(out).toContain('published: "2026-07-10"');
     expect(out.indexOf('published:')).toBeLessThan(out.indexOf('\n---\n'));
   });
 

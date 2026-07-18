@@ -1,4 +1,4 @@
-import { buildVideoEmbed, sanitize, yamlString } from './util';
+import { buildVideoEmbed, inlineText, sanitize, yamlString } from './util';
 import { t, variants, LocaleKey } from './i18n';
 
 export type SectionKind = 'cover' | 'content' | 'motion' | 'screenshot';
@@ -75,7 +75,9 @@ export function hookSection(
     parts.push(p.aiResult, ``);
   } else {
     parts.push(framesBlock(p.frameNames), ``);
-    if (p.transcript) parts.push(`### ${t('note.transcript')}`, ``, p.transcript, ``);
+    // Backticks dropped so an attacker-supplied transcript can't open a fence;
+    // its newlines are legitimate content and stay.
+    if (p.transcript) parts.push(`### ${t('note.transcript')}`, ``, p.transcript.replace(/`/g, ''), ``);
     if (sop) parts.push(sopBlock(sop), ``);
   }
   return { kind: 'content', startSeconds: 0, text: parts.join('\n') };
@@ -109,14 +111,14 @@ export function screenshotSection(imageNames: string[], sop?: string, aiResult?:
 export function buildAnchor(meta: VideoNoteMeta): string {
   const today = new Date().toISOString().slice(0, 10);
   const fm = [
-    `---`, `type: video`, `platform: ${meta.platform}`,
+    `---`, `type: video`, `platform: ${yamlString(meta.platform)}`,
     `video_id: ${yamlString(meta.videoId)}`, `video_url: ${yamlString(meta.videoUrl)}`,
     `title: ${yamlString(meta.title)}`,
     ...(meta.channel ? [`channel: ${yamlString(meta.channel)}`] : []),
-    ...(meta.published ? [`published: ${meta.published}`] : []),
+    ...(meta.published ? [`published: ${yamlString(meta.published)}`] : []),
     `dimensions: []`, `analyzed_at: ${today}`, `tags: []`, `depth: normal`, `---`,
   ].join('\n');
-  return `${fm}\n\n# ${meta.title}\n`;
+  return `${fm}\n\n# ${inlineText(meta.title)}\n`;
 }
 
 // Backfill path: notes created by hook/keyframe (or an older version) have no
@@ -128,10 +130,10 @@ export function ensurePublished(content: string, published?: string | null): str
   if (end === -1) return content;
   const fm = content.slice(0, end);
   if (/^published:/m.test(fm)) return content;
-  return `${fm}\npublished: ${published}${content.slice(end)}`;
+  return `${fm}\npublished: ${yamlString(published)}${content.slice(end)}`;
 }
 
-interface ParsedSection { kind: SectionKind; startSeconds: number; text: string; }
+interface ParsedSection { kind: SectionKind | null; startSeconds: number; text: string; }
 
 function kindOf(heading: string): SectionKind | null {
   // Substring match so an emoji prefix (## 🎬 内容) still resolves to its kind.
@@ -169,7 +171,7 @@ function stripTrailingRule(t: string): string {
 // currently present, preserving any other preamble the user added.
 function syncOverview(head: string, frontmatter: string, dims: SectionKind[]): string {
   const channel = frontmatter.match(/^channel:\s*"?(.*?)"?\s*$/m)?.[1];
-  const platform = frontmatter.match(/^platform:\s*(.*?)\s*$/m)?.[1];
+  const platform = frontmatter.match(/^platform:\s*"?(.*?)"?\s*$/m)?.[1];
   const label = [channel, platform].filter(Boolean).join(' · ') || t('note.videoFallback');
   const overview = `> [!abstract] ${label}\n> ${dims.map((d) => `${EMOJI[d]} ${headingLabel(d)}`).join(' · ')}`;
   const cleaned = head.replace(/\n*> \[!abstract\][^\n]*(?:\n>[^\n]*)*/g, '');
@@ -185,7 +187,7 @@ function parseSections(body: string): { head: string; sections: ParsedSection[] 
   let curHeading = '';
   const flush = () => {
     if (cur) {
-      const kind = kindOf(curHeading) ?? 'motion';
+      const kind = kindOf(curHeading);
       const m = curHeading.match(/(\d+)s/);
       sections.push({ kind, startSeconds: m ? parseInt(m[1], 10) : 0, text: cur.join('\n') });
     }
@@ -208,14 +210,28 @@ function parseSections(body: string): { head: string; sections: ParsedSection[] 
 }
 
 function addDimension(frontmatter: string, kind: SectionKind): string {
-  return frontmatter.replace(/^(dimensions:\s*\[)([^\]]*)(\])/m, (_, open, inner, close) => {
-    const dims = inner.split(',').map((d: string) => d.trim()).filter(Boolean);
-    // Dedupe by kind, not by string — a zh note must not gain a second
-    // entry for the same dimension when a section is appended in en.
-    if (!dims.some((d: string) => labelToKind(d) === kind)) dims.push(headingLabel(kind));
+  // Dedupe by kind, not by string — a zh note must not gain a second
+  // entry for the same dimension when a section is appended in en.
+  const unquote = (d: string) => d.replace(/^"(.*)"$/, '$1');
+  const merged = (dims: string[]): string[] => {
+    if (!dims.some((d) => labelToKind(d) === kind)) dims.push(headingLabel(kind));
     const rank = (d: string) => { const k = labelToKind(d); return k ? KINDS.indexOf(k) : -1; };
-    dims.sort((a: string, b: string) => rank(a) - rank(b));
-    return `${open}${dims.join(', ')}${close}`;
+    return dims.sort((a, b) => rank(a) - rank(b));
+  };
+  const inline = /^(dimensions:\s*\[)([^\]]*)(\])/m;
+  if (inline.test(frontmatter)) {
+    return frontmatter.replace(inline, (_, open, inner, close) => {
+      const dims = merged(inner.split(',').map((d: string) => unquote(d.trim())).filter(Boolean));
+      return `${open}${dims.join(', ')}${close}`;
+    });
+  }
+  // Obsidian's Properties editor rewrites inline lists to block style (quoting
+  // items it considers special); keep that shape when appending.
+  return frontmatter.replace(/^dimensions:\n((?:[ \t]+- [^\n]*(?:\n|$))*)/m, (_, items: string) => {
+    const dims = merged(
+      items.split('\n').map((l) => unquote(l.replace(/^[ \t]+- /, '').trim())).filter(Boolean),
+    );
+    return `dimensions:\n${dims.map((d) => `  - ${d}`).join('\n')}\n`;
   });
 }
 
@@ -243,15 +259,20 @@ export function mergeSection(existing: string, section: NewSection): { content: 
   }
 
   const incoming: ParsedSection = { kind: section.kind, startSeconds: section.startSeconds, text: section.text };
+  // Unknown-kind sections (a user's hand-written heading) sort after every
+  // known kind, keeping their relative order via the stable sort below.
+  const rank = (k: SectionKind | null) => (k === null ? KINDS.length : KINDS.indexOf(k));
   const all = [...sections, incoming].sort((a, b) =>
-    KINDS.indexOf(a.kind) - KINDS.indexOf(b.kind) || a.startSeconds - b.startSeconds,
+    rank(a.kind) - rank(b.kind) || (a.kind === null || b.kind === null ? 0 : a.startSeconds - b.startSeconds),
   );
   const ordered = renumber(all);
 
   const newFrontmatter = addDimension(frontmatter, section.kind);
   const dims = KINDS.filter((k) => ordered.some((s) => s.kind === k));
   const newHead = syncOverview(head, newFrontmatter, dims).replace(/\s+$/, '');
-  const renderedSections = ordered.map((s) => stripTrailingRule(emojiHeading(s.text, s.kind))).join('\n\n---\n\n');
+  const renderedSections = ordered
+    .map((s) => stripTrailingRule(s.kind === null ? s.text : emojiHeading(s.text, s.kind)))
+    .join('\n\n---\n\n');
   const newBody = [newHead, '', renderedSections, ''].join('\n');
   return { content: `${newFrontmatter}${newBody}`, skipped: false };
 }

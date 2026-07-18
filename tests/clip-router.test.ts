@@ -1,4 +1,5 @@
 import { routeClip, VaultOps } from '../src/clip-router';
+import { makeSerialQueue } from '../src/util';
 import { ClipRule, ScreenshotClipRule, ThumbnailClipRule } from '../src/types';
 import { ClipPayload } from '../src/server';
 import { setLanguage } from '../src/i18n';
@@ -17,6 +18,7 @@ function makeVaultOps(): jest.Mocked<VaultOps> {
     listMarkdownFiles: jest.fn().mockReturnValue([]),
     read: jest.fn().mockResolvedValue(''),
     modify: jest.fn().mockResolvedValue(undefined),
+    getFrontmatter: jest.fn().mockReturnValue(null),
   };
 }
 
@@ -309,6 +311,71 @@ describe('routeClip — append to existing Great Videos note', () => {
     expect(result.notePath).toBe('Content Creation/Great Videos/note.md');
   });
 
+  test('finds a note whose frontmatter was re-serialized by Obsidian (unquoted video_id)', async () => {
+    const vaultOps = makeVaultOps();
+    (vaultOps.listMarkdownFiles as jest.Mock).mockReturnValue(['Content Creation/Great Videos/note.md']);
+    (vaultOps.read as jest.Mock).mockResolvedValue(existingNote.replace('video_id: "abc123"', 'video_id: abc123'));
+    const payload: ClipPayload = {
+      mode: 'hook',
+      frames: [Buffer.from('f1').toString('base64')],
+      video_title: 'My Video',
+      url: 'https://www.youtube.com/watch?v=abc123',
+      captured_at: '2026-05-31T00:00:00Z',
+    };
+    await routeClip(payload, { ...clipRules, hook: { ...hookClipRule, sopPath: '' } }, vaultOps);
+    expect(vaultOps.modify).toHaveBeenCalled();
+    expect(vaultOps.create).not.toHaveBeenCalled();
+  });
+
+  test('finds a note via metadataCache frontmatter without a content scan', async () => {
+    const vaultOps = makeVaultOps();
+    (vaultOps.listMarkdownFiles as jest.Mock).mockReturnValue(['Content Creation/Great Videos/note.md']);
+    (vaultOps.getFrontmatter as jest.Mock).mockReturnValue({ video_id: 'abc123' });
+    (vaultOps.read as jest.Mock).mockResolvedValue(existingNote);
+    const payload: ClipPayload = {
+      mode: 'hook',
+      frames: [Buffer.from('f1').toString('base64')],
+      video_title: 'My Video',
+      url: 'https://www.youtube.com/watch?v=abc123',
+      captured_at: '2026-05-31T00:00:00Z',
+    };
+    await routeClip(payload, { ...clipRules, hook: { ...hookClipRule, sopPath: '' } }, vaultOps);
+    expect(vaultOps.modify).toHaveBeenCalled();
+    expect(vaultOps.create).not.toHaveBeenCalled();
+  });
+
+  test('cached non-matching frontmatter skips the file without reading it', async () => {
+    const vaultOps = makeVaultOps();
+    (vaultOps.listMarkdownFiles as jest.Mock).mockReturnValue(['Content Creation/Great Videos/other.md']);
+    (vaultOps.getFrontmatter as jest.Mock).mockReturnValue({ video_id: 'zzz999' });
+    const payload: ClipPayload = {
+      mode: 'hook',
+      frames: [Buffer.from('f1').toString('base64')],
+      video_title: 'My Video',
+      url: 'https://www.youtube.com/watch?v=abc123',
+      captured_at: '2026-05-31T00:00:00Z',
+    };
+    await routeClip(payload, { ...clipRules, hook: { ...hookClipRule, sopPath: '' } }, vaultOps);
+    expect(vaultOps.read).not.toHaveBeenCalled();
+    expect(vaultOps.create).toHaveBeenCalled();
+  });
+
+  test('URL-based video keys with regex metacharacters match without crashing', async () => {
+    const vaultOps = makeVaultOps();
+    (vaultOps.listMarkdownFiles as jest.Mock).mockReturnValue(['Content Creation/Great Videos/tweet.md']);
+    (vaultOps.read as jest.Mock).mockResolvedValue(existingNote.replace('video_id: "abc123"', 'video_id: https://x.com/u/status/123'));
+    const payload: ClipPayload = {
+      mode: 'hook',
+      frames: [Buffer.from('f1').toString('base64')],
+      video_title: 'Tweet Video',
+      url: 'https://x.com/u/status/123?s=20',
+      captured_at: '2026-05-31T00:00:00Z',
+    };
+    await routeClip(payload, { ...clipRules, hook: { ...hookClipRule, sopPath: '' } }, vaultOps);
+    expect(vaultOps.modify).toHaveBeenCalled();
+    expect(vaultOps.create).not.toHaveBeenCalled();
+  });
+
   test('no existing note: creates new note in Great Videos with ## 🎬 内容 section', async () => {
     const vaultOps = makeVaultOps();
     (vaultOps.listMarkdownFiles as jest.Mock).mockReturnValue([]);
@@ -377,7 +444,7 @@ describe('routeClip — unified video note (manual)', () => {
     await routeClip({ mode: 'keyframe', frames: ['Zg=='], video_title: 'XHS', url, time_range: { start: 5, end: 9 }, captured_at: '2026-06-28T00:00:00Z' }, manual, v);
     expect(Object.keys(store).length).toBe(1);
     const note = store[Object.keys(store)[0]];
-    expect(note).toContain('platform: xiaohongshu');
+    expect(note).toContain('platform: "xiaohongshu"');
     expect(note).toContain('video_id: "xhs123abc"');
     expect(note.indexOf('## 🎬 内容')).toBeLessThan(note.indexOf('## ✨ 动效'));
     expect(note).toContain('[▶ 跳转原视频]'); // no inline player for xhs
@@ -503,5 +570,119 @@ describe('routeClip — built-in SOP fallback', () => {
     await routeClip(payload, clipRules, vaultOps, { thumbnail: '# Built-in cover SOP' });
     const [, noteContent] = (vaultOps.create as jest.Mock).mock.calls[0];
     expect(noteContent).toContain('# Built-in cover SOP');
+  });
+});
+
+// ── injection hardening ───────────────────────────────────────────────────────
+
+describe('routeClip — untrusted title hardening', () => {
+  test('standalone screenshot note title cannot open a code fence', async () => {
+    const vaultOps = makeVaultOps();
+    const payload: ClipPayload = {
+      mode: 'screenshot', images: [Buffer.from('img').toString('base64')],
+      url: 'https://example.com/page', title: 'T\n```dataviewjs\nboom',
+    };
+    await routeClip(payload, clipRules, vaultOps);
+    const [, content] = (vaultOps.create as jest.Mock).mock.calls[0];
+    expect(content).not.toContain('```dataviewjs');
+  });
+});
+
+// ── concurrent clips ──────────────────────────────────────────────────────────
+
+describe('routeClip — concurrent clips for the same video', () => {
+  function makeStoreVaultOps() {
+    const files = new Map<string, string>();
+    const delay = () => new Promise((r) => setTimeout(r, 10));
+    const ops = makeVaultOps();
+    (ops.listMarkdownFiles as jest.Mock).mockImplementation(() => Array.from(files.keys()));
+    (ops.read as jest.Mock).mockImplementation(async (p: string) => { await delay(); return files.get(p) ?? ''; });
+    (ops.create as jest.Mock).mockImplementation(async (p: string, c: string) => { files.set(p, c); });
+    (ops.modify as jest.Mock).mockImplementation(async (p: string, c: string) => { await delay(); files.set(p, c); });
+    return { ops, files };
+  }
+
+  const existing = [
+    `---`, `type: video`, `video_id: "abc123"`, `dimensions: [封面标题]`, `---`,
+    ``, `# My Video`, ``, `## 🖼️ 封面标题`, `分析内容`,
+  ].join('\n');
+
+  const hookPayload: ClipPayload = {
+    mode: 'hook', frames: [Buffer.from('f1').toString('base64')], video_title: 'My Video',
+    url: 'https://www.youtube.com/watch?v=abc123', captured_at: '2026-05-31T00:00:00Z',
+  };
+  const kfPayload: ClipPayload = {
+    mode: 'keyframe', frames: [Buffer.from('f2').toString('base64')], video_title: 'My Video',
+    url: 'https://www.youtube.com/watch?v=abc123', time_range: { start: 10, end: 20 },
+    captured_at: '2026-05-31T00:00:00Z',
+  };
+  const rules = { ...clipRules, hook: { ...hookClipRule, sopPath: '' }, keyframe: { ...keyframeClipRule, sopPath: '' } };
+
+  test('two clips fired together both land when serialized through the queue', async () => {
+    const { ops, files } = makeStoreVaultOps();
+    files.set('Content Creation/Great Videos/note.md', existing);
+    const enqueue = makeSerialQueue();
+    await Promise.all([
+      enqueue(() => routeClip(hookPayload, rules, ops)),
+      enqueue(() => routeClip(kfPayload, rules, ops)),
+    ]);
+    const note = files.get('Content Creation/Great Videos/note.md')!;
+    expect(note).toContain('## 🎬 内容');
+    expect(note).toContain('## ✨ 动效');
+  });
+
+  test('two clips for the same NEW video create one note, not a create collision', async () => {
+    const { ops, files } = makeStoreVaultOps();
+    const enqueue = makeSerialQueue();
+    await Promise.all([
+      enqueue(() => routeClip(hookPayload, rules, ops)),
+      enqueue(() => routeClip(kfPayload, rules, ops)),
+    ]);
+    const notes = Array.from(files.keys()).filter((p) => p.endsWith('.md'));
+    expect(notes).toHaveLength(1);
+    const note = files.get(notes[0])!;
+    expect(note).toContain('## 🎬 内容');
+    expect(note).toContain('## ✨ 动效');
+  });
+
+  test('a failing clip does not block the next one in the queue', async () => {
+    const { ops, files } = makeStoreVaultOps();
+    files.set('Content Creation/Great Videos/note.md', existing);
+    const enqueue = makeSerialQueue();
+    const bad = enqueue(() => Promise.reject(new Error('boom')));
+    const good = enqueue(() => routeClip(kfPayload, rules, ops));
+    await expect(bad).rejects.toThrow('boom');
+    await good;
+    expect(files.get('Content Creation/Great Videos/note.md')!).toContain('## ✨ 动效');
+  });
+});
+
+// ── image binary integrity ────────────────────────────────────────────────────
+// Small Buffer.from() results are views into Node's shared 8 KB pool; writing
+// `.buffer` raw would persist the whole pool (with unrelated memory) as the image.
+
+describe('routeClip — image binary integrity', () => {
+  test('screenshot image writes exactly its own bytes, not the shared pool', async () => {
+    const vaultOps = makeVaultOps();
+    const payload: ClipPayload = {
+      mode: 'screenshot', images: [Buffer.from('pixels').toString('base64')],
+      url: 'https://x.com', title: 'S',
+    };
+    await routeClip(payload, clipRules, vaultOps);
+    const ab = (vaultOps.createBinary as jest.Mock).mock.calls[0][1] as ArrayBuffer;
+    expect(ab.byteLength).toBe(6);
+    expect(Buffer.from(ab).toString()).toBe('pixels');
+  });
+
+  test('hook frame writes exactly its own bytes, not the shared pool', async () => {
+    const vaultOps = makeVaultOps();
+    const payload: ClipPayload = {
+      mode: 'hook', frames: [Buffer.from('f1').toString('base64')], video_title: 'T',
+      url: 'https://youtube.com/watch?v=abc', captured_at: '2026-05-30T18:00:00Z',
+    };
+    await routeClip(payload, clipRules, vaultOps);
+    const ab = (vaultOps.createBinary as jest.Mock).mock.calls[0][1] as ArrayBuffer;
+    expect(ab.byteLength).toBe(2);
+    expect(Buffer.from(ab).toString()).toBe('f1');
   });
 });

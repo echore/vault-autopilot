@@ -194,7 +194,11 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
       .setDesc(t('settings.port.desc'))
       .addText(t => t.setValue(String(this.plugin.settings.httpServer.port)).onChange(async v => {
         const n = parseInt(v, 10);
-        if (n > 1024 && n < 65536) { this.plugin.settings.httpServer.port = n; await this.plugin.saveSettings(); }
+        if (n > 1024 && n < 65536) {
+          this.plugin.settings.httpServer.port = n;
+          await this.plugin.saveSettings();
+          this.plugin.restartServer();
+        }
       }));
 
     new Setting(containerEl)

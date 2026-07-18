@@ -46,6 +46,7 @@
   "notice.sopExportExists": "{path} already exists. The path now points to it.",
   "notice.savedTo": "Saved to {folder}\nWant a different location? Settings → Vault Autopilot → Storage locations",
   "notice.portInUse": "Vault Autopilot: port {port} is already in use. Quit the program using it, or set the same new port in both the plugin settings and the extension settings.",
+  "notice.serverError": "Vault Autopilot: the local server on port {port} stopped. Toggle it off and on in settings to retry.",
   "notice.sectionExists": "\"{section}\" already exists — not overwritten. To redo it, delete that section first, then clip again.",
   "error.screenshotFolderNotConfigured": "Screenshots folder not configured: set it in Settings → Vault Autopilot → Storage locations → Screenshots folder.",
   "error.videoFolderNotConfigured": "Video notes folder or cover images folder not configured: set them in Settings → Vault Autopilot → Storage locations.",

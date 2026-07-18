@@ -9,11 +9,14 @@ import { routeClip, VaultOps } from './clip-router';
 import { SopInstallOps, builtinSopFor } from './bundled-sops';
 import { GalleryView, GALLERY_VIEW_TYPE } from './gallery-view';
 import { t, setLanguage } from './i18n';
-import { assertDownloadable } from './util';
+import { assertDownloadable, makeSerialQueue } from './util';
 
 export default class VaultAutopilotPlugin extends Plugin {
   settings: PluginSettings = DEFAULT_SETTINGS;
   private server: http.Server | null = null;
+  // Double-clicks / extension retries race their read-modify-write on the same
+  // note; every clip goes through this queue so only one is in flight at a time.
+  private enqueueClip = makeSerialQueue();
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -61,9 +64,13 @@ export default class VaultAutopilotPlugin extends Plugin {
   }
 
   restartServer(): void {
-    this.server?.close();
+    const start = () => { if (this.settings.httpServer.enabled) this.startServer(); };
+    const old = this.server;
     this.server = null;
-    if (this.settings.httpServer.enabled) this.startServer();
+    // Rebind only after the old socket has fully closed; starting on the same
+    // tick races the close and hits EADDRINUSE on the same port.
+    if (old) old.close(() => start());
+    else start();
   }
 
   private async ensureFolder(folderPath: string): Promise<void> {
@@ -157,23 +164,32 @@ export default class VaultAutopilotPlugin extends Plugin {
         if (!(file instanceof TFile)) throw new Error(`File not found: ${filePath}`);
         await this.app.vault.modify(file, content);
       },
+      getFrontmatter: (filePath) => {
+        const file = this.app.vault.getAbstractFileByPath(filePath);
+        if (!(file instanceof TFile)) return null;
+        return this.app.metadataCache.getFileCache(file)?.frontmatter ?? null;
+      },
     };
     this.server = createServer(
       port,
-      async (payload) => {
+      (payload) => this.enqueueClip(async () => {
         const { notePath, notice } = await routeClip(payload, this.settings.clipRules, vaultOps, this.builtinSops());
         if (notePath) await this.maybeFirstSaveNotice(payload.mode, notePath);
         const obsidianUrl = notePath
           ? `obsidian://open?vault=${encodeURIComponent(this.app.vault.getName())}&file=${encodeURIComponent(notePath)}`
           : undefined;
         return { obsidianUrl, notice };
-      },
+      }),
       this.manifest.version,
     );
     this.server.on('error', (err: NodeJS.ErrnoException) => {
-      if (err.code === 'EADDRINUSE') {
-        new Notice(t('notice.portInUse', { port }), 10000);
-      }
+      // A failed listen leaves a dead server; drop the reference so /ping and
+      // clips report honestly and the next toggle/restart can rebind.
+      this.server = null;
+      new Notice(
+        err.code === 'EADDRINUSE' ? t('notice.portInUse', { port }) : t('notice.serverError', { port }),
+        10000,
+      );
     });
   }
 }

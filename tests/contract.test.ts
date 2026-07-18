@@ -13,6 +13,7 @@ function mockVaultOps(): VaultOps {
     listMarkdownFiles: () => [],
     read: async () => '',
     modify: async () => {},
+    getFrontmatter: () => null,
   };
 }
 
