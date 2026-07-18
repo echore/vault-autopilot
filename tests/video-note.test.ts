@@ -131,6 +131,20 @@ test('a hand-written unknown heading survives a merge untouched, placed after kn
   expect(r2.content.indexOf('## 我的分析')).toBeGreaterThan(r2.content.lastIndexOf('## 📸 截图'));
 });
 
+test('dimensions survive Obsidian Properties re-serialization to block-style YAML', () => {
+  // Obsidian's Properties editor rewrites `dimensions: [内容]` to a block list
+  // (quoting items it considers special). A later merge must still dedupe/append.
+  const reserialized = `---\ntype: video\nvideo_id: abc123\nvideo_url: https://www.youtube.com/watch?v=abc123\ntitle: Bee\ndimensions:\n  - "内容"\nanalyzed_at: 2026-07-01\n---\n\n# Bee\n\n## 🎬 内容\n\nbody\n`;
+  const r = mergeSection(reserialized, keyframeSection({ url: 'https://www.youtube.com/watch?v=abc123', platform: 'youtube', start: 45, end: 52, frameNames: ['k.png'] }));
+  const fm = r.content.match(/^---\n[\s\S]*?\n---/)![0];
+  expect(fm).toMatch(/dimensions:[\s\S]*内容/);
+  expect(fm).toMatch(/dimensions:[\s\S]*动效/);
+
+  const again = mergeSection(r.content, keyframeSection({ url: 'https://www.youtube.com/watch?v=abc123', platform: 'youtube', start: 100, end: 110, frameNames: ['k2.png'] }));
+  const fm2 = again.content.match(/^---\n[\s\S]*?\n---/)![0];
+  expect((fm2.match(/动效/g) || []).length).toBe(1);
+});
+
 test('hook section embeds the whole video from start (no end) + frames + 字幕', () => {
   const s = hookSection({ url: meta.videoUrl, platform: 'youtube', endSeconds: 15, frameNames: ['f1.png'], transcript: 'hello' });
   expect(s.kind).toBe('content');

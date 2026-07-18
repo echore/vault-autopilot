@@ -17,6 +17,7 @@ function makeVaultOps(): jest.Mocked<VaultOps> {
     listMarkdownFiles: jest.fn().mockReturnValue([]),
     read: jest.fn().mockResolvedValue(''),
     modify: jest.fn().mockResolvedValue(undefined),
+    getFrontmatter: jest.fn().mockReturnValue(null),
   };
 }
 
@@ -307,6 +308,71 @@ describe('routeClip — append to existing Great Videos note', () => {
     };
     const result = await routeClip(payload, { ...clipRules, hook: manualHookRule }, vaultOps);
     expect(result.notePath).toBe('Content Creation/Great Videos/note.md');
+  });
+
+  test('finds a note whose frontmatter was re-serialized by Obsidian (unquoted video_id)', async () => {
+    const vaultOps = makeVaultOps();
+    (vaultOps.listMarkdownFiles as jest.Mock).mockReturnValue(['Content Creation/Great Videos/note.md']);
+    (vaultOps.read as jest.Mock).mockResolvedValue(existingNote.replace('video_id: "abc123"', 'video_id: abc123'));
+    const payload: ClipPayload = {
+      mode: 'hook',
+      frames: [Buffer.from('f1').toString('base64')],
+      video_title: 'My Video',
+      url: 'https://www.youtube.com/watch?v=abc123',
+      captured_at: '2026-05-31T00:00:00Z',
+    };
+    await routeClip(payload, { ...clipRules, hook: { ...hookClipRule, sopPath: '' } }, vaultOps);
+    expect(vaultOps.modify).toHaveBeenCalled();
+    expect(vaultOps.create).not.toHaveBeenCalled();
+  });
+
+  test('finds a note via metadataCache frontmatter without a content scan', async () => {
+    const vaultOps = makeVaultOps();
+    (vaultOps.listMarkdownFiles as jest.Mock).mockReturnValue(['Content Creation/Great Videos/note.md']);
+    (vaultOps.getFrontmatter as jest.Mock).mockReturnValue({ video_id: 'abc123' });
+    (vaultOps.read as jest.Mock).mockResolvedValue(existingNote);
+    const payload: ClipPayload = {
+      mode: 'hook',
+      frames: [Buffer.from('f1').toString('base64')],
+      video_title: 'My Video',
+      url: 'https://www.youtube.com/watch?v=abc123',
+      captured_at: '2026-05-31T00:00:00Z',
+    };
+    await routeClip(payload, { ...clipRules, hook: { ...hookClipRule, sopPath: '' } }, vaultOps);
+    expect(vaultOps.modify).toHaveBeenCalled();
+    expect(vaultOps.create).not.toHaveBeenCalled();
+  });
+
+  test('cached non-matching frontmatter skips the file without reading it', async () => {
+    const vaultOps = makeVaultOps();
+    (vaultOps.listMarkdownFiles as jest.Mock).mockReturnValue(['Content Creation/Great Videos/other.md']);
+    (vaultOps.getFrontmatter as jest.Mock).mockReturnValue({ video_id: 'zzz999' });
+    const payload: ClipPayload = {
+      mode: 'hook',
+      frames: [Buffer.from('f1').toString('base64')],
+      video_title: 'My Video',
+      url: 'https://www.youtube.com/watch?v=abc123',
+      captured_at: '2026-05-31T00:00:00Z',
+    };
+    await routeClip(payload, { ...clipRules, hook: { ...hookClipRule, sopPath: '' } }, vaultOps);
+    expect(vaultOps.read).not.toHaveBeenCalled();
+    expect(vaultOps.create).toHaveBeenCalled();
+  });
+
+  test('URL-based video keys with regex metacharacters match without crashing', async () => {
+    const vaultOps = makeVaultOps();
+    (vaultOps.listMarkdownFiles as jest.Mock).mockReturnValue(['Content Creation/Great Videos/tweet.md']);
+    (vaultOps.read as jest.Mock).mockResolvedValue(existingNote.replace('video_id: "abc123"', 'video_id: https://x.com/u/status/123'));
+    const payload: ClipPayload = {
+      mode: 'hook',
+      frames: [Buffer.from('f1').toString('base64')],
+      video_title: 'Tweet Video',
+      url: 'https://x.com/u/status/123?s=20',
+      captured_at: '2026-05-31T00:00:00Z',
+    };
+    await routeClip(payload, { ...clipRules, hook: { ...hookClipRule, sopPath: '' } }, vaultOps);
+    expect(vaultOps.modify).toHaveBeenCalled();
+    expect(vaultOps.create).not.toHaveBeenCalled();
   });
 
   test('no existing note: creates new note in Great Videos with ## 🎬 内容 section', async () => {

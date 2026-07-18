@@ -157,6 +157,11 @@ export default class VaultAutopilotPlugin extends Plugin {
         if (!(file instanceof TFile)) throw new Error(`File not found: ${filePath}`);
         await this.app.vault.modify(file, content);
       },
+      getFrontmatter: (filePath) => {
+        const file = this.app.vault.getAbstractFileByPath(filePath);
+        if (!(file instanceof TFile)) return null;
+        return this.app.metadataCache.getFileCache(file)?.frontmatter ?? null;
+      },
     };
     this.server = createServer(
       port,

@@ -208,14 +208,28 @@ function parseSections(body: string): { head: string; sections: ParsedSection[] 
 }
 
 function addDimension(frontmatter: string, kind: SectionKind): string {
-  return frontmatter.replace(/^(dimensions:\s*\[)([^\]]*)(\])/m, (_, open, inner, close) => {
-    const dims = inner.split(',').map((d: string) => d.trim()).filter(Boolean);
-    // Dedupe by kind, not by string — a zh note must not gain a second
-    // entry for the same dimension when a section is appended in en.
-    if (!dims.some((d: string) => labelToKind(d) === kind)) dims.push(headingLabel(kind));
+  // Dedupe by kind, not by string — a zh note must not gain a second
+  // entry for the same dimension when a section is appended in en.
+  const unquote = (d: string) => d.replace(/^"(.*)"$/, '$1');
+  const merged = (dims: string[]): string[] => {
+    if (!dims.some((d) => labelToKind(d) === kind)) dims.push(headingLabel(kind));
     const rank = (d: string) => { const k = labelToKind(d); return k ? KINDS.indexOf(k) : -1; };
-    dims.sort((a: string, b: string) => rank(a) - rank(b));
-    return `${open}${dims.join(', ')}${close}`;
+    return dims.sort((a, b) => rank(a) - rank(b));
+  };
+  const inline = /^(dimensions:\s*\[)([^\]]*)(\])/m;
+  if (inline.test(frontmatter)) {
+    return frontmatter.replace(inline, (_, open, inner, close) => {
+      const dims = merged(inner.split(',').map((d: string) => unquote(d.trim())).filter(Boolean));
+      return `${open}${dims.join(', ')}${close}`;
+    });
+  }
+  // Obsidian's Properties editor rewrites inline lists to block style (quoting
+  // items it considers special); keep that shape when appending.
+  return frontmatter.replace(/^dimensions:\n((?:[ \t]+- [^\n]*(?:\n|$))*)/m, (_, items: string) => {
+    const dims = merged(
+      items.split('\n').map((l) => unquote(l.replace(/^[ \t]+- /, '').trim())).filter(Boolean),
+    );
+    return `dimensions:\n${dims.map((d) => `  - ${d}`).join('\n')}\n`;
   });
 }
 
