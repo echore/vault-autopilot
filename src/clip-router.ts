@@ -1,6 +1,6 @@
 import { ClipPayload, HookPayload, KeyframePayload, ScreenshotPayload, ThumbnailPayload } from './server';
 import { ClipRule, PluginSettings, ScreenshotClipRule, ThumbnailClipRule } from './types';
-import { sanitize, buildVideoEmbed, extractVideoId, detectPlatform, videoKey } from './util';
+import { sanitize, buildVideoEmbed, extractVideoId, detectPlatform, videoKey, safeFileId } from './util';
 import { buildAnchor, ensurePublished, mergeSection, coverSection, hookSection, keyframeSection, screenshotSection, VideoNoteMeta, NewSection, headingLabel, sopBlock } from './video-note';
 import { t } from './i18n';
 
@@ -189,7 +189,7 @@ async function handleThumbnail(
 
   // Always .webp — the gallery index reads `<video_id>.webp` exactly. (The bytes
   // are jpg/png; Obsidian's <img> renders by content-sniffing, not extension.)
-  const thumbnailFile = `${payload.video_id}.webp`;
+  const thumbnailFile = `${safeFileId(payload.video_id)}.webp`;
   const thumbnailPath = `${rule.thumbnailFolder}/${thumbnailFile}`;
   const imgData = await vaultOps.downloadUrl(payload.thumbnail_url);
   await vaultOps.createBinary(thumbnailPath, imgData);

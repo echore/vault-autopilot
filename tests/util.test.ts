@@ -1,4 +1,4 @@
-import { postProcessMarkdown, sanitize, extractVideoId, buildVideoEmbed } from '../src/util';
+import { postProcessMarkdown, sanitize, extractVideoId, buildVideoEmbed, safeFileId } from '../src/util';
 
 describe('postProcessMarkdown', () => {
   test('wraps bare 6-digit hex codes in backticks', () => {
@@ -69,6 +69,21 @@ describe('buildVideoEmbed', () => {
     const result = buildVideoEmbed('https://example.com/video', 'other', 0);
     expect(result).toContain('https://example.com/video');
     expect(result).not.toContain('<iframe');
+  });
+});
+
+describe('safeFileId', () => {
+  test('keeps clean platform ids', () => {
+    expect(safeFileId('dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ');
+    expect(safeFileId('BV1xx411c7mu')).toBe('BV1xx411c7mu');
+  });
+  test('strips path separators and traversal', () => {
+    expect(safeFileId('../../etc/passwd')).toBe('etc-passwd');
+    expect(safeFileId('a/b\\c')).toBe('a-b-c');
+  });
+  test('never returns empty', () => {
+    expect(safeFileId('')).toBe('cover');
+    expect(safeFileId('///')).toBe('cover');
   });
 });
 

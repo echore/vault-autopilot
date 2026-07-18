@@ -8,6 +8,17 @@ export function sanitize(str: string): string {
   return (str || '').replace(/[/\\:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
 }
 
+// A vault filename component derived from an untrusted id. Only word chars,
+// dash and underscore survive; runs of anything else collapse to a single dash.
+// Guarantees a non-empty, path-separator-free result.
+export function safeFileId(id: string): string {
+  const cleaned = (id || '')
+    .replace(/[^A-Za-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64);
+  return cleaned || 'cover';
+}
+
 export function extractVideoId(url: string, platform: string | undefined): string | null {
   const p = (platform ?? '').toLowerCase();
   if (p === 'youtube' || url.includes('youtube.com') || url.includes('youtu.be')) {
