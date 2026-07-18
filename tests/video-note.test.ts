@@ -116,6 +116,21 @@ test('a ## line inside a user code fence is NOT treated as a section', () => {
   expect(r.content).toContain('## ✨ 动效 ② · 130s–138s');
 });
 
+test('a hand-written unknown heading survives a merge untouched, placed after known sections', () => {
+  let c = buildAnchor(meta);
+  c = mergeSection(c, keyframeSection({ url: meta.videoUrl, platform: 'youtube', start: 45, end: 52, frameNames: ['k.png'] })).content;
+  c = c + '\n\n---\n\n## 我的分析\n\n这是我的想法\n';
+  const r = mergeSection(c, keyframeSection({ url: meta.videoUrl, platform: 'youtube', start: 130, end: 138, frameNames: ['k2.png'] }));
+  expect(r.content).toContain('## 我的分析');
+  expect(r.content).toContain('这是我的想法');
+  expect(r.content.indexOf('## 我的分析')).toBeGreaterThan(r.content.lastIndexOf('## ✨ 动效'));
+
+  const r2 = mergeSection(r.content, screenshotSection(['s.png']));
+  expect((r2.content.match(/## 我的分析/g) || []).length).toBe(1);
+  expect(r2.content).toContain('这是我的想法');
+  expect(r2.content.indexOf('## 我的分析')).toBeGreaterThan(r2.content.lastIndexOf('## 📸 截图'));
+});
+
 test('hook section embeds the whole video from start (no end) + frames + 字幕', () => {
   const s = hookSection({ url: meta.videoUrl, platform: 'youtube', endSeconds: 15, frameNames: ['f1.png'], transcript: 'hello' });
   expect(s.kind).toBe('content');

@@ -131,7 +131,7 @@ export function ensurePublished(content: string, published?: string | null): str
   return `${fm}\npublished: ${published}${content.slice(end)}`;
 }
 
-interface ParsedSection { kind: SectionKind; startSeconds: number; text: string; }
+interface ParsedSection { kind: SectionKind | null; startSeconds: number; text: string; }
 
 function kindOf(heading: string): SectionKind | null {
   // Substring match so an emoji prefix (## 🎬 内容) still resolves to its kind.
@@ -185,7 +185,7 @@ function parseSections(body: string): { head: string; sections: ParsedSection[] 
   let curHeading = '';
   const flush = () => {
     if (cur) {
-      const kind = kindOf(curHeading) ?? 'motion';
+      const kind = kindOf(curHeading);
       const m = curHeading.match(/(\d+)s/);
       sections.push({ kind, startSeconds: m ? parseInt(m[1], 10) : 0, text: cur.join('\n') });
     }
@@ -243,15 +243,20 @@ export function mergeSection(existing: string, section: NewSection): { content: 
   }
 
   const incoming: ParsedSection = { kind: section.kind, startSeconds: section.startSeconds, text: section.text };
+  // Unknown-kind sections (a user's hand-written heading) sort after every
+  // known kind, keeping their relative order via the stable sort below.
+  const rank = (k: SectionKind | null) => (k === null ? KINDS.length : KINDS.indexOf(k));
   const all = [...sections, incoming].sort((a, b) =>
-    KINDS.indexOf(a.kind) - KINDS.indexOf(b.kind) || a.startSeconds - b.startSeconds,
+    rank(a.kind) - rank(b.kind) || (a.kind === null || b.kind === null ? 0 : a.startSeconds - b.startSeconds),
   );
   const ordered = renumber(all);
 
   const newFrontmatter = addDimension(frontmatter, section.kind);
   const dims = KINDS.filter((k) => ordered.some((s) => s.kind === k));
   const newHead = syncOverview(head, newFrontmatter, dims).replace(/\s+$/, '');
-  const renderedSections = ordered.map((s) => stripTrailingRule(emojiHeading(s.text, s.kind))).join('\n\n---\n\n');
+  const renderedSections = ordered
+    .map((s) => stripTrailingRule(s.kind === null ? s.text : emojiHeading(s.text, s.kind)))
+    .join('\n\n---\n\n');
   const newBody = [newHead, '', renderedSections, ''].join('\n');
   return { content: `${newFrontmatter}${newBody}`, skipped: false };
 }
