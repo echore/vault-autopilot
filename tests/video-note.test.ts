@@ -229,6 +229,14 @@ describe('bilingual headings', () => {
   });
 });
 
+describe('null/undefined title', () => {
+  test('a null title never renders "# undefined" / "# null"', () => {
+    const a = buildAnchor({ videoId: 'v1', videoUrl: 'https://y.com/v1', title: null as any, platform: 'youtube' });
+    const heading = a.split('\n').find((l) => l.startsWith('# '))!;
+    expect(heading).not.toMatch(/undefined|null/);
+  });
+});
+
 describe('injection hardening', () => {
   const base = { videoId: 'v1', videoUrl: 'https://y.com/v1', title: 'T' };
 
