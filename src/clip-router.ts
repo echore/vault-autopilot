@@ -134,7 +134,7 @@ async function handleScreenshot(
   for (let i = 0; i < payload.images.length; i++) {
     const name = `${stem}-${String(i + 1).padStart(2, '0')}.png`;
     const bytes = Buffer.from(payload.images[i], 'base64');
-    await vaultOps.createBinary(`${framesDir}/${name}`, bytes.buffer as ArrayBuffer);
+    await vaultOps.createBinary(`${framesDir}/${name}`, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer);
     imageNames.push(name);
   }
 
@@ -238,7 +238,7 @@ async function handleMultiFrame(
   for (let i = 0; i < sampled.length; i++) {
     const name = `${stem}-f${String(i + 1).padStart(2, '0')}.jpg`;
     const bytes = Buffer.from(sampled[i], 'base64');
-    await vaultOps.createBinary(`${framesDir}/${name}`, bytes.buffer as ArrayBuffer);
+    await vaultOps.createBinary(`${framesDir}/${name}`, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer);
     frameNames.push(name);
   }
   const sopContent = readSopSafely(rule.sopPath, vaultOps) ?? builtinSop;

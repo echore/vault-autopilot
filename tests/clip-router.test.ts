@@ -505,3 +505,33 @@ describe('routeClip — built-in SOP fallback', () => {
     expect(noteContent).toContain('# Built-in cover SOP');
   });
 });
+
+// ── image binary integrity ────────────────────────────────────────────────────
+// Small Buffer.from() results are views into Node's shared 8 KB pool; writing
+// `.buffer` raw would persist the whole pool (with unrelated memory) as the image.
+
+describe('routeClip — image binary integrity', () => {
+  test('screenshot image writes exactly its own bytes, not the shared pool', async () => {
+    const vaultOps = makeVaultOps();
+    const payload: ClipPayload = {
+      mode: 'screenshot', images: [Buffer.from('pixels').toString('base64')],
+      url: 'https://x.com', title: 'S',
+    };
+    await routeClip(payload, clipRules, vaultOps);
+    const ab = (vaultOps.createBinary as jest.Mock).mock.calls[0][1] as ArrayBuffer;
+    expect(ab.byteLength).toBe(6);
+    expect(Buffer.from(ab).toString()).toBe('pixels');
+  });
+
+  test('hook frame writes exactly its own bytes, not the shared pool', async () => {
+    const vaultOps = makeVaultOps();
+    const payload: ClipPayload = {
+      mode: 'hook', frames: [Buffer.from('f1').toString('base64')], video_title: 'T',
+      url: 'https://youtube.com/watch?v=abc', captured_at: '2026-05-30T18:00:00Z',
+    };
+    await routeClip(payload, clipRules, vaultOps);
+    const ab = (vaultOps.createBinary as jest.Mock).mock.calls[0][1] as ArrayBuffer;
+    expect(ab.byteLength).toBe(2);
+    expect(Buffer.from(ab).toString()).toBe('f1');
+  });
+});
