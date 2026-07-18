@@ -13,6 +13,15 @@ describe('port migration', () => {
   test('missing port falls back to default', () => {
     expect(normalizePort(undefined)).toBe(17183);
   });
+  test('normalizePort clamps out-of-range values to default', () => {
+    expect(normalizePort(0)).toBe(17183);
+    expect(normalizePort(-5)).toBe(17183);
+    expect(normalizePort(70000)).toBe(17183);
+    expect(normalizePort(1024)).toBe(17183); // boundary: must be > 1024
+  });
+  test('normalizePort keeps a valid custom port', () => {
+    expect(normalizePort(27999)).toBe(27999);
+  });
 });
 
 describe('zero-config folder defaults', () => {

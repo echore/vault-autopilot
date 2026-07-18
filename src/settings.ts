@@ -27,6 +27,7 @@ const LEGACY_DEFAULT_PORT = 27183;
 
 export function normalizePort(loaded: number | undefined): number {
   if (loaded === undefined || loaded === LEGACY_DEFAULT_PORT) return DEFAULT_SETTINGS.httpServer.port;
+  if (!Number.isInteger(loaded) || loaded <= 1024 || loaded >= 65536) return DEFAULT_SETTINGS.httpServer.port;
   return loaded;
 }
 
