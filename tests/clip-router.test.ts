@@ -444,7 +444,7 @@ describe('routeClip — unified video note (manual)', () => {
     await routeClip({ mode: 'keyframe', frames: ['Zg=='], video_title: 'XHS', url, time_range: { start: 5, end: 9 }, captured_at: '2026-06-28T00:00:00Z' }, manual, v);
     expect(Object.keys(store).length).toBe(1);
     const note = store[Object.keys(store)[0]];
-    expect(note).toContain('platform: xiaohongshu');
+    expect(note).toContain('platform: "xiaohongshu"');
     expect(note).toContain('video_id: "xhs123abc"');
     expect(note.indexOf('## 🎬 内容')).toBeLessThan(note.indexOf('## ✨ 动效'));
     expect(note).toContain('[▶ 跳转原视频]'); // no inline player for xhs
@@ -570,6 +570,21 @@ describe('routeClip — built-in SOP fallback', () => {
     await routeClip(payload, clipRules, vaultOps, { thumbnail: '# Built-in cover SOP' });
     const [, noteContent] = (vaultOps.create as jest.Mock).mock.calls[0];
     expect(noteContent).toContain('# Built-in cover SOP');
+  });
+});
+
+// ── injection hardening ───────────────────────────────────────────────────────
+
+describe('routeClip — untrusted title hardening', () => {
+  test('standalone screenshot note title cannot open a code fence', async () => {
+    const vaultOps = makeVaultOps();
+    const payload: ClipPayload = {
+      mode: 'screenshot', images: [Buffer.from('img').toString('base64')],
+      url: 'https://example.com/page', title: 'T\n```dataviewjs\nboom',
+    };
+    await routeClip(payload, clipRules, vaultOps);
+    const [, content] = (vaultOps.create as jest.Mock).mock.calls[0];
+    expect(content).not.toContain('```dataviewjs');
   });
 });
 

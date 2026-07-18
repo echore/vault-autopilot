@@ -17,7 +17,7 @@ export function postProcessMarkdown(md: string): string {
 }
 
 export function sanitize(str: string): string {
-  return (str || '').replace(/[/\\:*?"<>|#^\[\]]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
+  return (str || '').replace(/[/\\:*?"<>|#^\[\]`]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
 }
 
 // Literal private/loopback/link-local hosts. The WHATWG URL parser already
@@ -64,6 +64,13 @@ export function assertDownloadable(url: string): void {
   try { parsed = new URL(url); } catch { throw new Error('Invalid URL'); }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error('Unsupported URL scheme');
   if (isPrivateHost(parsed.hostname)) throw new Error('Blocked host');
+}
+
+// Untrusted text interpolated into markdown structure (headings, callout
+// labels): newlines flattened and backticks dropped so it can never open a
+// fence or spill onto a structural line. null/undefined become ''.
+export function inlineText(v: unknown): string {
+  return String(v ?? '').replace(/`/g, '').replace(/[\r\n]+/g, ' ').trim();
 }
 
 // A safe double-quoted YAML scalar for an untrusted value: backslash and quote

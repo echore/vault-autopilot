@@ -229,11 +229,50 @@ describe('bilingual headings', () => {
   });
 });
 
+describe('injection hardening', () => {
+  const base = { videoId: 'v1', videoUrl: 'https://y.com/v1', title: 'T' };
+
+  test('crafted platform cannot inject frontmatter keys', () => {
+    const a = buildAnchor({ ...base, platform: 'x"\ninjected: true' });
+    const fm = a.match(/^---\n[\s\S]*?\n---/)![0];
+    expect(fm).not.toMatch(/^injected:/m);
+  });
+
+  test('crafted published cannot inject frontmatter keys', () => {
+    const a = buildAnchor({ ...base, platform: 'youtube', published: '2026-01-01\nevil: x' });
+    expect(a.match(/^---\n[\s\S]*?\n---/)![0]).not.toMatch(/^evil:/m);
+    const patched = ensurePublished('---\ntype: video\n---\n\n# T\n', '2026-01-01\nevil: x');
+    expect(patched.match(/^---\n[\s\S]*?\n---/)![0]).not.toMatch(/^evil:/m);
+  });
+
+  test('title with newline + fence cannot open a code block in the body', () => {
+    const a = buildAnchor({ ...base, platform: 'youtube', title: 'T\n```dataviewjs\nboom' });
+    const body = a.slice(a.match(/^---\n[\s\S]*?\n---/)![0].length);
+    expect(body).not.toContain('```');
+    expect(body).not.toContain('\nboom');
+  });
+
+  test('transcript backticks cannot open a fence', () => {
+    const s = hookSection({ url: 'https://youtu.be/abc', platform: 'youtube', endSeconds: 15, frameNames: ['f.png'], transcript: 'line1\n```dataviewjs\nboom\n```\nline2' });
+    expect(s.text).not.toContain('```');
+    expect(s.text).toContain('line1');
+    expect(s.text).toContain('line2');
+  });
+
+  test('overview label strips quotes from a quoted platform', () => {
+    const quoted = `---\ntype: video\nplatform: "youtube"\nvideo_id: "q1"\ntitle: "Bee"\ndimensions: []\n---\n\n# Bee\n`;
+    const c = mergeSection(quoted, screenshotSection(['s.png'])).content;
+    const label = c.match(/> \[!abstract\] ([^\n]*)/)![1];
+    expect(label).toContain('youtube');
+    expect(label).not.toContain('"');
+  });
+});
+
 describe('published frontmatter', () => {
   const base = { platform: 'youtube', videoId: 'x', videoUrl: 'https://y/x', title: 'T' };
 
   test('buildAnchor writes published when meta carries it', () => {
-    expect(buildAnchor({ ...base, published: '2026-07-10' })).toContain('published: 2026-07-10');
+    expect(buildAnchor({ ...base, published: '2026-07-10' })).toContain('published: "2026-07-10"');
   });
 
   test('buildAnchor omits published when absent', () => {
@@ -243,7 +282,7 @@ describe('published frontmatter', () => {
   test('ensurePublished inserts into existing frontmatter', () => {
     const content = '---\ntype: video\ntitle: "T"\n---\n\n# T\n';
     const out = ensurePublished(content, '2026-07-10');
-    expect(out).toContain('published: 2026-07-10');
+    expect(out).toContain('published: "2026-07-10"');
     expect(out.indexOf('published:')).toBeLessThan(out.indexOf('\n---\n'));
   });
 

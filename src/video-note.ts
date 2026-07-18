@@ -1,4 +1,4 @@
-import { buildVideoEmbed, sanitize, yamlString } from './util';
+import { buildVideoEmbed, inlineText, sanitize, yamlString } from './util';
 import { t, variants, LocaleKey } from './i18n';
 
 export type SectionKind = 'cover' | 'content' | 'motion' | 'screenshot';
@@ -75,7 +75,9 @@ export function hookSection(
     parts.push(p.aiResult, ``);
   } else {
     parts.push(framesBlock(p.frameNames), ``);
-    if (p.transcript) parts.push(`### ${t('note.transcript')}`, ``, p.transcript, ``);
+    // Backticks dropped so an attacker-supplied transcript can't open a fence;
+    // its newlines are legitimate content and stay.
+    if (p.transcript) parts.push(`### ${t('note.transcript')}`, ``, p.transcript.replace(/`/g, ''), ``);
     if (sop) parts.push(sopBlock(sop), ``);
   }
   return { kind: 'content', startSeconds: 0, text: parts.join('\n') };
@@ -109,14 +111,14 @@ export function screenshotSection(imageNames: string[], sop?: string, aiResult?:
 export function buildAnchor(meta: VideoNoteMeta): string {
   const today = new Date().toISOString().slice(0, 10);
   const fm = [
-    `---`, `type: video`, `platform: ${meta.platform}`,
+    `---`, `type: video`, `platform: ${yamlString(meta.platform)}`,
     `video_id: ${yamlString(meta.videoId)}`, `video_url: ${yamlString(meta.videoUrl)}`,
     `title: ${yamlString(meta.title)}`,
     ...(meta.channel ? [`channel: ${yamlString(meta.channel)}`] : []),
-    ...(meta.published ? [`published: ${meta.published}`] : []),
+    ...(meta.published ? [`published: ${yamlString(meta.published)}`] : []),
     `dimensions: []`, `analyzed_at: ${today}`, `tags: []`, `depth: normal`, `---`,
   ].join('\n');
-  return `${fm}\n\n# ${meta.title}\n`;
+  return `${fm}\n\n# ${inlineText(meta.title)}\n`;
 }
 
 // Backfill path: notes created by hook/keyframe (or an older version) have no
@@ -128,7 +130,7 @@ export function ensurePublished(content: string, published?: string | null): str
   if (end === -1) return content;
   const fm = content.slice(0, end);
   if (/^published:/m.test(fm)) return content;
-  return `${fm}\npublished: ${published}${content.slice(end)}`;
+  return `${fm}\npublished: ${yamlString(published)}${content.slice(end)}`;
 }
 
 interface ParsedSection { kind: SectionKind | null; startSeconds: number; text: string; }
@@ -169,7 +171,7 @@ function stripTrailingRule(t: string): string {
 // currently present, preserving any other preamble the user added.
 function syncOverview(head: string, frontmatter: string, dims: SectionKind[]): string {
   const channel = frontmatter.match(/^channel:\s*"?(.*?)"?\s*$/m)?.[1];
-  const platform = frontmatter.match(/^platform:\s*(.*?)\s*$/m)?.[1];
+  const platform = frontmatter.match(/^platform:\s*"?(.*?)"?\s*$/m)?.[1];
   const label = [channel, platform].filter(Boolean).join(' · ') || t('note.videoFallback');
   const overview = `> [!abstract] ${label}\n> ${dims.map((d) => `${EMOJI[d]} ${headingLabel(d)}`).join(' · ')}`;
   const cleaned = head.replace(/\n*> \[!abstract\][^\n]*(?:\n>[^\n]*)*/g, '');

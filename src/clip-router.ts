@@ -1,6 +1,6 @@
 import { ClipPayload, HookPayload, KeyframePayload, ScreenshotPayload, ThumbnailPayload } from './server';
 import { ClipRule, PluginSettings, ScreenshotClipRule, ThumbnailClipRule } from './types';
-import { sanitize, buildVideoEmbed, extractVideoId, detectPlatform, videoKey, safeFileId } from './util';
+import { sanitize, buildVideoEmbed, extractVideoId, detectPlatform, videoKey, safeFileId, inlineText } from './util';
 import { buildAnchor, ensurePublished, mergeSection, coverSection, hookSection, keyframeSection, screenshotSection, VideoNoteMeta, NewSection, headingLabel, sopBlock } from './video-note';
 import { t } from './i18n';
 
@@ -102,7 +102,7 @@ async function ensureCover(videoId: string, coverUrl: string | undefined, vaultO
 function buildScreenshotTemplate(payload: ScreenshotPayload, imageNames: string[], sopContent?: string): string {
   const imageLines = imageNames.map((n) => `> ![[${n}]]`).join('\n');
   const parts = [
-    `# Screenshot — ${payload.title}`,
+    `# Screenshot — ${inlineText(payload.title)}`,
     ``,
     t('note.source', { url: payload.url }),
     ``,
