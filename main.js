@@ -377,6 +377,7 @@ var DEFAULT_SETTINGS = {
 var LEGACY_DEFAULT_PORT = 27183;
 function normalizePort(loaded) {
   if (loaded === void 0 || loaded === LEGACY_DEFAULT_PORT) return DEFAULT_SETTINGS.httpServer.port;
+  if (!Number.isInteger(loaded) || loaded <= 1024 || loaded >= 65536) return DEFAULT_SETTINGS.httpServer.port;
   return loaded;
 }
 function emptyToDefault(loaded, defaults) {
@@ -559,6 +560,53 @@ var VaultAutopilotSettingTab = class extends import_obsidian.PluginSettingTab {
 
 // src/server.ts
 var http = __toESM(require("http"));
+
+// src/clip-validate.ts
+var ClipValidationError = class extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "ClipValidationError";
+  }
+};
+var MODES = ["thumbnail", "screenshot", "hook", "keyframe"];
+function isStringArray(v) {
+  return Array.isArray(v) && v.every((x) => typeof x === "string");
+}
+function validateClipPayload(raw) {
+  if (typeof raw !== "object" || raw === null) {
+    throw new ClipValidationError("Body must be a JSON object");
+  }
+  const p = raw;
+  if (typeof p.mode !== "string" || !MODES.includes(p.mode)) {
+    throw new ClipValidationError("Unknown or missing clip mode");
+  }
+  if (p.mode === "screenshot") {
+    if (!isStringArray(p.images)) {
+      if (typeof p.image === "string") {
+        p.images = [p.image];
+        delete p.image;
+      } else throw new ClipValidationError("screenshot requires images[]");
+    }
+    if (typeof p.url !== "string" || typeof p.title !== "string") {
+      throw new ClipValidationError("screenshot requires url and title");
+    }
+    return p;
+  }
+  if (p.mode === "thumbnail") {
+    if (typeof p.video_id !== "string" || typeof p.thumbnail_url !== "string" || typeof p.video_url !== "string") {
+      throw new ClipValidationError("thumbnail requires video_id, thumbnail_url, video_url");
+    }
+    return p;
+  }
+  if (!isStringArray(p.frames)) throw new ClipValidationError(`${p.mode} requires frames[]`);
+  if (typeof p.url !== "string") throw new ClipValidationError(`${p.mode} requires url`);
+  if (!(typeof p.video_title === "string" || p.video_title === null || p.video_title === void 0)) {
+    throw new ClipValidationError("video_title must be a string or null");
+  }
+  return p;
+}
+
+// src/server.ts
 function createServer2(port, onClip, version = "") {
   const server = http.createServer((req, res) => {
     const origin = req.headers["origin"] || "";
@@ -596,14 +644,21 @@ function createServer2(port, onClip, version = "") {
       body += chunk;
     });
     req.on("end", async () => {
+      let payload;
       try {
-        const payload = JSON.parse(body);
+        payload = validateClipPayload(JSON.parse(body));
+      } catch (err) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: false, error: err instanceof ClipValidationError ? err.message : "Invalid request body" }));
+        return;
+      }
+      try {
         const { obsidianUrl, notice } = await onClip(payload);
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ success: true, ...obsidianUrl ? { obsidianUrl } : {}, ...notice ? { notice } : {} }));
       } catch (err) {
         res.writeHead(500, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ success: false, error: String(err) }));
+        res.end(JSON.stringify({ success: false, error: "Save failed" }));
       }
     });
   });
@@ -614,6 +669,23 @@ function createServer2(port, onClip, version = "") {
 // src/util.ts
 function sanitize(str) {
   return (str || "").replace(/[/\\:*?"<>|]/g, " ").replace(/\s+/g, " ").trim().slice(0, 60);
+}
+function assertDownloadable(url) {
+  let scheme;
+  try {
+    scheme = new URL(url).protocol;
+  } catch (e) {
+    throw new Error("Invalid URL");
+  }
+  if (scheme !== "http:" && scheme !== "https:") throw new Error("Unsupported URL scheme");
+}
+function yamlString(v) {
+  const s = String(v != null ? v : "").replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/[\r\n]+/g, " ");
+  return `"${s}"`;
+}
+function safeFileId(id) {
+  const cleaned = (id || "").replace(/[^A-Za-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 64);
+  return cleaned || "cover";
 }
 function extractVideoId(url, platform) {
   const p = (platform != null ? platform : "").toLowerCase();
@@ -747,10 +819,10 @@ function buildAnchor(meta) {
     `---`,
     `type: video`,
     `platform: ${meta.platform}`,
-    `video_id: "${meta.videoId}"`,
-    `video_url: "${meta.videoUrl}"`,
-    `title: "${meta.title}"`,
-    ...meta.channel ? [`channel: "${meta.channel}"`] : [],
+    `video_id: ${yamlString(meta.videoId)}`,
+    `video_url: ${yamlString(meta.videoUrl)}`,
+    `title: ${yamlString(meta.title)}`,
+    ...meta.channel ? [`channel: ${yamlString(meta.channel)}`] : [],
     ...meta.published ? [`published: ${meta.published}`] : [],
     `dimensions: []`,
     `analyzed_at: ${today}`,
@@ -1014,7 +1086,7 @@ async function handleThumbnail(payload, rule, vaultOps, builtinSop) {
     throw new Error(t("error.videoFolderNotConfigured"));
   }
   await vaultOps.ensureFolder(rule.thumbnailFolder);
-  const thumbnailFile = `${payload.video_id}.webp`;
+  const thumbnailFile = `${safeFileId(payload.video_id)}.webp`;
   const thumbnailPath = `${rule.thumbnailFolder}/${thumbnailFile}`;
   const imgData = await vaultOps.downloadUrl(payload.thumbnail_url);
   await vaultOps.createBinary(thumbnailPath, imgData);
@@ -1048,7 +1120,7 @@ async function handleMultiFrame(payload, rule, vaultOps, searchFolder, assetFold
   await vaultOps.ensureFolder(framesDir);
   const frameNames = [];
   for (let i = 0; i < sampled.length; i++) {
-    const name = `${stem}-f${String(i + 1).padStart(2, "0")}.png`;
+    const name = `${stem}-f${String(i + 1).padStart(2, "0")}.jpg`;
     const bytes = Buffer.from(sampled[i], "base64");
     await vaultOps.createBinary(`${framesDir}/${name}`, bytes.buffer);
     frameNames.push(name);
@@ -1373,7 +1445,10 @@ var VaultAutopilotPlugin = class extends import_obsidian3.Plugin {
         return fs.readFileSync(abs, "utf8");
       },
       downloadUrl: async (url) => {
+        assertDownloadable(url);
         const resp = await (0, import_obsidian3.requestUrl)({ url, method: "GET" });
+        const MAX = 25 * 1024 * 1024;
+        if (resp.arrayBuffer.byteLength > MAX) throw new Error("Remote file too large");
         return resp.arrayBuffer;
       },
       fileExists: (p) => this.app.vault.getAbstractFileByPath(p) != null,
