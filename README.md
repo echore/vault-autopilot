@@ -2,7 +2,7 @@
 
 # Vault Autopilot
 
-Vault Autopilot receives clips from the companion Chrome extension, **[Obsidian Visual Clipper](https://github.com/echore/obsidian-visual-clipper)**, and writes them into structured notes and images in your vault — automatically, with no manual paste-and-format step.
+Vault Autopilot receives clips from the companion Chrome extension, **[Obsidian Visual Clipper](https://github.com/echore/visual-clipper)**, and writes them into structured notes and images in your vault — automatically, with no manual paste-and-format step.
 
 The plugin and the extension are a suite: the extension captures (screenshots, video covers, hooks, keyframes) from your browser; this plugin receives and files them. Neither is useful without the other.
 
@@ -20,7 +20,7 @@ The plugin and the extension are a suite: the extension captures (screenshots, v
 
 Vault Autopilot is **desktop-only** — it runs a local Node HTTP server, which is not available on Obsidian mobile.
 
-You'll also need the [Obsidian Visual Clipper](https://github.com/echore/obsidian-visual-clipper) Chrome extension installed for anything to actually reach the plugin.
+You'll also need the [Obsidian Visual Clipper](https://github.com/echore/visual-clipper) Chrome extension installed for anything to actually reach the plugin.
 
 ## Quickstart
 
