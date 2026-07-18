@@ -98,7 +98,7 @@ export function extractVideoId(url: string, platform: string | undefined): strin
     if (short) return short[1];
     const watch = url.match(/[?&]v=([a-zA-Z0-9_-]+)/);
     if (watch) return watch[1];
-    const embed = url.match(/embed\/([a-zA-Z0-9_-]+)/);
+    const embed = url.match(/(?:embed|shorts|live)\/([a-zA-Z0-9_-]+)/);
     if (embed) return embed[1];
   }
   if (p === 'bilibili' || url.includes('bilibili.com')) {

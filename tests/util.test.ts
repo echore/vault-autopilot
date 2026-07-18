@@ -92,6 +92,15 @@ describe('safeFileId', () => {
   });
 });
 
+describe('extractVideoId — Shorts and Live', () => {
+  test('shorts, live, and watch URLs for the same id collapse to one key', () => {
+    const id = 'dQw4w9WgXcQ';
+    expect(extractVideoId(`https://www.youtube.com/shorts/${id}`, 'youtube')).toBe(id);
+    expect(extractVideoId(`https://www.youtube.com/live/${id}`, 'youtube')).toBe(id);
+    expect(extractVideoId(`https://www.youtube.com/watch?v=${id}`, 'youtube')).toBe(id);
+  });
+});
+
 describe('assertDownloadable', () => {
   test('allows http and https on public CDN hosts', () => {
     expect(() => assertDownloadable('https://img.youtube.com/x.jpg')).not.toThrow();
