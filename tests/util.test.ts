@@ -1,4 +1,4 @@
-import { postProcessMarkdown, sanitize, extractVideoId, buildVideoEmbed, safeFileId } from '../src/util';
+import { postProcessMarkdown, sanitize, extractVideoId, buildVideoEmbed, safeFileId, assertDownloadable } from '../src/util';
 
 describe('postProcessMarkdown', () => {
   test('wraps bare 6-digit hex codes in backticks', () => {
@@ -84,6 +84,18 @@ describe('safeFileId', () => {
   test('never returns empty', () => {
     expect(safeFileId('')).toBe('cover');
     expect(safeFileId('///')).toBe('cover');
+  });
+});
+
+describe('assertDownloadable', () => {
+  test('allows http and https', () => {
+    expect(() => assertDownloadable('https://img.youtube.com/x.jpg')).not.toThrow();
+    expect(() => assertDownloadable('http://localhost/x.jpg')).not.toThrow();
+  });
+  test('rejects file: and data: and others', () => {
+    expect(() => assertDownloadable('file:///etc/passwd')).toThrow();
+    expect(() => assertDownloadable('data:text/html,x')).toThrow();
+    expect(() => assertDownloadable('ftp://x/y')).toThrow();
   });
 });
 

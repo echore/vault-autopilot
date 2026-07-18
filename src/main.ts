@@ -9,6 +9,7 @@ import { routeClip, VaultOps } from './clip-router';
 import { SopInstallOps, builtinSopFor } from './bundled-sops';
 import { GalleryView, GALLERY_VIEW_TYPE } from './gallery-view';
 import { t, setLanguage } from './i18n';
+import { assertDownloadable } from './util';
 
 export default class VaultAutopilotPlugin extends Plugin {
   settings: PluginSettings = DEFAULT_SETTINGS;
@@ -132,7 +133,10 @@ export default class VaultAutopilotPlugin extends Plugin {
         return fs.readFileSync(abs, 'utf8');
       },
       downloadUrl: async (url) => {
+        assertDownloadable(url);
         const resp = await requestUrl({ url, method: 'GET' });
+        const MAX = 25 * 1024 * 1024; // 25 MB — covers/thumbnails are far smaller
+        if (resp.arrayBuffer.byteLength > MAX) throw new Error('Remote file too large');
         return resp.arrayBuffer;
       },
       fileExists: (p) => this.app.vault.getAbstractFileByPath(p) != null,

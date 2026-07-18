@@ -8,6 +8,14 @@ export function sanitize(str: string): string {
   return (str || '').replace(/[/\\:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
 }
 
+// Guard for URLs we fetch on behalf of the client (covers, thumbnails): only
+// real web schemes, so a crafted payload can't reach file:/data:/ftp: etc.
+export function assertDownloadable(url: string): void {
+  let scheme: string;
+  try { scheme = new URL(url).protocol; } catch { throw new Error('Invalid URL'); }
+  if (scheme !== 'http:' && scheme !== 'https:') throw new Error('Unsupported URL scheme');
+}
+
 // A safe double-quoted YAML scalar for an untrusted value: backslash and quote
 // are escaped, newlines flattened to spaces so frontmatter stays one line/key.
 export function yamlString(v: string): string {
