@@ -48,11 +48,17 @@ describe('createServer', () => {
     expect(res.headers.get('access-control-allow-origin')).toBe('chrome-extension://test');
   });
 
-  test('handler error returns 500', async () => {
+  test('handler error returns generic 500', async () => {
     handler.mockRejectedValue(new Error('disk error'));
     const { status, body } = await request('POST', '/clip', { mode: 'screenshot', images: ['x'], url: '', title: '' });
     expect(status).toBe(500);
-    expect(body.error).toContain('disk error');
+    expect(body.error).toBe('Save failed');
+  });
+
+  test('invalid body returns 400', async () => {
+    const { status, body } = await request('POST', '/clip', { mode: 'nope' });
+    expect(status).toBe(400);
+    expect(body.success).toBe(false);
   });
 
   test('unknown route returns 404', async () => {

@@ -1,8 +1,10 @@
 import * as http from 'http';
+import { validateClipPayload, ClipValidationError } from './clip-validate';
 
 export type ScreenshotPayload = {
   mode: 'screenshot';
   images: string[];
+  image?: string;       // legacy single-shot field; normalized to images[] on ingest
   url: string;
   title: string;
   cover_url?: string;
@@ -12,7 +14,7 @@ export type HookPayload = {
   mode: 'hook';
   frames: string[];
   transcript?: string;
-  video_title: string;
+  video_title: string | null;
   channel?: string;
   platform?: string;
   url: string;
@@ -25,7 +27,7 @@ export type HookPayload = {
 export type KeyframePayload = {
   mode: 'keyframe';
   frames: string[];
-  video_title: string;
+  video_title: string | null;
   url: string;
   time_range: { start: number; end: number };
   captured_at: string;
@@ -95,14 +97,21 @@ export function createServer(port: number, onClip: ClipHandler, version = ''): h
       body += chunk;
     });
     req.on('end', async () => {
+      let payload: ClipPayload;
       try {
-        const payload = JSON.parse(body) as ClipPayload;
+        payload = validateClipPayload(JSON.parse(body));
+      } catch (err) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err instanceof ClipValidationError ? err.message : 'Invalid request body' }));
+        return;
+      }
+      try {
         const { obsidianUrl, notice } = await onClip(payload);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true, ...(obsidianUrl ? { obsidianUrl } : {}), ...(notice ? { notice } : {}) }));
       } catch (err) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: false, error: String(err) }));
+        res.end(JSON.stringify({ success: false, error: 'Save failed' }));
       }
     });
   });
