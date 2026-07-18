@@ -1,4 +1,5 @@
 import { routeClip, VaultOps } from '../src/clip-router';
+import { makeSerialQueue } from '../src/util';
 import { ClipRule, ScreenshotClipRule, ThumbnailClipRule } from '../src/types';
 import { ClipPayload } from '../src/server';
 import { setLanguage } from '../src/i18n';
@@ -569,6 +570,75 @@ describe('routeClip — built-in SOP fallback', () => {
     await routeClip(payload, clipRules, vaultOps, { thumbnail: '# Built-in cover SOP' });
     const [, noteContent] = (vaultOps.create as jest.Mock).mock.calls[0];
     expect(noteContent).toContain('# Built-in cover SOP');
+  });
+});
+
+// ── concurrent clips ──────────────────────────────────────────────────────────
+
+describe('routeClip — concurrent clips for the same video', () => {
+  function makeStoreVaultOps() {
+    const files = new Map<string, string>();
+    const delay = () => new Promise((r) => setTimeout(r, 10));
+    const ops = makeVaultOps();
+    (ops.listMarkdownFiles as jest.Mock).mockImplementation(() => Array.from(files.keys()));
+    (ops.read as jest.Mock).mockImplementation(async (p: string) => { await delay(); return files.get(p) ?? ''; });
+    (ops.create as jest.Mock).mockImplementation(async (p: string, c: string) => { files.set(p, c); });
+    (ops.modify as jest.Mock).mockImplementation(async (p: string, c: string) => { await delay(); files.set(p, c); });
+    return { ops, files };
+  }
+
+  const existing = [
+    `---`, `type: video`, `video_id: "abc123"`, `dimensions: [封面标题]`, `---`,
+    ``, `# My Video`, ``, `## 🖼️ 封面标题`, `分析内容`,
+  ].join('\n');
+
+  const hookPayload: ClipPayload = {
+    mode: 'hook', frames: [Buffer.from('f1').toString('base64')], video_title: 'My Video',
+    url: 'https://www.youtube.com/watch?v=abc123', captured_at: '2026-05-31T00:00:00Z',
+  };
+  const kfPayload: ClipPayload = {
+    mode: 'keyframe', frames: [Buffer.from('f2').toString('base64')], video_title: 'My Video',
+    url: 'https://www.youtube.com/watch?v=abc123', time_range: { start: 10, end: 20 },
+    captured_at: '2026-05-31T00:00:00Z',
+  };
+  const rules = { ...clipRules, hook: { ...hookClipRule, sopPath: '' }, keyframe: { ...keyframeClipRule, sopPath: '' } };
+
+  test('two clips fired together both land when serialized through the queue', async () => {
+    const { ops, files } = makeStoreVaultOps();
+    files.set('Content Creation/Great Videos/note.md', existing);
+    const enqueue = makeSerialQueue();
+    await Promise.all([
+      enqueue(() => routeClip(hookPayload, rules, ops)),
+      enqueue(() => routeClip(kfPayload, rules, ops)),
+    ]);
+    const note = files.get('Content Creation/Great Videos/note.md')!;
+    expect(note).toContain('## 🎬 内容');
+    expect(note).toContain('## ✨ 动效');
+  });
+
+  test('two clips for the same NEW video create one note, not a create collision', async () => {
+    const { ops, files } = makeStoreVaultOps();
+    const enqueue = makeSerialQueue();
+    await Promise.all([
+      enqueue(() => routeClip(hookPayload, rules, ops)),
+      enqueue(() => routeClip(kfPayload, rules, ops)),
+    ]);
+    const notes = Array.from(files.keys()).filter((p) => p.endsWith('.md'));
+    expect(notes).toHaveLength(1);
+    const note = files.get(notes[0])!;
+    expect(note).toContain('## 🎬 内容');
+    expect(note).toContain('## ✨ 动效');
+  });
+
+  test('a failing clip does not block the next one in the queue', async () => {
+    const { ops, files } = makeStoreVaultOps();
+    files.set('Content Creation/Great Videos/note.md', existing);
+    const enqueue = makeSerialQueue();
+    const bad = enqueue(() => Promise.reject(new Error('boom')));
+    const good = enqueue(() => routeClip(kfPayload, rules, ops));
+    await expect(bad).rejects.toThrow('boom');
+    await good;
+    expect(files.get('Content Creation/Great Videos/note.md')!).toContain('## ✨ 动效');
   });
 });
 

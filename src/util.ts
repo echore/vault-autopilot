@@ -1,5 +1,17 @@
 import { t } from './i18n';
 
+// Serializes async tasks: each runs only after the previous settles, so two
+// in-flight clips can't interleave their read-modify-write on the same note.
+// A rejection reaches its own caller but never poisons the chain.
+export function makeSerialQueue(): <T>(task: () => Promise<T>) => Promise<T> {
+  let tail: Promise<unknown> = Promise.resolve();
+  return (task) => {
+    const result = tail.then(task, task);
+    tail = result.catch(() => undefined);
+    return result;
+  };
+}
+
 export function postProcessMarkdown(md: string): string {
   return md.replace(/(?<!`)(#[0-9A-Fa-f]{6}|#[0-9A-Fa-f]{3})\b(?!`)/g, '`$1`');
 }

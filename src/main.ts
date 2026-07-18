@@ -9,11 +9,14 @@ import { routeClip, VaultOps } from './clip-router';
 import { SopInstallOps, builtinSopFor } from './bundled-sops';
 import { GalleryView, GALLERY_VIEW_TYPE } from './gallery-view';
 import { t, setLanguage } from './i18n';
-import { assertDownloadable } from './util';
+import { assertDownloadable, makeSerialQueue } from './util';
 
 export default class VaultAutopilotPlugin extends Plugin {
   settings: PluginSettings = DEFAULT_SETTINGS;
   private server: http.Server | null = null;
+  // Double-clicks / extension retries race their read-modify-write on the same
+  // note; every clip goes through this queue so only one is in flight at a time.
+  private enqueueClip = makeSerialQueue();
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -165,14 +168,14 @@ export default class VaultAutopilotPlugin extends Plugin {
     };
     this.server = createServer(
       port,
-      async (payload) => {
+      (payload) => this.enqueueClip(async () => {
         const { notePath, notice } = await routeClip(payload, this.settings.clipRules, vaultOps, this.builtinSops());
         if (notePath) await this.maybeFirstSaveNotice(payload.mode, notePath);
         const obsidianUrl = notePath
           ? `obsidian://open?vault=${encodeURIComponent(this.app.vault.getName())}&file=${encodeURIComponent(notePath)}`
           : undefined;
         return { obsidianUrl, notice };
-      },
+      }),
       this.manifest.version,
     );
     this.server.on('error', (err: NodeJS.ErrnoException) => {
