@@ -185,7 +185,7 @@ describe('routeClip — manual mode (hook)', () => {
     await routeClip(payload, manualClipRules, vaultOps);
     expect(vaultOps.createBinary).toHaveBeenCalledTimes(3);
     expect(vaultOps.createBinary).toHaveBeenCalledWith(
-      expect.stringMatching(/Assets\/images\/hook-.+-f01\.png/),
+      expect.stringMatching(/Assets\/images\/hook-.+-f01\.jpg/),
       expect.any(ArrayBuffer),
     );
   });

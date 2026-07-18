@@ -236,7 +236,7 @@ async function handleMultiFrame(
   await vaultOps.ensureFolder(framesDir);
   const frameNames: string[] = [];
   for (let i = 0; i < sampled.length; i++) {
-    const name = `${stem}-f${String(i + 1).padStart(2, '0')}.png`;
+    const name = `${stem}-f${String(i + 1).padStart(2, '0')}.jpg`;
     const bytes = Buffer.from(sampled[i], 'base64');
     await vaultOps.createBinary(`${framesDir}/${name}`, bytes.buffer as ArrayBuffer);
     frameNames.push(name);
