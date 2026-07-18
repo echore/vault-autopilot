@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.1
+
+- Security hardening for the local `/clip` endpoint: payloads are validated and normalized before anything touches the vault. Malformed bodies and unknown modes now get a safe 400 response, and error responses no longer leak internal details.
+- Untrusted video ids are sanitized before becoming vault file names, so a crafted id cannot escape the covers folder.
+- Note frontmatter values (title, channel, urls) are escaped, so quotes or newlines in a video title can no longer corrupt a note's YAML.
+- Cover and thumbnail downloads are restricted to http(s) URLs with a 25 MB size cap.
+- An out of range port value in saved settings now falls back to the default 17183.
+- Video frames are saved with a `.jpg` extension matching their actual JPEG bytes; screenshots stay `.png`.
+- Docs: the network use disclosure now spells out why the local endpoint is unauthenticated and what the worst case is.
+
 ## 0.4.0
 
 - Video notes now carry the video's original publish date (`published_at`) in frontmatter; existing notes are backfilled on the next upsert from the same video.
