@@ -121,6 +121,8 @@ describe('assertDownloadable', () => {
     expect(() => assertDownloadable('http://127.0.0.1:8080/x')).toThrow();
     expect(() => assertDownloadable('http://127.8.9.10/x')).toThrow();
     expect(() => assertDownloadable('http://[::1]/x')).toThrow();
+    expect(() => assertDownloadable('http://localhost./x')).toThrow(); // FQDN trailing dot
+    expect(() => assertDownloadable('http://printer.local./x')).toThrow();
     expect(() => assertDownloadable('http://0x7f000001/x')).toThrow(); // URL-normalized to 127.0.0.1
     expect(() => assertDownloadable('http://[::ffff:127.0.0.1]/x')).toThrow();
   });

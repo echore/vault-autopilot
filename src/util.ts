@@ -26,7 +26,7 @@ export function sanitize(str: string): string {
 // IPs are accepted — DNS-rebinding protection is out of scope for a desktop
 // plugin talking to public CDNs.
 function isPrivateHost(hostname: string): boolean {
-  let h = hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  let h = hostname.replace(/^\[|\]$/g, '').toLowerCase().replace(/\.$/, '');
   if (h === 'localhost' || h.endsWith('.local')) return true;
   if (h.startsWith('::ffff:')) {
     // IPv4-mapped IPv6; the URL parser serializes it as hex groups
