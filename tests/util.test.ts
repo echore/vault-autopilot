@@ -93,14 +93,43 @@ describe('safeFileId', () => {
 });
 
 describe('assertDownloadable', () => {
-  test('allows http and https', () => {
+  test('allows http and https on public CDN hosts', () => {
     expect(() => assertDownloadable('https://img.youtube.com/x.jpg')).not.toThrow();
-    expect(() => assertDownloadable('http://localhost/x.jpg')).not.toThrow();
+    expect(() => assertDownloadable('https://i.ytimg.com/vi/x/hq.jpg')).not.toThrow();
+    expect(() => assertDownloadable('http://i0.hdslb.com/bfs/archive/x.jpg')).not.toThrow();
   });
   test('rejects file: and data: and others', () => {
     expect(() => assertDownloadable('file:///etc/passwd')).toThrow();
     expect(() => assertDownloadable('data:text/html,x')).toThrow();
     expect(() => assertDownloadable('ftp://x/y')).toThrow();
+  });
+  // The /clip endpoint is CSRF-reachable, so thumbnail_url is attacker-influenced;
+  // literal private/loopback/link-local hosts must never be fetched. (Hostnames
+  // that merely RESOLVE to private IPs are accepted — DNS-rebinding protection
+  // is deliberately out of scope for a desktop plugin.)
+  test('rejects loopback and localhost literals', () => {
+    expect(() => assertDownloadable('http://localhost/x.jpg')).toThrow();
+    expect(() => assertDownloadable('http://127.0.0.1:8080/x')).toThrow();
+    expect(() => assertDownloadable('http://127.8.9.10/x')).toThrow();
+    expect(() => assertDownloadable('http://[::1]/x')).toThrow();
+    expect(() => assertDownloadable('http://0x7f000001/x')).toThrow(); // URL-normalized to 127.0.0.1
+    expect(() => assertDownloadable('http://[::ffff:127.0.0.1]/x')).toThrow();
+  });
+  test('rejects private and link-local ranges', () => {
+    expect(() => assertDownloadable('http://10.1.2.3/x')).toThrow();
+    expect(() => assertDownloadable('http://172.16.0.1/x')).toThrow();
+    expect(() => assertDownloadable('http://172.31.255.255/x')).toThrow();
+    expect(() => assertDownloadable('http://192.168.1.5/x')).toThrow();
+    expect(() => assertDownloadable('http://169.254.169.254/latest/meta-data/')).toThrow();
+    expect(() => assertDownloadable('http://0.0.0.0/x')).toThrow();
+    expect(() => assertDownloadable('http://[fc00::1]/x')).toThrow();
+    expect(() => assertDownloadable('http://[fe80::1]/x')).toThrow();
+    expect(() => assertDownloadable('http://printer.local/x')).toThrow();
+  });
+  test('near-miss public addresses stay allowed', () => {
+    expect(() => assertDownloadable('http://172.32.1.1/x')).not.toThrow();
+    expect(() => assertDownloadable('http://11.0.0.1/x')).not.toThrow();
+    expect(() => assertDownloadable('http://192.169.0.1/x')).not.toThrow();
   });
 });
 

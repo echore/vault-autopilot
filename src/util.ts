@@ -20,12 +20,50 @@ export function sanitize(str: string): string {
   return (str || '').replace(/[/\\:*?"<>|#^\[\]]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
 }
 
+// Literal private/loopback/link-local hosts. The WHATWG URL parser already
+// canonicalizes hex/octal/integer IPv4 forms (0x7f000001 → 127.0.0.1), so the
+// dotted-decimal check covers those. Hostnames that merely RESOLVE to private
+// IPs are accepted — DNS-rebinding protection is out of scope for a desktop
+// plugin talking to public CDNs.
+function isPrivateHost(hostname: string): boolean {
+  let h = hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  if (h === 'localhost' || h.endsWith('.local')) return true;
+  if (h.startsWith('::ffff:')) {
+    // IPv4-mapped IPv6; the URL parser serializes it as hex groups
+    // ([::ffff:127.0.0.1] → ::ffff:7f00:1), so decode back to dotted form.
+    const rest = h.slice(7);
+    const hex = rest.match(/^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+    if (hex) {
+      const hi = parseInt(hex[1], 16);
+      const lo = parseInt(hex[2], 16);
+      h = `${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`;
+    } else {
+      h = rest;
+    }
+  }
+  const v4 = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (v4) {
+    const a = Number(v4[1]);
+    const b = Number(v4[2]);
+    return a === 0 || a === 10 || a === 127 ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 169 && b === 254);
+  }
+  if (h.includes(':')) {
+    return h === '::1' || h === '::' || /^f[cd]/.test(h) || /^fe[89ab]/.test(h);
+  }
+  return false;
+}
+
 // Guard for URLs we fetch on behalf of the client (covers, thumbnails): only
-// real web schemes, so a crafted payload can't reach file:/data:/ftp: etc.
+// real web schemes to public hosts, so a crafted payload can't reach
+// file:/data:/ftp: or pivot the plugin into localhost / LAN / cloud metadata.
 export function assertDownloadable(url: string): void {
-  let scheme: string;
-  try { scheme = new URL(url).protocol; } catch { throw new Error('Invalid URL'); }
-  if (scheme !== 'http:' && scheme !== 'https:') throw new Error('Unsupported URL scheme');
+  let parsed: URL;
+  try { parsed = new URL(url); } catch { throw new Error('Invalid URL'); }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error('Unsupported URL scheme');
+  if (isPrivateHost(parsed.hostname)) throw new Error('Blocked host');
 }
 
 // A safe double-quoted YAML scalar for an untrusted value: backslash and quote
