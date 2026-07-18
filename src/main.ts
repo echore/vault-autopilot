@@ -64,9 +64,13 @@ export default class VaultAutopilotPlugin extends Plugin {
   }
 
   restartServer(): void {
-    this.server?.close();
+    const start = () => { if (this.settings.httpServer.enabled) this.startServer(); };
+    const old = this.server;
     this.server = null;
-    if (this.settings.httpServer.enabled) this.startServer();
+    // Rebind only after the old socket has fully closed; starting on the same
+    // tick races the close and hits EADDRINUSE on the same port.
+    if (old) old.close(() => start());
+    else start();
   }
 
   private async ensureFolder(folderPath: string): Promise<void> {
@@ -179,9 +183,13 @@ export default class VaultAutopilotPlugin extends Plugin {
       this.manifest.version,
     );
     this.server.on('error', (err: NodeJS.ErrnoException) => {
-      if (err.code === 'EADDRINUSE') {
-        new Notice(t('notice.portInUse', { port }), 10000);
-      }
+      // A failed listen leaves a dead server; drop the reference so /ping and
+      // clips report honestly and the next toggle/restart can rebind.
+      this.server = null;
+      new Notice(
+        err.code === 'EADDRINUSE' ? t('notice.portInUse', { port }) : t('notice.serverError', { port }),
+        10000,
+      );
     });
   }
 }
