@@ -1,7 +1,7 @@
 {
   "id": "vault-autopilot",
   "name": "Vault Autopilot",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "minAppVersion": "1.4.0",
   "description": "Receive screenshots and video frames from the Obsidian Visual Clipper Chrome extension over a local port and write structured notes into your vault.",
   "author": "liyachen",

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0
+
+- Video notes now carry the video's original publish date (`published_at`) in frontmatter; existing notes are backfilled on the next upsert from the same video.
+- Gallery cards show the publish date, falling back to the clip date when the platform does not expose one.
+- The 16:9 wide-embed fix now also applies in Live Preview, not only Reading view.
+- Bundled analysis SOPs (cover, hook, keyframe) synced with the latest rewritten vault versions.
+
 ## 0.3.0
 
 - Video library gallery: a ribbon icon opens a native cover-card view of every video note, no Dataview or CSS snippets needed. Filter chips are data driven: platforms (when more than one), analysis dimensions (localized), deep dives (when present), and frequent creators. Cards open their notes; the view refreshes as new clips arrive.
