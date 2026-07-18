@@ -126,7 +126,9 @@ export default class VaultAutopilotPlugin extends Plugin {
       create: async (p, content) => { await this.app.vault.create(p, content); },
       readFileSync: (p) => {
         // sopPath accepts both absolute paths and vault-relative ones (the
-        // Customize button fills vault-relative paths).
+        // Customize button fills vault-relative paths). Absolute paths may
+        // point outside the vault, which the Vault API cannot read — hence
+        // Node fs instead of this.app.vault.adapter.
         const abs = nodePath.isAbsolute(p)
           ? p
           : nodePath.join((this.app.vault.adapter as FileSystemAdapter).getBasePath(), p);

@@ -42,7 +42,7 @@
 .vap-img-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
 .vap-body { padding: 10px 12px 12px; }
-.vap-creator { font-size: 11px; color: #e05a2b; font-weight: 500; display: block; margin-bottom: 4px; }
+.vap-creator { font-size: 11px; color: var(--color-orange); font-weight: 500; display: block; margin-bottom: 4px; }
 .vap-title {
   font-size: 13px; font-weight: 600; line-height: 1.4; margin-bottom: 6px;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
@@ -52,17 +52,17 @@
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .vap-footer { display: flex; justify-content: space-between; }
-.vap-views { font-size: 11px; color: #22863a; font-weight: 500; }
+.vap-views { font-size: 11px; color: var(--color-green); font-weight: 500; }
 .vap-date { font-size: 11px; color: var(--text-faint); }
 
 .vap-deep-badge {
   position: absolute; top: 7px; left: 7px;
   font-size: 10px; font-weight: 600;
-  background: #6c3fcc; color: white;
+  background: var(--interactive-accent); color: var(--text-on-accent);
   padding: 2px 7px; border-radius: 4px;
   pointer-events: none;
 }
-.vap-card-deep { border-left: 3px solid #6c3fcc; }
+.vap-card-deep { border-left: 3px solid var(--interactive-accent); }
 
 /* Video embeds the plugin writes into notes render wide at 16:9 instead of
    the cramped default. Scoped to the two platforms we embed.
