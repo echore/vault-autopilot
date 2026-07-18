@@ -1,4 +1,4 @@
-import { buildVideoEmbed, sanitize } from './util';
+import { buildVideoEmbed, sanitize, yamlString } from './util';
 import { t, variants, LocaleKey } from './i18n';
 
 export type SectionKind = 'cover' | 'content' | 'motion' | 'screenshot';
@@ -110,9 +110,9 @@ export function buildAnchor(meta: VideoNoteMeta): string {
   const today = new Date().toISOString().slice(0, 10);
   const fm = [
     `---`, `type: video`, `platform: ${meta.platform}`,
-    `video_id: "${meta.videoId}"`, `video_url: "${meta.videoUrl}"`,
-    `title: "${meta.title}"`,
-    ...(meta.channel ? [`channel: "${meta.channel}"`] : []),
+    `video_id: ${yamlString(meta.videoId)}`, `video_url: ${yamlString(meta.videoUrl)}`,
+    `title: ${yamlString(meta.title)}`,
+    ...(meta.channel ? [`channel: ${yamlString(meta.channel)}`] : []),
     ...(meta.published ? [`published: ${meta.published}`] : []),
     `dimensions: []`, `analyzed_at: ${today}`, `tags: []`, `depth: normal`, `---`,
   ].join('\n');

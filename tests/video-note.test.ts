@@ -1,8 +1,24 @@
 import { buildAnchor, ensurePublished, mergeSection, coverSection, hookSection, keyframeSection, screenshotSection, VideoNoteMeta } from '../src/video-note';
+import { yamlString } from '../src/util';
 import { setLanguage } from '../src/i18n';
 
 beforeEach(() => setLanguage('zh'));
 afterEach(() => setLanguage('en'));
+
+describe('yamlString', () => {
+  test('quotes and escapes double quotes', () => {
+    expect(yamlString('He said "hi"')).toBe('"He said \\"hi\\""');
+  });
+  test('escapes newlines to spaces', () => {
+    expect(yamlString('line1\nline2')).toBe('"line1 line2"');
+  });
+});
+
+test('buildAnchor keeps valid frontmatter when title has quotes', () => {
+  const fm = buildAnchor({ platform: 'youtube', videoId: 'abc', videoUrl: 'https://y.com', title: 'A "quoted" title' });
+  const body = fm.split('\n---')[0];
+  expect(body).toContain('title: "A \\"quoted\\" title"');
+});
 
 test('screenshot sections sort after 动效 and renumber ①②', () => {
   let c = buildAnchor({ platform: 'youtube', videoId: 'abc123', videoUrl: 'https://www.youtube.com/watch?v=abc123', title: 'Bee' });

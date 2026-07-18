@@ -8,6 +8,13 @@ export function sanitize(str: string): string {
   return (str || '').replace(/[/\\:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
 }
 
+// A safe double-quoted YAML scalar for an untrusted value: backslash and quote
+// are escaped, newlines flattened to spaces so frontmatter stays one line/key.
+export function yamlString(v: string): string {
+  const s = String(v ?? '').replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/[\r\n]+/g, ' ');
+  return `"${s}"`;
+}
+
 // A vault filename component derived from an untrusted id. Only word chars,
 // dash and underscore survive; runs of anything else collapse to a single dash.
 // Guarantees a non-empty, path-separator-free result.
