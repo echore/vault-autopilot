@@ -96,6 +96,10 @@ export function createServer(port: number, onClip: ClipHandler, version = ''): h
       }
       body += chunk;
     });
+    // A client abort mid-body emits 'error'; without a listener Node throws it
+    // as an uncaught exception (renderer console noise). Nothing to respond to —
+    // the socket is already gone.
+    req.on('error', () => { /* client went away */ });
     req.on('end', async () => {
       let payload: ClipPayload;
       try {

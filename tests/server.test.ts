@@ -101,6 +101,23 @@ describe('createServer', () => {
     expect(handler).toHaveBeenCalledWith(payload);
   });
 
+  test('an error on the request stream does not crash the server', async () => {
+    // A client abort mid-body emits 'error' on the server's IncomingMessage.
+    // Without a listener that throws as an uncaught exception. Emit it directly
+    // on the real req so the reproduction is deterministic, and assert nothing
+    // throws and the server still answers.
+    const gotError = new Promise<void>((resolve) => {
+      server.once('request', (req) => {
+        req.on('data', () => {});
+        setImmediate(() => { req.emit('error', new Error('ECONNRESET')); resolve(); });
+      });
+    });
+    fetch(`http://127.0.0.1:${PORT}/clip`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"mode":"screenshot"' }).catch(() => {});
+    await gotError;
+    const { status } = await request('GET', '/ping');
+    expect(status).toBe(200);
+  });
+
   test('GET /ping returns app identity and version', async () => {
     const { status, body } = await request('GET', '/ping');
     expect(status).toBe(200);
