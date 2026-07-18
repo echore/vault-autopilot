@@ -31,6 +31,11 @@ describe('sanitize', () => {
   test('returns empty string for undefined input', () => {
     expect(sanitize(undefined as any)).toBe('');
   });
+  test('strips Obsidian-reserved chars [ ] # ^ common in video titles', () => {
+    expect(sanitize('[Official Video] Song')).toBe('Official Video Song');
+    expect(sanitize('C# tutorial')).toBe('C tutorial');
+    expect(sanitize('Video [4K] ^best^')).toBe('Video 4K best');
+  });
 });
 
 describe('extractVideoId', () => {

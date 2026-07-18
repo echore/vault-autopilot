@@ -5,7 +5,7 @@ export function postProcessMarkdown(md: string): string {
 }
 
 export function sanitize(str: string): string {
-  return (str || '').replace(/[/\\:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
+  return (str || '').replace(/[/\\:*?"<>|#^\[\]]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
 }
 
 // Guard for URLs we fetch on behalf of the client (covers, thumbnails): only
