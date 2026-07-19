@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.3
+
+Obsidian plugin review fixes. No functional changes.
+
+- Remove "Obsidian" from the manifest description per plugin guidelines.
+- Await `workspace.revealLeaf()` (async since Obsidian 1.7.2) and raise `minAppVersion` to 1.7.2 accordingly.
+- Replace inline style assignments in the settings tab with a CSS class (identical appearance).
+
 ## 0.4.2
 
 Pre-submission audit fixes. No changes to the extension↔plugin `/clip` contract.
