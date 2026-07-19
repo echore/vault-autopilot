@@ -281,9 +281,7 @@ export class VaultAutopilotSettingTab extends PluginSettingTab {
             this.display();
           }));
       }
-      const stateEl = setting.infoEl.createDiv();
-      stateEl.style.fontSize = '12px';
-      stateEl.style.marginTop = '4px';
+      const stateEl = setting.infoEl.createDiv({ cls: 'vault-autopilot-sop-state' });
       sopStateEls[row.mode] = stateEl;
     }
     refreshSopStates();

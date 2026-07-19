@@ -29,7 +29,7 @@ export default class VaultAutopilotPlugin extends Plugin {
 
   async activateGallery(): Promise<void> {
     const existing = this.app.workspace.getLeavesOfType(GALLERY_VIEW_TYPE)[0];
-    if (existing) { this.app.workspace.revealLeaf(existing); return; }
+    if (existing) { await this.app.workspace.revealLeaf(existing); return; }
     const leaf = this.app.workspace.getLeaf(true);
     await leaf.setViewState({ type: GALLERY_VIEW_TYPE, active: true });
   }
