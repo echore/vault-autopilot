@@ -552,9 +552,7 @@ var VaultAutopilotSettingTab = class extends import_obsidian.PluginSettingTab {
           this.display();
         }));
       }
-      const stateEl = setting.infoEl.createDiv();
-      stateEl.style.fontSize = "12px";
-      stateEl.style.marginTop = "4px";
+      const stateEl = setting.infoEl.createDiv({ cls: "vault-autopilot-sop-state" });
       sopStateEls[row.mode] = stateEl;
     }
     refreshSopStates();
@@ -1421,7 +1419,7 @@ var VaultAutopilotPlugin = class extends import_obsidian3.Plugin {
   async activateGallery() {
     const existing = this.app.workspace.getLeavesOfType(GALLERY_VIEW_TYPE)[0];
     if (existing) {
-      this.app.workspace.revealLeaf(existing);
+      await this.app.workspace.revealLeaf(existing);
       return;
     }
     const leaf = this.app.workspace.getLeaf(true);
