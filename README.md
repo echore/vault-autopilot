@@ -1,4 +1,4 @@
-**English** | [简体中文](README.zh.md)
+**English** | [简体中文](https://github.com/echore/vault-autopilot/blob/master/README.zh.md)
 
 # Vault Autopilot
 
