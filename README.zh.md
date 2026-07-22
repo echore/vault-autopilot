@@ -14,13 +14,11 @@ Vault Autopilot 配合配套的 Chrome 扩展 **[Obsidian Visual Clipper](https:
 
 ## 安装
 
-**社区插件市场**（推荐，上架后可用）：打开 Obsidian → 设置 → 社区插件 → 浏览 → 搜索 "Vault Autopilot" → 安装 → 启用。
-
-**通过 BRAT 安装**（市场上架前的临时方案）：安装 [BRAT](https://github.com/TfTHacker/obsidian42-brat) 插件，然后用 "Add a beta plugin" 添加本仓库地址。
+**社区插件市场**（推荐）：打开 Obsidian → 设置 → 社区插件 → 浏览 → 搜索 "Vault Autopilot" → 安装 → 启用。
 
 Vault Autopilot **仅支持桌面端**——它会启动一个本机 Node HTTP 服务，Obsidian 移动端不支持本地服务，因此不可用。
 
-要让剪藏内容真正到达插件，还需要安装 [Obsidian Visual Clipper](https://github.com/liyachen/obsidian-visual-clipper) Chrome 扩展。
+要让剪藏内容真正到达插件，还需要安装 [Obsidian Visual Clipper](https://github.com/echore/visual-clipper) Chrome 扩展。
 
 ## 快速上手
 

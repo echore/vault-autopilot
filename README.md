@@ -14,9 +14,7 @@ The plugin and the extension are a suite: the extension captures (screenshots, v
 
 ## Install
 
-**Community plugin store** (recommended, once listed): open Obsidian → Settings → Community plugins → Browse → search "Vault Autopilot" → Install → Enable.
-
-**Via BRAT (while the store listing is pending):** install the [BRAT](https://github.com/TfTHacker/obsidian42-brat) plugin, then use "Add a beta plugin" and point it at this repository.
+**Community plugin store** (recommended): open Obsidian → Settings → Community plugins → Browse → search "Vault Autopilot" → Install → Enable.
 
 Vault Autopilot is **desktop-only** — it runs a local Node HTTP server, which is not available on Obsidian mobile.
 
